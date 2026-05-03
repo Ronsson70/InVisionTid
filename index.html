@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="In Vision Tid">
+<meta name="theme-color" content="#F1EBDE">
+<title>In Vision Tid</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiSW4gVmlzaW9uIFRpZCIsInNob3J0X25hbWUiOiJJViBUaWQiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiI0ZBRjlGNiIsInRoZW1lX2NvbG9yIjoiIzNENDA1QiIsImljb25zIjpbeyJzcmMiOiJkYXRhOmltYWdlL3N2Zyt4bWw7YmFzZTY0LFBITjJaeUI0Yld4dWN6MGlhSFIwY0RvdkwzZDNkeTUzTXk1dmNtY3ZNakF3TUM5emRtY2lJSFpwWlhkQ2IzZzlJakFnTUNBeE9USWdNVGt5SWo0OGNtVmpkQ0IzYVdSMGFEMGlNVGt5SWlCb1pXbG5hSFE5SWpFNU1pSWdjbmc5SWpRd0lpQm1hV3hzUFNJak0wUTBNRFZDSWk4K1BIUmxlSFFnZUQwaU9UWWlJSGs5SWprMklpQm1iMjUwTFdaaGJXbHNlVDBpYzNsemRHVnRMWFZwSWlCbWIyNTBMWE5wZW1VOUlqWXdJaUJtYVd4c1BTSjNhR2wwWlNJZ2RHVjRkQzFoYm1Ob2IzSTlJbTFwWkdSc1pTSWdaSGt1UFNJdU0yVnRJajdrOFRYOFBDOTBaWGgwUGp3dmMzWm5QZz09Iiwic2l6ZXMiOiIxOTJ4MTkyIiwidHlwZSI6ImltYWdlL3N2Zyt4bWwifV19">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--sage:#5E7368;--sage-dark:#3A4B3E;--sage-deep:#1F2F22;--sage-light:#8FA594;--sage-pale:#E8E3D4;--sage-ghost:#EFEADD;--warm:#F1EBDE;--text:#1A1816;--text-light:#4E4A42;--text-muted:#6F6959;--accent:#BA5E3C;--accent-light:#F0D9CB;--success:#B8943A;--border:#E5DFD1;--card:#FDFBF7;--radius:14px}
+body{font-family:'Outfit',system-ui,sans-serif;background:var(--warm);color:var(--text);min-height:100vh;-webkit-tap-highlight-color:transparent;font-weight:400;letter-spacing:0.01em}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+input:focus,select:focus,textarea:focus{border-color:var(--sage)!important;outline:none;box-shadow:0 0 0 3px rgba(94,115,104,0.12)}
+button{cursor:pointer;font-family:inherit;transition:all 0.2s ease}
+button:active{transform:scale(0.97)}
+@media(hover:hover){button:hover{opacity:.9}}
+#root{margin:0 auto;min-height:100vh}
+.install-banner{background:var(--sage-deep);color:#fff;padding:14px 20px;display:flex;align-items:center;gap:12px;font-size:13px;font-weight:500}
+.install-banner button{background:var(--sage-light);color:var(--sage-deep);border:none;border-radius:10px;padding:8px 18px;font-weight:600;font-size:13px}
+.install-banner .dismiss{background:transparent;color:rgba(255,255,255,.5);font-size:18px;padding:0 4px}
+.modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(44,51,49,0.5);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;animation:fadeIn 0.2s ease}
+.modal{background:var(--card);border-radius:20px;padding:24px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(44,51,49,.15),0 0 0 1px var(--border)}
+.toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%);background:var(--sage-deep);color:#fff;padding:12px 20px;border-radius:14px;font-size:14px;font-weight:500;z-index:200;box-shadow:0 8px 30px rgba(45,62,51,.35);display:flex;align-items:center;gap:12px;animation:slideUp 0.3s ease;font-family:'Outfit',system-ui,sans-serif;max-width:90vw}
+.toast button{background:rgba(255,255,255,.2);border:none;color:#fff;padding:6px 14px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+
+/* Mobile: larger text, buttons and labels */
+@media(max-width:600px){
+  body{font-size:16px}
+  input,select,textarea{font-size:16px!important;padding:12px 16px!important}
+  button{font-size:15px!important;padding:12px 16px!important}
+  .install-banner{font-size:14px}
+  .install-banner button{font-size:14px;padding:10px 20px}
+  .modal{padding:20px}
+}
+
+/* Desktop: wider layout with sidebar nav */
+@media(min-width:768px){
+  #root-inner{display:flex;flex-direction:row;min-height:100vh}
+  .desktop-sidebar{display:flex!important;flex-direction:column;width:220px;background:var(--card);border-right:1px solid var(--border);padding:20px 16px;position:fixed;top:0;left:0;height:100vh;z-index:50}
+  .desktop-main{margin-left:220px;flex:1;padding:0 40px}
+  .mobile-nav{display:none!important}
+  .mobile-header{display:none!important}
+}
+@media(max-width:767px){
+  .desktop-sidebar{display:none!important}
+  .desktop-main{max-width:100%}
+  #root{max-width:540px;padding-bottom:90px}
+}
+@media(max-width:380px){
+  .tab-label{display:none!important}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+if('serviceWorker' in navigator){const sw=`self.addEventListener('install',e=>{self.skipWaiting()});self.addEventListener('activate',e=>{e.waitUntil(clients.claim())});self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>new Response('Offline')))});`;const b=new Blob([sw],{type:'application/javascript'});navigator.serviceWorker.register(URL.createObjectURL(b)).catch(()=>{})}
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;window.dispatchEvent(new Event('pwainstallable'))});
+</script>
+<script type="text/babel">
+const{useState,useEffect,useRef,useCallback}=React;
+
+// ── Config ──
+const MS_CLIENT_ID='a556c14a-656f-433e-b485-c4513122856c';
+const MS_REDIRECT_URI=window.location.origin+window.location.pathname;
+const MS_SCOPES='Files.ReadWrite Calendars.Read';
+const ONEDRIVE_FILENAME='invisiontid-data.json';
+const STORAGE_KEY='invisiontid-data';
+const TIMER_KEY='invisiontid-timer';
+const LOGO_SRC="data:image/png;base64,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";
+const TOKEN_KEY='invisiontid-ms-token';
+const TOKEN_EXPIRY_KEY='invisiontid-ms-expiry';
+
+// ── Data model ──
+// data = { clients:[], projects:[], entries:[], expenses:[], trips:[], invoices:[], hourlyRate:850, kmRate:2.5, weeklyGoal:0 }
+// client = { id, name, contact, phone, email, orgNr, address, status?:'active'|'paused'|'closed' }
+// project = { id, name, clientId?, hourlyRate?, sessionPrice?, pricingPeriods?:[{id,startDate,endDate?,type:'hourly'|'fixed',amount}] }
+// entry = { id, projectId, moment, seconds, date, startTime?, endTime?, createdAt, note?, calEventId? }
+// expense = { id, projectId, amount, description, date, createdAt }
+// trip = { id, projectId, km, description, date, createdAt }
+// invoice = { projectId, month:'2026-03', invoicedAt:'2026-04-02' }
+const defaultData={clients:[],projects:[],entries:[],expenses:[],trips:[],invoices:[],deletedIds:{},hourlyRate:850,kmRate:2.5,weeklyGoal:0};
+
+// ── Storage ──
+function loadLocal(){try{const r=localStorage.getItem(STORAGE_KEY);const d=r?JSON.parse(r):defaultData;if(!d.clients)d.clients=[];if(!d.expenses)d.expenses=[];if(!d.trips)d.trips=[];if(!d.invoices)d.invoices=[];if(!d.deletedIds)d.deletedIds={};if(!d.kmRate)d.kmRate=2.5;if(!d.weeklyGoal&&d.weeklyGoal!==0)d.weeklyGoal=0;return d}catch{return defaultData}}
+function saveLocal(d){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(d))}catch(e){console.error(e)}}
+
+// ── MS Auth ──
+function getMsToken(){const t=localStorage.getItem(TOKEN_KEY);const e=parseInt(localStorage.getItem(TOKEN_EXPIRY_KEY)||'0');if(t&&Date.now()<e)return t;return null}
+function saveMsToken(t,ei){localStorage.setItem(TOKEN_KEY,t);localStorage.setItem(TOKEN_EXPIRY_KEY,String(Date.now()+ei*1000))}
+function clearMsToken(){localStorage.removeItem(TOKEN_KEY);localStorage.removeItem(TOKEN_EXPIRY_KEY)}
+function msLoginUrl(){const p=new URLSearchParams({client_id:MS_CLIENT_ID,response_type:'token',redirect_uri:MS_REDIRECT_URI,scope:MS_SCOPES,response_mode:'fragment',prompt:'select_account'});return`https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${p}`}
+function checkAuthRedirect(){const h=window.location.hash;if(h.includes('access_token')){const p=new URLSearchParams(h.substring(1));const t=p.get('access_token');const ei=parseInt(p.get('expires_in')||'3600');if(t){saveMsToken(t,ei);window.history.replaceState(null,'',window.location.pathname+window.location.search);return t}}return null}
+
+// ── OneDrive ──
+async function oneDriveRead(token){try{const r=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/InVisionTid/${ONEDRIVE_FILENAME}:/content`,{headers:{Authorization:`Bearer ${token}`}});if(r.status===404)return null;if(!r.ok){if(r.status===401)clearMsToken();return null}return await r.json()}catch(e){console.error(e);return null}}
+async function oneDriveWrite(token,data){try{const r=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/InVisionTid/${ONEDRIVE_FILENAME}:/content`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({...data,lastSync:new Date().toISOString()})});if(r.status===401)clearMsToken();return r.ok}catch(e){console.error(e);return false}}
+
+// ── Merge ──
+// Merges local+remote using:
+//  - updatedAt (fallback createdAt) to pick latest version when same id appears on both sides
+//  - deletedIds (id → deletedAt timestamp) as tombstones so deletions survive round-trips
+function mergeData(local,remote){
+  if(!remote||!remote.projects||!remote.entries)return local;
+  // Combine tombstones, keeping latest deletedAt per id
+  const mergedDeleted={...(remote.deletedIds||{}),...(local.deletedIds||{})};
+  Object.keys(remote.deletedIds||{}).forEach(id=>{
+    const r=remote.deletedIds[id],l=local.deletedIds?.[id];
+    if(!l||r>l)mergedDeleted[id]=r;
+  });
+  const tombstoneTime=id=>mergedDeleted[id]||null;
+  const timeOf=x=>x.updatedAt||x.createdAt||'';
+  // Order: local first, remote second. Using >= means remote wins on tie
+  // (OneDrive is source of truth for records without updatedAt bumps).
+  const merge=(la,ra)=>{
+    const m=new Map();
+    [...(la||[]),...(ra||[])].forEach(x=>{
+      const tomb=tombstoneTime(x.id);
+      if(tomb&&tomb>=timeOf(x))return; // item deleted after (or at) its last update → drop
+      const existing=m.get(x.id);
+      if(!existing||timeOf(x)>=timeOf(existing))m.set(x.id,x);
+    });
+    return Array.from(m.values());
+  };
+  // Merge invoices: keep latest per project+month (no tombstones needed; small identity)
+  const mergedInvoices=[...new Map([...(remote.invoices||[]),...(local.invoices||[])].map(i=>[i.projectId+'|'+i.month,i])).values()];
+  return{clients:merge(local.clients,remote.clients),projects:merge(local.projects,remote.projects),entries:merge(local.entries,remote.entries),expenses:merge(local.expenses,remote.expenses),trips:merge(local.trips,remote.trips),invoices:mergedInvoices,deletedIds:mergedDeleted,hourlyRate:local.hourlyRate||remote.hourlyRate||850,kmRate:local.kmRate||remote.kmRate||2.5,weeklyGoal:local.weeklyGoal||remote.weeklyGoal||0};
+}
+
+// ── Calendar API ──
+async function fetchCalendarEvents(token, startDate, endDate) {
+  try {
+    // Send times with explicit timezone offset for Stockholm (CET/CEST)
+    // Use midnight local time - Graph will handle DST correctly with the Prefer header
+    const url = `https://graph.microsoft.com/v1.0/me/calendar/calendarview?startDateTime=${startDate}T00:00:00.000Z&endDateTime=${endDate}T23:59:59.000Z&$orderby=start/dateTime&$top=100&$select=subject,start,end,isAllDay`;
+    const r = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Prefer: 'outlook.timezone="Europe/Stockholm"' } });
+    if (!r.ok) return [];
+    const data = await r.json();
+    return (data.value || []).map(ev => {
+      // Graph returns times in Stockholm timezone thanks to Prefer header
+      const startDt = ev.start?.dateTime || '';
+      const endDt = ev.end?.dateTime || '';
+      // Extract date part directly from the returned Stockholm-local time
+      const evDate = startDt.slice(0, 10);
+      return {
+        id: ev.id,
+        subject: ev.subject || '(Ingen rubrik)',
+        start: startDt,
+        end: endDt,
+        isAllDay: ev.isAllDay || false,
+        date: evDate,
+      };
+    });
+  } catch (e) { console.error('Calendar read error:', e); return []; }
+}
+
+// Parse Graph datetime as local (no timezone conversion)
+function parseLocalDt(dtStr) {
+  if (!dtStr) return null;
+  // Remove any trailing Z or timezone - treat as local
+  const clean = dtStr.replace(/[Z+].*$/, '');
+  const parts = clean.split(/[-T:\.]/);
+  return new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]), parseInt(parts[3]||0), parseInt(parts[4]||0), parseInt(parts[5]||0));
+}
+
+function calEventDuration(ev) {
+  try {
+    const s = parseLocalDt(ev.start), e = parseLocalDt(ev.end);
+    if (!s || !e) return 0;
+    return Math.max(Math.round((e - s) / 1000), 0);
+  } catch { return 0; }
+}
+
+function calEventTimeStr(ev) {
+  try {
+    const s = parseLocalDt(ev.start);
+    const e = parseLocalDt(ev.end);
+    return `${String(s.getHours()).padStart(2,'0')}:${String(s.getMinutes()).padStart(2,'0')}–${String(e.getHours()).padStart(2,'0')}:${String(e.getMinutes()).padStart(2,'0')}`;
+  } catch { return ''; }
+}
+
+// ── Helpers ──
+function gid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function fmtDur(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`}
+function fmtH(s){return(s/3600).toFixed(1)}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+const PC=["#7C9082","#D4856A","#8B7EA8","#C4A55A","#5B8A72","#B07156","#6989A8","#A8855B","#7B6E8E","#84A67A"];
+function pc(i){return PC[i%PC.length]}
+// ── Pricing helpers ──
+// Three pricing models:
+// 1. Timpris (hourly): project.hourlyRate or data.hourlyRate (default)
+// 2. Pris per tillfälle (session): project.sessionPrice - each unique logged date = 1 session
+// 3. Fastpris över period (fixed): project.pricingPeriods with type='fixed' - distributed over days
+
+function getRate(project,data){return project?.hourlyRate||data.hourlyRate||850}
+function hasSessionPrice(project){return project?.sessionPrice>0}
+function isFixedPrice(project){return(project?.pricingPeriods||[]).some(p=>p.type==='fixed')}
+function getActivePeriod(project,date){if(!project?.pricingPeriods?.length)return null;return project.pricingPeriods.find(p=>date>=p.startDate&&(!p.endDate||date<=p.endDate))||null}
+
+// Count unique days logged for a project within given entries
+function getSessionCount(project,entries){if(!hasSessionPrice(project))return 0;const dates=new Set(entries.filter(e=>e.projectId===project.id).map(e=>e.date));return dates.size}
+function getSessionRevenue(project,entries){return getSessionCount(project,entries)*project.sessionPrice}
+
+// Calculate revenue for a set of entries (used everywhere)
+// Priority: sessionPrice > pricingPeriod > hourlyRate
+function calcRevenue(entries,data){
+  let total=0;const sessDays=new Set();
+  entries.forEach(e=>{
+    const p=data.projects.find(x=>x.id===e.projectId);if(!p)return;
+    // Model 1: Session price (per unique day) - takes priority over everything
+    if(hasSessionPrice(p)){const key=e.projectId+'|'+e.date;if(!sessDays.has(key)){sessDays.add(key);total+=p.sessionPrice}return}
+    // Model 2: Check for pricing period on this date
+    const period=getActivePeriod(p,e.date);
+    if(period?.type==='fixed')return; // Fixed periods counted separately via calcFixedMonthly/getFixedWeeklyAmount
+    if(period?.type==='hourly'&&period.amount){total+=(e.seconds/3600)*period.amount;return}
+    // Model 3: If project has ANY fixed pricing periods, don't fall back to hourly
+    // (the entry date is outside the period range - don't count it as hourly)
+    if(isFixedPrice(p))return;
+    // Model 4: Standard hourly rate (only if no other pricing model exists)
+    total+=(e.seconds/3600)*getRate(p,data);
+  });
+  return total;
+}
+
+// Calculate fixed period amounts for entries in a given month (year, monthIndex 0-11)
+// Divides evenly by number of months the period spans
+function calcFixedMonthly(data,year,month){
+  let total=0;
+  const mStart=year+'-'+String(month+1).padStart(2,'0')+'-01';
+  const mEndDay=new Date(year,month+1,0).getDate();
+  const mEnd=year+'-'+String(month+1).padStart(2,'0')+'-'+String(mEndDay).padStart(2,'0');
+  data.projects.forEach(p=>{(p.pricingPeriods||[]).forEach(pp=>{
+    if(pp.type!=='fixed'||!pp.amount)return;
+    const start=pp.startDate;const end=pp.endDate;
+    if(!end){if(start>=mStart&&start<=mEnd)total+=pp.amount;return}
+    if(mStart>end||mEnd<start)return;
+    // Count total months the period spans
+    const sY=parseInt(start.slice(0,4)),sM=parseInt(start.slice(5,7))-1;
+    const eY=parseInt(end.slice(0,4)),eM=parseInt(end.slice(5,7))-1;
+    const totalMonths=Math.max(1,(eY-sY)*12+(eM-sM)+1);
+    total+=Math.round(pp.amount/totalMonths);
+  })});
+  return total;
+}
+
+// Calculate fixed period amounts for a specific week
+// Uses monthly amount / ~4.33 weeks for consistency with calcFixedMonthly
+function getFixedWeeklyAmount(project,weekDates){
+  if(!project?.pricingPeriods)return 0;let total=0;
+  project.pricingPeriods.forEach(p=>{
+    if(p.type!=='fixed'||!p.amount)return;
+    const start=p.startDate;const end=p.endDate;
+    if(!end){if(weekDates[0]<=start&&start<=weekDates[6])total+=p.amount;return}
+    if(weekDates[6]<start||weekDates[0]>end)return;
+    // Monthly amount divided by weeks in a month (~4.33)
+    const sY=parseInt(start.slice(0,4)),sM=parseInt(start.slice(5,7))-1;
+    const eY=parseInt(end.slice(0,4)),eM=parseInt(end.slice(5,7))-1;
+    const totalMonths=Math.max(1,(eY-sY)*12+(eM-sM)+1);
+    const monthlyAmount=p.amount/totalMonths;
+    total+=Math.round(monthlyAmount/4.33);
+  });
+  return total;
+}
+
+// Calculate total weekly revenue (for weekly goal)
+function calcWeekRevenue(data,weekDates){
+  const wEntries=data.entries.filter(e=>weekDates.includes(e.date));
+  let rev=calcRevenue(wEntries,data);
+  data.projects.forEach(p=>{rev+=getFixedWeeklyAmount(p,weekDates)});
+  return rev;
+}
+
+// ── ICS ──
+function genICS(entries,projects){const p2=n=>String(n).padStart(2,'0');const fd=(ds,om)=>{const d=new Date(ds+'T08:00:00');d.setMinutes(d.getMinutes()+om);return d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'T'+p2(d.getHours())+p2(d.getMinutes())+'00'};let l=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//In Vision Tid//SV","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:In Vision Tid"];const bd={};entries.forEach(e=>{if(!bd[e.date])bd[e.date]=[];bd[e.date].push(e)});Object.entries(bd).forEach(([date,de])=>{let o=0;de.forEach(en=>{const pr=projects.find(p=>p.id===en.projectId);const dur=Math.max(Math.round(en.seconds/60),1);const sm=pr?`${pr.name}: ${en.moment}`:en.moment;l.push("BEGIN:VEVENT",`DTSTART:${fd(date,o)}`,`DTEND:${fd(date,o+dur)}`,`SUMMARY:${sm}`,`UID:${en.id}@invisiontid`,"END:VEVENT");o+=dur})});l.push("END:VCALENDAR");return l.join("\r\n")}
+function dlICS(entries,projects,fn){const b=new Blob([genICS(entries,projects)],{type:'text/calendar;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn||'tidsrapport.ics';a.click()}
+
+// ── Week helpers ──
+function localDateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function getWeekDates(off=0){const n=new Date(),dw=n.getDay(),mo=dw===0?-6:1-dw;const mon=new Date(n);mon.setDate(n.getDate()+mo+off*7);mon.setHours(12,0,0,0);return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return localDateStr(d)})}
+function weekLabel(ds){const o={day:'numeric',month:'short'};return`${new Date(ds[0]+'T12:00:00').toLocaleDateString('sv-SE',o)} – ${new Date(ds[6]+'T12:00:00').toLocaleDateString('sv-SE',o)}`}
+const DN=["Mån","Tis","Ons","Tor","Fre","Lör","Sön"];
+
+// ── Styles ──
+const S={
+  header:{display:'flex',alignItems:'center',gap:0,padding:'24px 20px 12px'},
+  logo:{display:'flex',flexDirection:'column'},
+  logoMain:{fontSize:20,fontWeight:700,color:'var(--sage-deep)',letterSpacing:'-0.3px',lineHeight:1.1},
+  logoSub:{fontSize:13,fontWeight:400,color:'var(--text-muted)',letterSpacing:'1.5px',textTransform:'uppercase',marginTop:2},
+  tabBar:{display:'flex',gap:0,padding:'0 16px',background:'var(--card)',borderRadius:'var(--radius)',margin:'0 16px 16px',boxShadow:'0 2px 12px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04)',overflow:'hidden'},
+  tab:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'12px 4px',border:'none',background:'transparent',color:'var(--text-muted)',borderBottom:'2.5px solid transparent',transition:'all 0.25s ease',fontSize:'inherit',minWidth:0},
+  tabActive:{color:'var(--sage-deep)',borderBottomColor:'var(--sage-deep)',background:'var(--sage-ghost)'},
+  content:{padding:'0 16px 16px'},
+  section:{marginBottom:20,animation:'fadeIn 0.3s ease'},
+  sectionHeader:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10},
+  sectionTitle:{fontSize:12,fontWeight:700,textTransform:'uppercase',letterSpacing:'1.5px',color:'var(--text)',marginBottom:10,display:'block'},
+  sectionSubtle:{fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:'1.5px',color:'var(--text-muted)',marginBottom:10,display:'block'},
+  groupTitle:{fontSize:18,fontWeight:700,color:'var(--text)',marginBottom:8,display:'block'},
+  addBtn:{background:'var(--sage-ghost)',border:'1.5px dashed var(--sage-light)',borderRadius:10,padding:'8px 16px',fontSize:14,color:'var(--sage-dark)',fontWeight:500},
+  pillRow:{display:'flex',flexWrap:'wrap',gap:8},
+  pill:{padding:'9px 18px',borderRadius:24,fontSize:14,transition:'all 0.2s ease',whiteSpace:'nowrap',fontWeight:500},
+  inlineForm:{display:'flex',gap:8,marginBottom:10},
+  input:{flex:1,padding:'12px 16px',borderRadius:'var(--radius)',border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',transition:'border-color 0.2s, box-shadow 0.2s'},
+  inputSmall:{padding:'12px 14px',borderRadius:'var(--radius)',border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,width:78,color:'var(--text)',fontFamily:'inherit'},
+  textarea:{width:'100%',padding:'12px 16px',borderRadius:'var(--radius)',border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',resize:'vertical',minHeight:60},
+  confirmBtn:{padding:'13px 22px',borderRadius:'var(--radius)',border:'none',background:'var(--sage-deep)',color:'#fff',fontSize:15,fontWeight:600,whiteSpace:'nowrap',boxShadow:'0 4px 14px rgba(45,62,51,.35)'},
+  hint:{fontSize:14,color:'var(--text-muted)',fontStyle:'italic',padding:'10px 0',display:'block'},
+  timerDisplay:{textAlign:'center',padding:'28px 0 20px'},
+  timerDigits:{fontSize:48,fontWeight:700,fontVariantNumeric:'tabular-nums',color:'var(--sage-deep)',letterSpacing:'2px',fontFamily:"'JetBrains Mono',monospace"},
+  timerControls:{display:'flex',justifyContent:'center',gap:12,marginTop:16},
+  timerBtn:{padding:'12px 28px',borderRadius:'var(--radius)',border:'none',fontSize:14,fontWeight:600,transition:'all 0.2s ease',boxShadow:'0 4px 14px rgba(0,0,0,.1)'},
+  startBtn:{background:'var(--sage)',color:'#fff'},stopBtn:{background:'var(--accent)',color:'#fff'},resetBtn:{background:'var(--sage-pale)',color:'var(--sage-dark)'},
+  manualToggle:{background:'none',border:'none',color:'var(--text-muted)',fontSize:14,padding:'10px 0',fontWeight:500},
+  manualForm:{background:'var(--card)',borderRadius:16,padding:18,marginTop:8,display:'flex',flexDirection:'column',gap:14,border:'1px solid var(--border)',boxShadow:'0 4px 20px rgba(0,0,0,.07),0 1px 3px rgba(0,0,0,.04)'},
+  manualRow:{display:'flex',gap:10,flexWrap:'wrap'},
+  fieldGroup:{display:'flex',flexDirection:'column',gap:5,flex:1,minWidth:80},
+  fieldLabel:{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'},
+  entryRow:{display:'flex',alignItems:'center',gap:10,padding:'13px 0',borderBottom:'1px solid var(--sage-ghost)'},
+  entryDot:{width:10,height:10,borderRadius:'50%',flexShrink:0},
+  entryInfo:{flex:1,display:'flex',flexDirection:'column',gap:3},
+  entryProject:{fontSize:15,fontWeight:600,color:'var(--text)'},
+  entryMoment:{fontSize:13,color:'var(--text-muted)'},
+  entryTime:{fontSize:15,fontWeight:600,color:'var(--sage-deep)',fontVariantNumeric:'tabular-nums'},
+  deleteBtn:{background:'none',border:'none',fontSize:20,color:'var(--text-muted)',padding:'10px 12px',lineHeight:1,minWidth:44,minHeight:44,display:'inline-flex',alignItems:'center',justifyContent:'center'},
+  editBtn:{background:'none',border:'none',fontSize:16,color:'var(--sage)',padding:'10px 10px',minWidth:40,minHeight:40,display:'inline-flex',alignItems:'center',justifyContent:'center'},
+  dateGroup:{marginBottom:16,animation:'fadeIn 0.3s ease'},
+  dateHeader:{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'14px 0 6px'},
+  dateLabel:{fontSize:15,fontWeight:600,color:'var(--sage-deep)'},
+  dateTotalBadge:{fontSize:13,fontWeight:600,color:'var(--sage-dark)',background:'var(--sage-pale)',padding:'5px 14px',borderRadius:12},
+  weekNav:{display:'flex',alignItems:'center',gap:8,padding:'12px 0',position:'relative'},
+  weekNavBtn:{background:'var(--card)',border:'1.5px solid var(--border)',borderRadius:10,width:38,height:38,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,color:'var(--sage-deep)',boxShadow:'0 2px 8px rgba(0,0,0,.06)'},
+  weekNavCenter:{flex:1,textAlign:'center',display:'flex',flexDirection:'column',gap:2},
+  weekLabel:{fontSize:15,fontWeight:600,color:'var(--sage-deep)'},weekTotal:{fontSize:12,color:'var(--text-muted)'},
+  weekTodayBtn:{position:'absolute',right:0,top:-2,background:'var(--sage)',color:'#fff',border:'none',borderRadius:10,padding:'5px 12px',fontSize:11,fontWeight:600,boxShadow:'0 2px 6px rgba(94,115,104,.3)'},
+  weekChart:{display:'flex',gap:6,alignItems:'flex-end',height:160,padding:'16px 0',borderBottom:'1px solid var(--border)',marginBottom:16},
+  weekDayCol:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6,height:'100%'},
+  weekBarContainer:{flex:1,width:'70%',display:'flex',flexDirection:'column-reverse',borderRadius:8,overflow:'hidden'},
+  weekDayLabel:{fontSize:13,fontWeight:500},weekDayHours:{fontSize:12,color:'var(--text-muted)',fontVariantNumeric:'tabular-nums'},
+  cardRow:{display:'flex',gap:10,marginBottom:16},
+  summaryCard:{flex:1,background:'var(--card)',borderRadius:16,padding:'16px 14px',display:'flex',flexDirection:'column',gap:4,border:'1px solid var(--border)',boxShadow:'0 4px 16px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)'},
+  summaryCardAccent:{background:'var(--sage-deep)',border:'none',color:'#fff',boxShadow:'0 6px 24px rgba(61,79,66,.25)'},
+  cardLabel:{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'1px',opacity:.75},
+  cardValue:{fontSize:22,fontWeight:700,fontVariantNumeric:'tabular-nums'},
+  rateRow:{display:'flex',alignItems:'center',gap:12},
+  projectBreakdown:{marginBottom:16,animation:'fadeIn 0.3s ease'},
+  projectBarHeader:{display:'flex',alignItems:'center',gap:8,marginBottom:6},
+  projectBarHours:{fontSize:13,color:'var(--text-light)',marginLeft:'auto',fontVariantNumeric:'tabular-nums'},
+  barTrack:{height:6,background:'var(--sage-ghost)',borderRadius:3,overflow:'hidden'},
+  barFill:{height:'100%',borderRadius:3,transition:'width 0.6s ease'},
+  momentList:{padding:'6px 0 6px 18px'},
+  momentRow:{display:'flex',justifyContent:'space-between',padding:'3px 0',fontSize:13,color:'var(--text-light)'},
+  momentHours:{fontVariantNumeric:'tabular-nums',fontWeight:500},
+  exportBtn:{width:'100%',padding:'15px',borderRadius:'var(--radius)',border:'2px solid var(--sage)',background:'transparent',color:'var(--sage-deep)',fontSize:15,fontWeight:600},
+  icsHint:{fontSize:13,color:'var(--text-muted)',textAlign:'center',marginTop:8,lineHeight:1.4},
+  modalTitle:{fontSize:20,fontWeight:700,color:'var(--sage-deep)',marginBottom:16},
+  modalField:{marginBottom:14},
+  modalBtns:{display:'flex',gap:8,marginTop:18},
+  noteTag:{fontSize:12,color:'var(--sage)',fontStyle:'italic'},
+  clientBadge:{fontSize:12,color:'var(--text-light)',background:'var(--sage-ghost)',padding:'3px 10px',borderRadius:8,display:'inline-block',marginTop:2},
+};
+
+// ── Icons ──
+function Icon({id,size=18}){
+  const common={width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",style:{flexShrink:0}};
+  if(id==='timer')return <svg {...common}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+  if(id==='dash')return <svg {...common}><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>;
+  if(id==='week')return <svg {...common}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+  if(id==='entries')return <svg {...common}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>;
+  if(id==='report')return <svg {...common}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>;
+  return null;
+}
+
+// ── Shared Components ──
+// Toast context for app-wide notifications
+const ToastCtx=React.createContext();
+function ToastProvider({children}){
+  const[toast,setToast]=useState(null);const tRef=useRef(null);
+  const show=(msg,action)=>{if(tRef.current)clearTimeout(tRef.current);setToast({msg,action});tRef.current=setTimeout(()=>setToast(null),action?5000:2500)};
+  const dismiss=()=>{if(tRef.current)clearTimeout(tRef.current);setToast(null)};
+  return<ToastCtx.Provider value={show}>{children}{toast&&<div className="toast"><span style={{flex:1}}>{toast.msg}</span>{toast.action&&<button onClick={()=>{toast.action();dismiss()}}>{toast.action.label||'Ångra'}</button>}</div>}</ToastCtx.Provider>
+}
+function useToast(){return React.useContext(ToastCtx)}
+
+function InstallBanner(){const[show,setShow]=useState(false);const[isIOS,setIsIOS]=useState(false);useEffect(()=>{const ios=/iPad|iPhone|iPod/.test(navigator.userAgent)&&!window.MSStream;const sa=window.navigator.standalone||window.matchMedia('(display-mode:standalone)').matches;if(ios&&!sa){setIsIOS(true);setShow(true)}const h=()=>setShow(true);window.addEventListener('pwainstallable',h);if(deferredPrompt)setShow(true);return()=>window.removeEventListener('pwainstallable',h)},[]);const hi=async()=>{if(deferredPrompt){deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;setShow(false)}};if(!show)return null;if(isIOS)return<div className="install-banner"><span style={{flex:1}}>Installera: tryck <strong>Dela</strong> och <strong>Hemskärmen</strong></span><button className="dismiss" onClick={()=>setShow(false)}>x</button></div>;return<div className="install-banner"><span style={{flex:1}}>Installera In Vision Tid</span><button onClick={hi}>Installera</button><button className="dismiss" onClick={()=>setShow(false)}>x</button></div>}
+
+function Pill({label,color,selected,onClick}){return<button onClick={onClick} style={{...S.pill,background:selected?color:'transparent',color:selected?'#fff':color,border:`2px solid ${color}`,fontWeight:selected?700:500}}>{label}</button>}
+
+function TabBar({active,onChange}){
+  const tabs=[
+    {id:'timer',label:'Logga'},
+    {id:'dash',label:'Dashboard'},
+    {id:'week',label:'Vecka'},
+    {id:'entries',label:'Historik'},
+    {id:'report',label:'Rapport'}
+  ];
+  return<div style={S.tabBar}>{tabs.map(t=><button key={t.id} onClick={()=>onChange(t.id)} style={{...S.tab,...(active===t.id?S.tabActive:{})}}><Icon id={t.id} size={22}/><span className="tab-label" style={{fontSize:12,fontWeight:active===t.id?600:400}}>{t.label}</span></button>)}</div>
+}
+
+// ── Edit Entry Modal ──
+function EditEntryModal({entry,data,onSave,onClose}){
+  const[projectId,setPid]=useState(entry.projectId);
+  const[moment,setMom]=useState(entry.moment);
+  const[date,setDate]=useState(entry.date);
+  const[hours,setH]=useState(String(Math.floor(entry.seconds/3600)));
+  const[mins,setM]=useState(String(Math.floor((entry.seconds%3600)/60)));
+  const[startTime,setST]=useState(entry.startTime||'');
+  const[endTime,setET]=useState(entry.endTime||'');
+  const[note,setNote]=useState(entry.note||'');
+  useEffect(()=>{
+    if(startTime&&endTime){const[sh,sm]=startTime.split(':').map(Number);const[eh,em]=endTime.split(':').map(Number);let diff=(eh*60+em)-(sh*60+sm);if(diff<0)diff+=24*60;setH(String(Math.floor(diff/60)));setM(String(diff%60))}
+  },[startTime,endTime]);
+  const save=()=>{const s=((parseInt(hours)||0)*3600)+((parseInt(mins)||0)*60);if(s<=0)return;onSave({...entry,projectId,moment:moment||'Allmänt',date,seconds:s,startTime:startTime||undefined,endTime:endTime||undefined,note:note.trim()||undefined});onClose()};
+  return<div className="modal-overlay" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
+    <div style={S.modalTitle}>Redigera tidspost</div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Projekt</label><select style={{...S.input,marginTop:4}} value={projectId} onChange={e=>setPid(e.target.value)}>{data.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Moment</label><input style={{...S.input,marginTop:4}} value={moment} onChange={e=>setMom(e.target.value)}/></div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Datum</label><input type="date" style={{...S.input,marginTop:4}} value={date} onChange={e=>setDate(e.target.value)}/></div>
+    <div style={{...S.manualRow,...S.modalField}}>
+      <div style={S.fieldGroup}><label style={S.fieldLabel}>Från</label><input type="time" style={S.inputSmall} value={startTime} onChange={e=>setST(e.target.value)}/></div>
+      <div style={S.fieldGroup}><label style={S.fieldLabel}>Till</label><input type="time" style={S.inputSmall} value={endTime} onChange={e=>setET(e.target.value)}/></div>
+      <div style={S.fieldGroup}><label style={S.fieldLabel}>Timmar</label><input type="number" min="0" style={S.inputSmall} value={hours} onChange={e=>setH(e.target.value)}/></div>
+      <div style={S.fieldGroup}><label style={S.fieldLabel}>Minuter</label><input type="number" min="0" max="59" style={S.inputSmall} value={mins} onChange={e=>setM(e.target.value)}/></div>
+    </div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Anteckning</label><textarea style={{...S.textarea,marginTop:4}} placeholder="Valfri anteckning..." value={note} onChange={e=>setNote(e.target.value)}/></div>
+    <div style={S.modalBtns}><button onClick={save} style={{...S.confirmBtn,flex:1}}>Spara</button><button onClick={onClose} style={{...S.exportBtn,flex:1,fontSize:14,padding:'10px'}}>Avbryt</button></div>
+  </div></div>
+}
+
+// ── Split Entry Modal ──
+function SplitEntryModal({entry,data,onSplit,onClose}){
+  const totalMin=Math.round(entry.seconds/60);
+  const[splitMin,setSplitMin]=useState(Math.round(totalMin/2));
+  const[moment2,setMom2]=useState('');
+  const[proj2,setProj2]=useState(entry.projectId);
+  const remaining=totalMin-splitMin;
+  const split=()=>{if(splitMin<=0||splitMin>=totalMin)return;
+    const e1={...entry,seconds:splitMin*60};
+    const e2={id:gid(),projectId:proj2,moment:moment2||'Allmänt',seconds:remaining*60,date:entry.date,startTime:undefined,endTime:undefined,createdAt:new Date().toISOString()};
+    onSplit(e1,e2);onClose()};
+  return<div className="modal-overlay" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
+    <div style={S.modalTitle}>Dela upp tidspost</div>
+    <div style={{background:'var(--sage-ghost)',borderRadius:12,padding:12,marginBottom:16,fontSize:13,color:'var(--text-light)'}}>
+      {entry.moment} · {fmtH(entry.seconds)} h · {entry.date}
+    </div>
+    <div style={S.modalField}>
+      <label style={S.fieldLabel}>Del 1: {entry.moment} ({Math.floor(splitMin/60)}h {splitMin%60}min)</label>
+      <input type="range" min="1" max={totalMin-1} value={splitMin} onChange={e=>setSplitMin(parseInt(e.target.value))} style={{width:'100%',marginTop:8,accentColor:'var(--sage)'}}/>
+    </div>
+    <div style={S.modalField}>
+      <label style={S.fieldLabel}>Del 2: ({Math.floor(remaining/60)}h {remaining%60}min)</label>
+      <input style={{...S.input,marginTop:4}} placeholder="Moment för del 2..." value={moment2} onChange={e=>setMom2(e.target.value)}/>
+    </div>
+    <div style={S.modalField}>
+      <label style={S.fieldLabel}>Projekt för del 2</label>
+      <select style={{...S.input,marginTop:4}} value={proj2} onChange={e=>setProj2(e.target.value)}>{data.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
+    </div>
+    <div style={S.modalBtns}><button onClick={split} style={{...S.confirmBtn,flex:1}}>Dela upp</button><button onClick={onClose} style={{...S.exportBtn,flex:1,fontSize:14,padding:'10px'}}>Avbryt</button></div>
+  </div></div>
+}
+
+// ── Edit Project Modal ──
+function EditProjectModal({project,data,onSave,onClose}){
+  const[name,setName]=useState(project.name);
+  const[clientId,setCid]=useState(project.clientId||'');
+  const[rate,setRate]=useState(project.hourlyRate!=null?String(project.hourlyRate):'');
+  const[sessionPrice,setSessionPrice]=useState(project.sessionPrice!=null?String(project.sessionPrice):'');
+  const[periods,setPeriods]=useState(project.pricingPeriods||[]);
+  const addPeriod=()=>setPeriods([...periods,{id:gid(),startDate:today(),endDate:'',type:'fixed',amount:0}]);
+  const updPeriod=(id,field,val)=>setPeriods(periods.map(p=>p.id===id?{...p,[field]:val}:p));
+  const delPeriod=(id)=>setPeriods(periods.filter(p=>p.id!==id));
+  const hasSession=sessionPrice&&parseFloat(sessionPrice)>0;
+  const hasPeriods=periods.length>0;
+  const save=()=>{if(!name.trim())return;onSave({...project,name:name.trim(),clientId:clientId||undefined,hourlyRate:(!hasSession&&!hasPeriods&&rate)?parseInt(rate):undefined,sessionPrice:sessionPrice?parseFloat(sessionPrice):undefined,pricingPeriods:periods.length?periods.map(p=>({...p,amount:parseFloat(p.amount)||0})):undefined,fixedPrice:undefined});onClose()};
+  return<div className="modal-overlay" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
+    <div style={S.modalTitle}>Redigera projekt</div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Projektnamn</label><input style={{...S.input,marginTop:4,width:'100%'}} value={name} onChange={e=>setName(e.target.value)} autoFocus/></div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Kund</label><select style={{...S.input,marginTop:4}} value={clientId} onChange={e=>setCid(e.target.value)}><option value="">Ingen kund vald</option>{(data.clients||[]).filter(c=>(c.status||'active')!=='closed').sort((a,b)=>a.name.localeCompare(b.name,'sv')).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+    <div style={{display:'flex',gap:10}}>
+      <div style={{...S.modalField,flex:1}}><label style={{...S.fieldLabel,opacity:(hasSession||hasPeriods)?.4:1}}>Timpris (kr/h)</label><input type="number" style={{...S.input,marginTop:4,opacity:(hasSession||hasPeriods)?.4:1}} placeholder={String(data.hourlyRate)} value={rate} onChange={e=>setRate(e.target.value)} disabled={hasSession||hasPeriods}/></div>
+      <div style={{...S.modalField,flex:1}}><label style={{...S.fieldLabel,opacity:hasPeriods?.4:1}}>Pris per tillfälle (kr)</label><input type="number" style={{...S.input,marginTop:4,opacity:hasPeriods?.4:1}} placeholder="Valfritt" value={sessionPrice} onChange={e=>setSessionPrice(e.target.value)} disabled={hasPeriods}/></div>
+    </div>
+    {hasSession&&!hasPeriods&&<div style={{fontSize:12,color:'var(--sage)',marginTop:-8,marginBottom:8}}>Pris per tillfälle aktivt – varje loggad dag räknas som ett tillfälle</div>}
+    {hasPeriods&&<div style={{fontSize:12,color:'var(--sage)',marginTop:-8,marginBottom:8}}>Prisperioder aktivt – timpris och tillfällepris ignoreras</div>}
+    <div style={S.modalField}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><label style={S.fieldLabel}>Prisperioder</label><button onClick={addPeriod} style={{...S.addBtn,padding:'4px 12px',fontSize:12}}>+ Ny period</button></div>
+      {periods.length===0&&<span style={{...S.hint,padding:'6px 0'}}>Inga prisperioder – standard timpris gäller</span>}
+      {periods.map((p,i)=><div key={p.id} style={{background:'var(--sage-ghost)',borderRadius:12,padding:12,marginTop:8}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div style={{flex:1,minWidth:90}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)'}}>Från</label><input type="date" style={{...S.input,fontSize:14,padding:'8px 10px',marginTop:2}} value={p.startDate} onChange={e=>updPeriod(p.id,'startDate',e.target.value)}/></div>
+          <div style={{flex:1,minWidth:90}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)'}}>Till</label><input type="date" style={{...S.input,fontSize:14,padding:'8px 10px',marginTop:2,borderColor:p.type==='fixed'&&!p.endDate?'var(--accent)':'var(--border)'}} value={p.endDate||''} onChange={e=>updPeriod(p.id,'endDate',e.target.value)}/></div>
+          {p.type==='fixed'&&!p.endDate&&<div style={{width:'100%',fontSize:11,color:'var(--accent)',marginTop:4}}>Ange slutdatum för att fördela fastpriset per vecka. Utan slutdatum räknas hela beloppet veckan det startar.</div>}
+          <div style={{minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)'}}>Typ</label><select style={{...S.input,fontSize:14,padding:'8px 10px',marginTop:2}} value={p.type} onChange={e=>updPeriod(p.id,'type',e.target.value)}><option value="fixed">Fastpris</option><option value="hourly">Timpris</option></select></div>
+          <div style={{minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)'}}>{p.type==='fixed'?'Belopp (kr)':'Kr/h'}</label><input type="number" style={{...S.input,fontSize:14,padding:'8px 10px',marginTop:2}} value={p.amount||''} onChange={e=>updPeriod(p.id,'amount',e.target.value)}/></div>
+          <button onClick={()=>delPeriod(p.id)} style={{...S.deleteBtn,marginBottom:4}}>x</button>
+        </div>
+      </div>)}
+    </div>
+    <div style={S.modalBtns}><button onClick={save} style={{...S.confirmBtn,flex:1}}>Spara</button><button onClick={onClose} style={{...S.exportBtn,flex:1,fontSize:14,padding:'10px'}}>Avbryt</button></div>
+  </div></div>
+}
+
+// ── Client Modal ──
+function ClientModal({client,onSave,onClose}){
+  const[name,setName]=useState(client?.name||'');
+  const[contact,setContact]=useState(client?.contact||'');
+  const[phone,setPhone]=useState(client?.phone||'');
+  const[email,setEmail]=useState(client?.email||'');
+  const[orgNr,setOrgNr]=useState(client?.orgNr||'');
+  const[address,setAddress]=useState(client?.address||'');
+  const[status,setStatus]=useState(client?.status||'active');
+  const save=()=>{if(!name.trim())return;onSave({id:client?.id||gid(),name:name.trim(),contact:contact.trim(),phone:phone.trim(),email:email.trim(),orgNr:orgNr.trim(),address:address.trim(),status});onClose()};
+  return<div className="modal-overlay" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
+    <div style={S.modalTitle}>{client?'Redigera kund':'Ny kund'}</div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Organisation / Kundnamn</label><input style={{...S.input,marginTop:4}} value={name} onChange={e=>setName(e.target.value)} autoFocus/></div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Organisationsnummer</label><input style={{...S.input,marginTop:4}} placeholder="XXXXXX-XXXX" value={orgNr} onChange={e=>setOrgNr(e.target.value)}/></div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Kontaktperson</label><input style={{...S.input,marginTop:4}} value={contact} onChange={e=>setContact(e.target.value)}/></div>
+    <div style={{display:'flex',gap:10}}>
+      <div style={{...S.modalField,flex:1}}><label style={S.fieldLabel}>Telefon</label><input type="tel" style={{...S.input,marginTop:4}} placeholder="070-123 45 67" value={phone} onChange={e=>setPhone(e.target.value)}/></div>
+      <div style={{...S.modalField,flex:1}}><label style={S.fieldLabel}>E-post</label><input type="email" style={{...S.input,marginTop:4}} placeholder="namn@exempel.se" value={email} onChange={e=>setEmail(e.target.value)}/></div>
+    </div>
+    <div style={S.modalField}><label style={S.fieldLabel}>Adress</label><textarea style={{...S.textarea,marginTop:4,minHeight:50}} placeholder="Gatuadress, postnummer, ort" value={address} onChange={e=>setAddress(e.target.value)}/></div>
+    {client&&<div style={S.modalField}><label style={S.fieldLabel}>Status</label><div style={{...S.pillRow,marginTop:6}}>
+      <Pill label="Aktiv" color="var(--sage)" selected={status==='active'} onClick={()=>setStatus('active')}/>
+      <Pill label="Vilande" color="var(--accent)" selected={status==='paused'} onClick={()=>setStatus('paused')}/>
+      <Pill label="Avslutad" color="var(--text-muted)" selected={status==='closed'} onClick={()=>setStatus('closed')}/>
+    </div></div>}
+    <div style={S.modalBtns}><button onClick={save} style={{...S.confirmBtn,flex:1}}>Spara</button><button onClick={onClose} style={{...S.exportBtn,flex:1,fontSize:14,padding:'10px'}}>Avbryt</button></div>
+  </div></div>
+}
+
+// ── Timer View ──
+function TimerView({data,setData,openSettings}){
+  const toast=useToast();
+  const[running,setRunning]=useState(false);const[elapsed,setElapsed]=useState(0);
+  const[selProj,setSelProj]=useState(null);const[moment,setMom]=useState('');const[note,setNote]=useState('');
+  const[showNew,setShowNew]=useState(false);const[newName,setNewName]=useState('');const[newClient,setNewClient]=useState('');const[newRate,setNewRate]=useState('');
+  const intRef=useRef(null),startRef=useRef(null);
+  const[showManual,setShowManual]=useState(false);const[mDate,setMDate]=useState(today());const[mH,setMH]=useState('');const[mM,setMM]=useState('');const[mMom,setMMom]=useState('');const[mProj,setMProj]=useState(null);const[mNote,setMNote]=useState('');const[mStart,setMStart]=useState('');const[mEnd,setMEnd]=useState('');
+  const[showExpense,setShowExpense]=useState(false);const[expType,setExpType]=useState('expense');const[expDate,setExpDate]=useState(today());const[expProj,setExpProj]=useState('');const[expDesc,setExpDesc]=useState('');const[expAmount,setExpAmount]=useState('');const[expKm,setExpKm]=useState('');
+  const[showExtra,setShowExtra]=useState(false);
+  const[projSearch,setProjSearch]=useState('');
+
+  // Auto-calc hours/minutes when start/end times change
+  useEffect(()=>{
+    if(mStart&&mEnd){
+      const[sh,sm]=mStart.split(':').map(Number);const[eh,em]=mEnd.split(':').map(Number);
+      let diff=(eh*60+em)-(sh*60+sm);if(diff<0)diff+=24*60;
+      setMH(String(Math.floor(diff/60)));setMM(String(diff%60));
+    }
+  },[mStart,mEnd]);
+
+  // Restore running timer on mount
+  useEffect(()=>{
+    try{const saved=JSON.parse(localStorage.getItem(TIMER_KEY)||'null');
+      if(saved&&saved.running&&saved.startedAt){
+        const el=Math.floor((Date.now()-saved.startedAt)/1000);
+        if(saved.selProj)setSelProj(saved.selProj);
+        if(saved.moment)setMom(saved.moment);
+        if(saved.note)setNote(saved.note);
+        setElapsed(el);setRunning(true);setShowManual(true);
+      }
+    }catch{}
+  },[]);
+
+  useEffect(()=>{if(running){startRef.current=Date.now()-elapsed*1000;intRef.current=setInterval(()=>setElapsed(Math.floor((Date.now()-startRef.current)/1000)),1000)}else clearInterval(intRef.current);return()=>clearInterval(intRef.current)},[running]);
+
+  const startTimer=()=>{if(!selProj)return;const startedAt=Date.now()-elapsed*1000;try{localStorage.setItem(TIMER_KEY,JSON.stringify({running:true,startedAt,selProj,moment,note}))}catch{}setRunning(true)};
+  const stop=()=>{setRunning(false);try{localStorage.removeItem(TIMER_KEY)}catch{}if(elapsed>0&&selProj){const e={id:gid(),projectId:selProj,moment:moment||'Allmänt',seconds:elapsed,date:today(),createdAt:new Date().toISOString(),note:note.trim()||undefined};const u={...data,entries:[...data.entries,e]};setData(u);saveLocal(u);toast('✓ Tid sparad')}setElapsed(0);setMom('');setNote('')};
+  const cancelTimer=()=>{setRunning(false);setElapsed(0);try{localStorage.removeItem(TIMER_KEY)}catch{}};
+  const addProj=()=>{if(!newName.trim())return;const p={id:gid(),name:newName.trim(),clientId:newClient||undefined,hourlyRate:newRate?parseInt(newRate):undefined};const u={...data,projects:[...data.projects,p]};setData(u);saveLocal(u);setSelProj(p.id);setNewName('');setNewClient('');setNewRate('');setShowNew(false)};
+  const addManual=()=>{const p=mProj||selProj;if(!p)return;const s=((parseInt(mH)||0)*3600)+((parseInt(mM)||0)*60);if(s<=0)return;const e={id:gid(),projectId:p,moment:mMom||'Allmänt',seconds:s,date:mDate,startTime:mStart||undefined,endTime:mEnd||undefined,createdAt:new Date().toISOString(),note:mNote.trim()||undefined};const u={...data,entries:[...data.entries,e]};setData(u);saveLocal(u);setMH('');setMM('');setMMom('');setMNote('');setMStart('');setMEnd('');toast('✓ Tid sparad')};
+  const addExpense=()=>{const p=expProj||selProj;if(!p)return;if(expType==='expense'){const amt=parseFloat(expAmount);if(!amt||amt<=0)return;const ex={id:gid(),projectId:p,amount:amt,description:expDesc||'Utlägg',date:expDate,createdAt:new Date().toISOString()};const u={...data,expenses:[...(data.expenses||[]),ex]};setData(u);saveLocal(u);toast('✓ Utlägg sparat')}else{const km=parseFloat(expKm);if(!km||km<=0)return;const tr={id:gid(),projectId:p,km:km,description:expDesc||'Resa',date:expDate,createdAt:new Date().toISOString()};const u={...data,trips:[...(data.trips||[]),tr]};setData(u);saveLocal(u);toast('✓ Resa sparad')}setExpDesc('');setExpAmount('');setExpKm('');setShowExpense(false)};
+  const repeatYesterday=()=>{
+    const y=new Date();y.setDate(y.getDate()-1);const yDate=localDateStr(y);
+    const yEntries=data.entries.filter(e=>e.date===yDate);
+    if(yEntries.length===0){toast('Inga poster från igår att upprepa');return}
+    const todayDate=today();
+    const hasToday=data.entries.some(e=>e.date===todayDate);
+    if(hasToday&&!confirm('Du har redan poster idag. Lägg till gårdagens poster ändå?'))return;
+    const newEntries=yEntries.map(e=>({...e,id:gid(),date:todayDate,createdAt:new Date().toISOString(),calEventId:undefined}));
+    const u={...data,entries:[...data.entries,...newEntries]};
+    setData(u);saveLocal(u);
+    toast('✓ '+newEntries.length+' poster kopierade från igår');
+  };
+
+  return<div style={{paddingTop:8}}>
+    {/* Week revenue - primary focus */}
+    {(()=>{
+      const wd=getWeekDates(0);
+      const wRev=calcWeekRevenue(data,wd);
+      const goal=data.weeklyGoal||0;
+      const pct=goal>0?Math.min(Math.round(wRev/goal*100),100):0;
+      const remaining=goal>0?Math.max(goal-wRev,0):0;
+      const reached=goal>0&&wRev>=goal;
+      const todayDate=today();
+      const tH=data.entries.filter(e=>e.date===todayDate).reduce((s,e)=>s+e.seconds,0)/3600;
+      return<div style={{background:'var(--card)',borderRadius:16,padding:'20px',marginBottom:20,border:'1px solid var(--border)',boxShadow:'0 2px 10px rgba(0,0,0,.04)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:8}}>
+          <span style={S.sectionSubtle}>Veckan</span>
+          {goal>0&&<span style={{fontSize:14,fontWeight:700,color:reached?'var(--success)':'var(--text-muted)'}}>{pct}%</span>}
+        </div>
+        <div style={{fontSize:32,fontWeight:700,color:'var(--text)',fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginBottom:goal>0?12:4,lineHeight:1.1}}>
+          {wRev.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr
+          {goal>0&&<span style={{fontSize:15,fontWeight:500,color:'var(--text-muted)',fontFamily:"'Outfit',system-ui,sans-serif",marginLeft:10}}>av {goal.toLocaleString('sv-SE')} kr</span>}
+        </div>
+        {goal>0&&<>
+          <div style={{height:10,background:'var(--sage-ghost)',borderRadius:5,overflow:'hidden'}}>
+            <div style={{height:'100%',width:`${pct}%`,background:reached?'var(--success)':'var(--sage-deep)',borderRadius:5,transition:'width 0.6s ease'}}/>
+          </div>
+          <div style={{fontSize:13,color:reached?'var(--success)':'var(--text-muted)',marginTop:8,fontWeight:reached?600:400}}>
+            {reached?'Mål uppnått!':remaining.toLocaleString('sv-SE',{maximumFractionDigits:0})+' kr kvar denna vecka'}
+          </div>
+        </>}
+        {!goal&&<button onClick={openSettings} style={{fontSize:13,color:'var(--accent)',background:'none',border:'none',padding:0,cursor:'pointer',textDecoration:'underline',fontFamily:'inherit',textAlign:'left'}}>Sätt veckomål →</button>}
+        {tH>0&&<div style={{fontSize:13,color:'var(--text-muted)',marginTop:goal>0?10:8,paddingTop:10,borderTop:'1px solid var(--sage-ghost)'}}>Idag: <span style={{fontWeight:600,color:'var(--text)'}}>{tH.toFixed(1)} h</span> loggat</div>}
+      </div>;
+    })()}
+
+    <div style={S.section}>
+      <div style={S.sectionHeader}><span style={S.sectionTitle}>Projekt</span><button onClick={()=>setShowNew(!showNew)} style={S.addBtn}>+ Nytt</button></div>
+      {showNew&&<div style={S.manualForm}>
+        <input style={S.input} placeholder="Projektnamn..." value={newName} onChange={e=>setNewName(e.target.value)} autoFocus/>
+        <div style={S.manualRow}>
+          <div style={{flex:1}}><label style={S.fieldLabel}>Kund</label><select style={S.input} value={newClient} onChange={e=>setNewClient(e.target.value)}><option value="">Ingen kund</option>{(data.clients||[]).filter(c=>(c.status||'active')!=='closed').sort((a,b)=>a.name.localeCompare(b.name,'sv')).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+          <div style={S.fieldGroup}><label style={S.fieldLabel}>Timpris</label><input type="number" style={S.inputSmall} placeholder={String(data.hourlyRate)} value={newRate} onChange={e=>setNewRate(e.target.value)}/></div>
+        </div>
+        <button onClick={addProj} style={S.confirmBtn}>Skapa projekt</button>
+      </div>}
+      {data.projects.length>6&&<input style={{...S.input,marginBottom:8,fontSize:14,padding:'10px 14px'}} placeholder="Sök projekt eller kund..." value={projSearch} onChange={e=>setProjSearch(e.target.value)}/>}
+      <div style={S.pillRow}>{(()=>{
+        const q=projSearch.toLowerCase().trim();
+        const filtered=q?data.projects.map((p,i)=>({p,i})).filter(({p})=>{
+          const cl=(data.clients||[]).find(c=>c.id===p.clientId);
+          return p.name.toLowerCase().includes(q)||(cl?.name||'').toLowerCase().includes(q);
+        }):data.projects.map((p,i)=>({p,i}));
+        return filtered.map(({p,i})=>{const cl=(data.clients||[]).find(c=>c.id===p.clientId);
+          return<Pill key={p.id} label={p.name+(cl?' · '+cl.name:'')} color={pc(i)} selected={selProj===p.id} onClick={()=>setSelProj(p.id)}/>});
+      })()}{data.projects.length===0&&<span style={S.hint}>Skapa ditt första projekt ovan</span>}{data.projects.length>0&&projSearch&&data.projects.filter(p=>{const cl=(data.clients||[]).find(c=>c.id===p.clientId);return p.name.toLowerCase().includes(projSearch.toLowerCase().trim())||(cl?.name||'').toLowerCase().includes(projSearch.toLowerCase().trim())}).length===0&&<span style={S.hint}>Inga projekt matchar "{projSearch}"</span>}</div>
+    </div>
+
+    {/* Manual entry - simplified */}
+    <div style={S.section}>
+      <span style={S.sectionTitle}>Logga tid</span>
+      <div style={S.manualForm}>
+        <div><label style={S.fieldLabel}>Projekt</label><select style={{...S.input,marginTop:4}} value={mProj||selProj||''} onChange={e=>setMProj(e.target.value)}><option value="">Välj projekt...</option>{data.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+        <div><label style={S.fieldLabel}>Moment</label><input style={{...S.input,marginTop:4}} placeholder="Vad gjorde du?" value={mMom} onChange={e=>setMMom(e.target.value)}/></div>
+        <div style={S.manualRow}>
+          <div style={S.fieldGroup}><label style={S.fieldLabel}>Timmar</label><input type="number" min="0" style={S.inputSmall} placeholder="0" value={mH} onChange={e=>setMH(e.target.value)}/></div>
+          <div style={S.fieldGroup}><label style={S.fieldLabel}>Minuter</label><input type="number" min="0" max="59" style={S.inputSmall} placeholder="0" value={mM} onChange={e=>setMM(e.target.value)}/></div>
+        </div>
+        <button onClick={()=>setShowExtra(!showExtra)} style={{...S.manualToggle,textAlign:'left',padding:'4px 0',alignSelf:'flex-start'}}>{showExtra?'▾ Dölj datum, tider och anteckning':'▸ Datum, tider och anteckning'}</button>
+        {showExtra&&<>
+          <div style={S.manualRow}>
+            <div style={S.fieldGroup}><label style={S.fieldLabel}>Datum</label><input type="date" style={S.input} value={mDate} onChange={e=>setMDate(e.target.value)}/></div>
+            <div style={S.fieldGroup}><label style={S.fieldLabel}>Från</label><input type="time" style={S.inputSmall} value={mStart} onChange={e=>setMStart(e.target.value)}/></div>
+            <div style={S.fieldGroup}><label style={S.fieldLabel}>Till</label><input type="time" style={S.inputSmall} value={mEnd} onChange={e=>setMEnd(e.target.value)}/></div>
+          </div>
+          <div><label style={S.fieldLabel}>Anteckning</label><textarea style={{...S.textarea,marginTop:4}} placeholder="Valfri anteckning..." value={mNote} onChange={e=>setMNote(e.target.value)}/></div>
+        </>}
+        <button onClick={addManual} style={S.confirmBtn}>Lägg till tid</button>
+      </div>
+    </div>
+
+    {/* Repeat yesterday - only if yesterday has entries */}
+    {(()=>{
+      const y=new Date();y.setDate(y.getDate()-1);const yDate=localDateStr(y);
+      const yCount=data.entries.filter(e=>e.date===yDate).length;
+      if(yCount===0)return null;
+      return<div style={S.section}>
+        <button onClick={repeatYesterday} style={{...S.manualToggle,color:'var(--sage-deep)',fontWeight:600}}>↻ Upprepa gårdagens poster ({yCount} st)</button>
+      </div>;
+    })()}
+
+    {/* Timer - compact, collapsible */}
+    <div style={S.section}>
+      <button onClick={()=>setShowManual(!showManual)} style={S.manualToggle}>{showManual?'▾ Dölj timer':'▸ Starta timer'}</button>
+      {showManual&&<div style={{background:'var(--card)',borderRadius:14,padding:12,marginTop:8,border:'1px solid var(--border)',boxShadow:'0 2px 10px rgba(0,0,0,.05)',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+        <input style={{...S.input,flex:'1 1 120px'}} placeholder="Moment..." value={moment} onChange={e=>setMom(e.target.value)}/>
+        <span style={{fontSize:24,fontWeight:700,fontVariantNumeric:'tabular-nums',color:'var(--sage-deep)',fontFamily:"'JetBrains Mono',monospace",minWidth:80,textAlign:'center'}}>{fmtDur(elapsed)}</span>
+        {!running?<button onClick={startTimer} style={{...S.timerBtn,...S.startBtn,padding:'8px 18px',fontSize:13,opacity:selProj?1:.4}}>Starta</button>:
+        <><button onClick={stop} style={{...S.timerBtn,...S.stopBtn,padding:'8px 18px',fontSize:13}}>Spara</button><button onClick={cancelTimer} style={{...S.timerBtn,...S.resetBtn,padding:'8px 14px',fontSize:13}}>Avbryt</button></>}
+      </div>}
+    </div>
+
+    {/* Expense / Trip - collapsible */}
+    <div style={S.section}>
+      <button onClick={()=>setShowExpense(!showExpense)} style={S.manualToggle}>{showExpense?'▾ Dölj utlägg & resor':'▸ Lägg till utlägg eller resa'}</button>
+      {showExpense&&<div style={S.manualForm}>
+        <div style={S.pillRow}>
+          <Pill label="Utlägg" color="var(--sage)" selected={expType==='expense'} onClick={()=>setExpType('expense')}/>
+          <Pill label="Resa" color="var(--sage)" selected={expType==='trip'} onClick={()=>setExpType('trip')}/>
+        </div>
+        <div style={S.manualRow}>
+          <div style={S.fieldGroup}><label style={S.fieldLabel}>Datum</label><input type="date" style={S.input} value={expDate} onChange={e=>setExpDate(e.target.value)}/></div>
+          <div style={S.fieldGroup}><label style={S.fieldLabel}>Projekt</label><select style={S.input} value={expProj||selProj||''} onChange={e=>setExpProj(e.target.value)}><option value="">Välj projekt...</option>{data.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+        </div>
+        {expType==='expense'?<div style={S.manualRow}>
+          <div style={{flex:2}}><label style={S.fieldLabel}>Beskrivning</label><input style={S.input} placeholder="T.ex. Material, fika, parkering..." value={expDesc} onChange={e=>setExpDesc(e.target.value)}/></div>
+          <div style={S.fieldGroup}><label style={S.fieldLabel}>Belopp (kr)</label><input type="number" min="0" style={S.inputSmall} placeholder="0" value={expAmount} onChange={e=>setExpAmount(e.target.value)}/></div>
+        </div>:<div style={S.manualRow}>
+          <div style={{flex:2}}><label style={S.fieldLabel}>Beskrivning</label><input style={S.input} placeholder="T.ex. Kundmöte Göteborg..." value={expDesc} onChange={e=>setExpDesc(e.target.value)}/></div>
+          <div style={S.fieldGroup}><label style={S.fieldLabel}>Kilometer</label><input type="number" min="0" style={S.inputSmall} placeholder="0" value={expKm} onChange={e=>setExpKm(e.target.value)}/></div>
+        </div>}
+        <button onClick={addExpense} style={S.confirmBtn}>{expType==='expense'?'Lägg till utlägg':'Lägg till resa'}</button>
+      </div>}
+    </div>
+
+    {/* Today's details - compact */}
+    {(()=>{const todayDate=today();const tEntries=data.entries.filter(e=>e.date===todayDate).sort((a,b)=>b.createdAt.localeCompare(a.createdAt));
+      const tExp=(data.expenses||[]).filter(e=>e.date===todayDate);const tTrips=(data.trips||[]).filter(e=>e.date===todayDate);
+      if(!tEntries.length&&!tExp.length&&!tTrips.length)return null;
+      return<div style={{...S.section,borderTop:'1px solid var(--border)',paddingTop:16,marginTop:8}}>
+        <span style={S.sectionSubtle}>Dagens poster</span>
+        {tEntries.map(entry=>{const proj=data.projects.find(p=>p.id===entry.projectId);const pi=data.projects.findIndex(p=>p.id===entry.projectId);
+          return<div key={entry.id} style={S.entryRow}><div style={{...S.entryDot,background:pc(pi)}}/><div style={S.entryInfo}><span style={S.entryProject}>{proj?.name||'?'}</span><span style={S.entryMoment}>{entry.startTime&&entry.endTime?entry.startTime+'–'+entry.endTime+' · ':''}{entry.moment}{entry.note&&<span style={S.noteTag}> — {entry.note}</span>}</span></div><span style={S.entryTime}>{fmtH(entry.seconds)} h</span></div>})}
+        {tExp.map(exp=>{const proj=data.projects.find(p=>p.id===exp.projectId);return<div key={exp.id} style={S.entryRow}><div style={{...S.entryDot,background:'var(--accent)'}}/><div style={S.entryInfo}><span style={S.entryProject}>{exp.description}</span><span style={S.entryMoment}>{proj?.name||'?'} · Utlägg</span></div><span style={S.entryTime}>{exp.amount} kr</span></div>})}
+        {tTrips.map(trip=>{const proj=data.projects.find(p=>p.id===trip.projectId);return<div key={trip.id} style={S.entryRow}><div style={{...S.entryDot,background:'var(--sage-light)'}}/><div style={S.entryInfo}><span style={S.entryProject}>{trip.description}</span><span style={S.entryMoment}>{proj?.name||'?'} · {trip.km} km</span></div><span style={S.entryTime}>{trip.km*(data.kmRate||2.5)} kr</span></div>})}
+      </div>})()}
+  </div>
+}
+
+// ── Dashboard View ──
+function DashboardView({data,weekOffset,setWeekOffset}){
+  const dashWeek=weekOffset;const setDashWeek=setWeekOffset;
+  const now=new Date();
+  const thisMonth=now.getMonth(),thisYear=now.getFullYear();
+  const lastMonth=thisMonth===0?11:thisMonth-1,lastYear=thisMonth===0?thisYear-1:thisYear;
+  const monthNames=['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+  const todayDate=today();
+
+  // Parse date string to month/year without timezone issues
+  const parseMonth=(dateStr)=>{const p=dateStr.split('-');return{m:parseInt(p[1])-1,y:parseInt(p[0])}};
+
+  // This month's data
+  const mEntries=data.entries.filter(e=>{const p=parseMonth(e.date);return p.m===thisMonth&&p.y===thisYear});
+  const mSec=mEntries.reduce((s,e)=>s+e.seconds,0);const mH=mSec/3600;
+  let mCost=calcRevenue(mEntries,data)+calcFixedMonthly(data,thisYear,thisMonth);
+  const mExp=(data.expenses||[]).filter(e=>{const p=parseMonth(e.date);return p.m===thisMonth&&p.y===thisYear}).reduce((s,e)=>s+e.amount,0);
+  const mTrips=(data.trips||[]).filter(e=>{const p=parseMonth(e.date);return p.m===thisMonth&&p.y===thisYear}).reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
+  const mTotal=mCost+mExp+mTrips;
+  const mProjects=new Set(mEntries.map(e=>e.projectId)).size;
+
+  // Last month's data (for comparison)
+  const lEntries=data.entries.filter(e=>{const p=parseMonth(e.date);return p.m===lastMonth&&p.y===lastYear});
+  const lH=lEntries.reduce((s,e)=>s+e.seconds,0)/3600;
+  let lCost=calcRevenue(lEntries,data)+calcFixedMonthly(data,lastYear,lastMonth);
+
+  const diffH=mH-lH;const diffPct=lH>0?Math.round((diffH/lH)*100):0;
+
+  // Weekly trend (last 12 weeks)
+  const weeklyData=[];
+  for(let w=11;w>=0;w--){
+    const wd=getWeekDates(-w);
+    const wSec=data.entries.filter(e=>wd.includes(e.date)).reduce((s,e)=>s+e.seconds,0);
+    const wStart=new Date(wd[0]+'T12:00:00');
+    weeklyData.push({label:`${wStart.getDate()}/${wStart.getMonth()+1}`,hours:wSec/3600});
+  }
+  const maxWH=Math.max(...weeklyData.map(w=>w.hours),1);
+
+  // Top projects this month
+  const projTime={};mEntries.forEach(e=>{if(!projTime[e.projectId])projTime[e.projectId]=0;projTime[e.projectId]+=e.seconds});
+  const topProjects=Object.entries(projTime).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const maxProjSec=topProjects.length>0?topProjects[0][1]:1;
+
+  // Activity heatmap (last 30 days)
+  const heatDays=[];
+  for(let d=29;d>=0;d--){
+    const dt=new Date(now.getFullYear(),now.getMonth(),now.getDate()-d,12,0,0);
+    const ds=localDateStr(dt);
+    const sec=data.entries.filter(e=>e.date===ds).reduce((s,e)=>s+e.seconds,0);
+    heatDays.push({date:ds,hours:sec/3600,day:dt.getDay(),dayNum:dt.getDate()});
+  }
+  const maxHeat=Math.max(...heatDays.map(d=>d.hours),1);
+
+  const card={background:'var(--card)',borderRadius:16,padding:16,border:'1px solid var(--border)',boxShadow:'0 4px 20px rgba(0,0,0,.06)',marginBottom:14};
+  const compStyle=(val)=>({fontSize:12,fontWeight:600,color:val>0?'var(--sage)':val<0?'var(--accent)':'var(--text-muted)'});
+
+  return<div style={{paddingTop:8}}>
+    {/* Week navigation */}
+    <div style={S.weekNav}>
+      <button onClick={()=>setDashWeek(dashWeek-1)} style={S.weekNavBtn}>{'◀'}</button>
+      <div style={S.weekNavCenter}>
+        <span style={S.weekLabel}>{weekLabel(getWeekDates(dashWeek))}</span>
+        {dashWeek===0&&<span style={{fontSize:12,color:'var(--sage)',fontWeight:600}}>Denna vecka</span>}
+      </div>
+      <button onClick={()=>setDashWeek(dashWeek+1)} style={{...S.weekNavBtn,opacity:dashWeek>=0?.3:1}} disabled={dashWeek>=0}>{'▶'}</button>
+      {dashWeek!==0&&<button onClick={()=>setDashWeek(0)} style={S.weekTodayBtn}>Denna vecka</button>}
+    </div>
+
+    {/* Today indicator - only show for current week */}
+    {dashWeek===0&&(()=>{const todayDate=today();const tEntries=data.entries.filter(e=>e.date===todayDate);const tH=tEntries.reduce((s,e)=>s+e.seconds,0)/3600;
+      let tRev=calcRevenue(tEntries,data);
+      return<div style={{background:tH>0?'var(--sage-deep)':'var(--card)',borderRadius:16,padding:'16px',marginBottom:16,color:tH>0?'#fff':'var(--text)',border:tH>0?'none':'2px dashed var(--border)',boxShadow:tH>0?'0 4px 16px rgba(45,62,51,.25)':'none'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div><div style={{fontSize:12,fontWeight:600,opacity:.7,textTransform:'uppercase',letterSpacing:'1px'}}>Idag</div>
+            <div style={{fontSize:28,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2}}>{tH.toFixed(1)} h</div></div>
+          {tH>0&&<div style={{textAlign:'right'}}><div style={{fontSize:12,fontWeight:600,opacity:.7,textTransform:'uppercase',letterSpacing:'1px'}}>Intäkt</div>
+            <div style={{fontSize:22,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2}}>{tRev.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</div></div>}
+          {tH===0&&<span style={{fontSize:14,color:'var(--text-muted)'}}>Ingen tid loggad ännu</span>}
+        </div>
+      </div>})()}
+
+    {/* Week summary card */}
+    {(()=>{
+      const wd=getWeekDates(dashWeek);
+      const wEntries=data.entries.filter(e=>wd.includes(e.date));
+      const wH=wEntries.reduce((s,e)=>s+e.seconds,0)/3600;
+      const wRev=calcWeekRevenue(data,wd);
+      return<div style={{background:'var(--sage-ghost)',borderRadius:16,padding:'16px',marginBottom:16}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <div><div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Veckan</div>
+            <div style={{fontSize:24,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)'}}>{wH.toFixed(1)} h</div></div>
+          <div style={{textAlign:'right'}}><div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Intäkt</div>
+            <div style={{fontSize:20,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)'}}>{wRev.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</div></div>
+        </div>
+      </div>})()}
+
+    {/* Month header */}
+    <div style={{marginBottom:16}}>
+      <span style={{fontSize:20,fontWeight:700,color:'var(--sage-deep)'}}>{monthNames[thisMonth]} {thisYear}</span>
+    </div>
+
+    {/* Summary cards */}
+    <div style={S.cardRow}>
+      <div style={S.summaryCard}>
+        <span style={S.cardLabel}>Tid</span>
+        <span style={S.cardValue}>{mH.toFixed(1)} h</span>
+        <span style={compStyle(diffH)}>{diffH>0?'+':''}{diffH.toFixed(1)} h vs {monthNames[lastMonth]}</span>
+      </div>
+      <div style={S.summaryCard}>
+        <span style={S.cardLabel}>Projekt</span>
+        <span style={S.cardValue}>{mProjects}</span>
+      </div>
+      <div style={{...S.summaryCard,...S.summaryCardAccent}}>
+        <span style={S.cardLabel}>Totalt</span>
+        <span style={S.cardValue}>{mTotal.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span>
+      </div>
+    </div>
+
+    {/* Project distribution - pie chart */}
+    {topProjects.length>1&&<div style={card}>
+      <span style={{...S.sectionTitle,marginBottom:12}}>Fördelning per projekt</span>
+      <div style={{display:'flex',alignItems:'center',gap:16}}>
+        <svg viewBox="0 0 100 100" style={{width:100,height:100,flexShrink:0}}>
+          {(()=>{const total=topProjects.reduce((s,[,sec])=>s+sec,0);let cum=0;
+            return topProjects.map(([pid,sec],i)=>{const pct=sec/total;const start=cum;cum+=pct;
+              const x1=50+40*Math.cos(2*Math.PI*start-Math.PI/2);const y1=50+40*Math.sin(2*Math.PI*start-Math.PI/2);
+              const x2=50+40*Math.cos(2*Math.PI*(start+pct)-Math.PI/2);const y2=50+40*Math.sin(2*Math.PI*(start+pct)-Math.PI/2);
+              const large=pct>0.5?1:0;const pi=data.projects.findIndex(p=>p.id===pid);
+              return<path key={pid} d={topProjects.length===1?`M50,10A40,40,0,1,1,49.99,10Z`:`M50,50L${x1},${y1}A40,40,0,${large},1,${x2},${y2}Z`} fill={pc(pi)} opacity="0.85"/>})})()}
+        </svg>
+        <div style={{display:'flex',flexDirection:'column',gap:4,flex:1}}>
+          {topProjects.map(([pid,sec],i)=>{const proj=data.projects.find(p=>p.id===pid);const pi=data.projects.findIndex(p=>p.id===pid);const pct=Math.round(sec/topProjects.reduce((s,[,v])=>s+v,0)*100);
+            return<div key={pid} style={{display:'flex',alignItems:'center',gap:6,fontSize:13}}>
+              <div style={{width:8,height:8,borderRadius:'50%',background:pc(pi),flexShrink:0}}/>
+              <span style={{flex:1,color:'var(--text)'}}>{proj?.name||'?'}</span>
+              <span style={{fontWeight:600,color:'var(--sage-deep)',fontVariantNumeric:'tabular-nums'}}>{pct}%</span>
+            </div>})}
+        </div>
+      </div>
+    </div>}
+
+    {/* Weekly trend chart */}
+    <div style={card}>
+      <span style={{...S.sectionTitle,marginBottom:14}}>Timmar per vecka</span>
+      <div style={{display:'flex',alignItems:'flex-end',gap:4,height:100}}>
+        {weeklyData.map((w,i)=>{
+          const pct=Math.max((w.hours/maxWH)*100,2);
+          const isThisWeek=i===weeklyData.length-1;
+          return<div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+            <span style={{fontSize:11,color:'var(--text-muted)',fontVariantNumeric:'tabular-nums'}}>{w.hours>0?w.hours.toFixed(0):''}</span>
+            <div style={{width:'100%',height:`${pct}%`,background:isThisWeek?'var(--sage)':'var(--sage-pale)',borderRadius:4,minHeight:2,transition:'height 0.4s ease'}}/>
+            <span style={{fontSize:11,color:isThisWeek?'var(--sage-deep)':'var(--text-muted)',fontWeight:isThisWeek?600:400}}>{w.label}</span>
+          </div>
+        })}
+      </div>
+    </div>
+
+    {/* Top projects */}
+    {topProjects.length>0&&<div style={card}>
+      <span style={{...S.sectionTitle,marginBottom:12}}>Topp-projekt denna månad</span>
+      {topProjects.map(([pid,sec],i)=>{
+        const proj=data.projects.find(p=>p.id===pid);const pi=data.projects.findIndex(p=>p.id===pid);
+        const h=sec/3600;const pct=(sec/maxProjSec)*100;
+        return<div key={pid} style={{marginBottom:10}}>
+          <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+            <div style={{...S.entryDot,background:pc(pi)}}/>
+            <span style={{fontSize:14,fontWeight:600,color:'var(--text)',flex:1}}>{proj?.name||'?'}</span>
+            <span style={{fontSize:13,fontWeight:600,color:'var(--sage-deep)',fontVariantNumeric:'tabular-nums'}}>{h.toFixed(1)} h</span>
+          </div>
+          <div style={S.barTrack}><div style={{...S.barFill,width:`${pct}%`,background:pc(pi)}}/></div>
+        </div>
+      })}
+    </div>}
+
+    {/* Activity heatmap */}
+    <div style={card}>
+      <span style={{...S.sectionTitle,marginBottom:12}}>Aktivitet senaste 30 dagarna</span>
+      <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
+        {heatDays.map((d,i)=>{
+          const intensity=d.hours>0?Math.max(0.2,d.hours/maxHeat):0;
+          const bg=d.hours>0?`rgba(94,115,104,${intensity})`:'var(--sage-ghost)';
+          const isToday=d.date===todayDate;
+          return<div key={i} title={`${d.date}: ${d.hours.toFixed(1)} h`} style={{
+            width:26,height:26,borderRadius:5,background:bg,
+            border:isToday?'2px solid var(--sage-deep)':'1px solid transparent',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            fontSize:11,color:d.hours>maxHeat*0.5?'#fff':'var(--text-muted)',fontWeight:500,
+          }}>{d.dayNum}</div>
+        })}
+      </div>
+      <div style={{display:'flex',gap:12,marginTop:8,fontSize:11,color:'var(--text-muted)'}}>
+        <span>Mindre</span>
+        <div style={{display:'flex',gap:2}}>
+          {[0,0.2,0.4,0.7,1].map((v,i)=><div key={i} style={{width:12,height:12,borderRadius:2,background:v===0?'var(--sage-ghost)':`rgba(94,115,104,${v})`}}/>)}
+        </div>
+        <span>Mer</span>
+      </div>
+    </div>
+
+  </div>
+}
+
+// ── Week View (with calendar) ──
+function WeekView({data,setData,msConnected,weekOffset,setWeekOffset}){
+  const wo=weekOffset;const setWo=setWeekOffset;
+  const[calEvents,setCalEvents]=useState([]);
+  const[calLoading,setCalLoading]=useState(false);
+  const[importProj,setImportProj]=useState('');
+  const[hiddenEvents,setHiddenEvents]=useState(()=>{try{return JSON.parse(localStorage.getItem('invisiontid-hidden-cal')||'[]')}catch{return[]}});
+  const wd=getWeekDates(wo),wl=weekLabel(wd);
+  const we=data.entries.filter(e=>wd.includes(e.date)),wt=we.reduce((s,e)=>s+e.seconds,0);
+  const dt=wd.map(d=>data.entries.filter(e=>e.date===d).reduce((s,e)=>s+e.seconds,0));
+  const mx=Math.max(...dt,3600);
+
+  useEffect(()=>{
+    const t=getMsToken();
+    if(!t||!msConnected)return;
+    setCalLoading(true);
+    // Fetch one extra day on each side to handle UTC/Stockholm offset
+    const dayBefore = new Date(new Date(wd[0]+'T12:00:00'));dayBefore.setDate(dayBefore.getDate()-1);
+    const dayAfter = new Date(new Date(wd[6]+'T12:00:00'));dayAfter.setDate(dayAfter.getDate()+1);
+    const fetchStart = dayBefore.toISOString().slice(0,10);
+    const fetchEnd = dayAfter.toISOString().slice(0,10);
+    fetchCalendarEvents(t,fetchStart,fetchEnd).then(events=>{
+      // Filter to only events whose local date falls within the week
+      setCalEvents(events.filter(ev=>ev.date>=wd[0]&&ev.date<=wd[6]));
+      setCalLoading(false);
+    }).catch(()=>setCalLoading(false));
+  },[wo,msConnected]);
+
+  const hideEvent=(evId)=>{const updated=[...hiddenEvents,evId];setHiddenEvents(updated);try{localStorage.setItem('invisiontid-hidden-cal',JSON.stringify(updated))}catch{}};
+  const showAllHidden=()=>{setHiddenEvents([]);try{localStorage.removeItem('invisiontid-hidden-cal')}catch{}};
+
+  const visibleEvents=calEvents.filter(ev=>!hiddenEvents.includes(ev.id));
+  const hiddenCount=calEvents.length-visibleEvents.length;
+
+  const importEvent=(ev)=>{
+    const pid=importProj||data.projects[0]?.id;
+    if(!pid){alert('Skapa ett projekt först');return}
+    const dur=calEventDuration(ev);
+    if(dur<=0)return;
+    const alreadyImported=data.entries.some(e=>e.calEventId===ev.id);
+    if(alreadyImported){alert('Redan importerad');return}
+    const entry={id:gid(),projectId:pid,moment:ev.subject,seconds:dur,date:ev.date,createdAt:new Date().toISOString(),calEventId:ev.id};
+    const u={...data,entries:[...data.entries,entry]};
+    setData(u);saveLocal(u);
+  };
+
+  const importAllEvents=()=>{
+    const pid=importProj||data.projects[0]?.id;
+    if(!pid){alert('Skapa ett projekt först');return}
+    const importable=visibleEvents.filter(ev=>!ev.isAllDay&&calEventDuration(ev)>0&&!data.entries.some(e=>e.calEventId===ev.id));
+    if(importable.length===0)return;
+    const newEntries=importable.map(ev=>({id:gid(),projectId:pid,moment:ev.subject,seconds:calEventDuration(ev),date:ev.date,createdAt:new Date().toISOString(),calEventId:ev.id}));
+    const u={...data,entries:[...data.entries,...newEntries]};
+    setData(u);saveLocal(u);
+  };
+
+  const importableCount=visibleEvents.filter(ev=>!ev.isAllDay&&calEventDuration(ev)>0&&!data.entries.some(e=>e.calEventId===ev.id)).length;
+
+  return<div style={{paddingTop:8}}>
+    <div style={S.weekNav}><button onClick={()=>setWo(wo-1)} style={S.weekNavBtn}>{'◀'}</button><div style={S.weekNavCenter}><span style={S.weekLabel}>{wl}</span><span style={S.weekTotal}>{fmtH(wt)} h totalt</span></div><button onClick={()=>setWo(wo+1)} style={S.weekNavBtn}>{'▶'}</button>{wo!==0&&<button onClick={()=>setWo(0)} style={S.weekTodayBtn}>Idag</button>}</div>
+    <div style={S.weekChart}>{wd.map((date,i)=>{const dayE=data.entries.filter(e=>e.date===date),td=date===today();const byP={};dayE.forEach(e=>{if(!byP[e.projectId])byP[e.projectId]=0;byP[e.projectId]+=e.seconds});const segs=Object.entries(byP).map(([pid,sec])=>({color:pc(data.projects.findIndex(p=>p.id===pid)),pct:(sec/mx)*100}));
+      return<div key={date} style={S.weekDayCol}><div style={S.weekBarContainer}>{segs.length>0?segs.map((sg,si)=><div key={si} style={{width:'100%',height:`${Math.max(sg.pct,1)}%`,background:sg.color,borderRadius:si===0?'6px 6px 0 0':si===segs.length-1?'0 0 6px 6px':0}}/>):<div style={{width:'100%',height:'2%',background:'#e5e2dc',borderRadius:6}}/>}</div><span style={{...S.weekDayLabel,fontWeight:td?700:500,color:td?'var(--sage-deep)':'var(--text-muted)'}}>{DN[i]}</span><span style={S.weekDayHours}>{dt[i]>0?fmtH(dt[i]):'–'}</span></div>})}</div>
+
+    {/* Calendar events */}
+    {msConnected&&<div style={{...S.section,background:'var(--card)',borderRadius:16,padding:18,border:'1px solid var(--border)',marginBottom:16,boxShadow:'0 4px 20px rgba(0,0,0,.06)'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <span style={{...S.sectionTitle,marginBottom:0}}>Kalender</span>
+        {calLoading&&<span style={{fontSize:11,color:'var(--text-muted)'}}>Laddar...</span>}
+      </div>
+      {calEvents.length>0&&<div style={{marginBottom:10}}>
+        <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
+          <label style={{...S.fieldLabel,marginBottom:0}}>Importera till:</label>
+          <select style={{...S.input,flex:'0 1 180px',padding:'6px 10px',fontSize:13}} value={importProj} onChange={e=>setImportProj(e.target.value)}>
+            {data.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {importableCount>0&&<button onClick={importAllEvents} style={{...S.confirmBtn,padding:'6px 14px',fontSize:12}}>Importera alla ({importableCount})</button>}
+        </div>
+      </div>}
+      {visibleEvents.length===0&&!calLoading&&<span style={S.hint}>Inga kalenderhändelser denna vecka{hiddenCount>0&&` (${hiddenCount} dolda)`}</span>}
+      {wd.map((date,i)=>{
+        const dayEvents=visibleEvents.filter(ev=>ev.date===date);
+        if(dayEvents.length===0)return null;
+        const dO=new Date(date+'T12:00:00'),td=date===today();
+        return<div key={'cal-'+date} style={{marginBottom:10}}>
+          <div style={{fontSize:12,fontWeight:600,color:td?'var(--sage-deep)':'var(--text-muted)',marginBottom:4}}>{DN[i]} {dO.getDate()}/{dO.getMonth()+1}</div>
+          {dayEvents.map(ev=>{
+            const dur=calEventDuration(ev);
+            const imported=data.entries.some(e=>e.calEventId===ev.id);
+            return<div key={ev.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 0',borderBottom:'1px solid var(--border)'}}>
+              <div style={{width:3,height:24,borderRadius:2,background:ev.isAllDay?'#F2CC8F':'#8E7DBE',flexShrink:0}}/>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{fontSize:13,fontWeight:500,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ev.subject}</div>
+                <div style={{fontSize:11,color:'var(--text-muted)'}}>{ev.isAllDay?'Heldag':calEventTimeStr(ev)}{dur>0&&!ev.isAllDay&&` · ${fmtH(dur)} h`}</div>
+              </div>
+              {!ev.isAllDay&&dur>0&&!imported&&<button onClick={()=>importEvent(ev)} style={{...S.addBtn,padding:'3px 10px',fontSize:11,borderStyle:'solid'}}>+ Tid</button>}
+              {imported&&<span style={{fontSize:11,color:'var(--sage)',fontWeight:600}}>Importerad</span>}
+              <button onClick={()=>hideEvent(ev.id)} style={{...S.deleteBtn,fontSize:14,color:'var(--border)'}} title="Dölj händelse">x</button>
+            </div>
+          })}
+        </div>
+      })}
+      {hiddenCount>0&&<button onClick={showAllHidden} style={{background:'none',border:'none',fontSize:12,color:'var(--text-muted)',padding:'8px 0',textDecoration:'underline',cursor:'pointer'}}>Visa {hiddenCount} dolda händelser</button>}
+    </div>}
+    {!msConnected&&<div style={{...S.section,background:'var(--sage-ghost)',borderRadius:16,padding:18,textAlign:'center'}}>
+      <span style={{fontSize:13,color:'var(--text-muted)'}}>Logga in med Microsoft i Synk-fliken för att se din kalender här.</span>
+    </div>}
+
+    {/* Time entries */}
+    {wd.map((date,i)=>{const dayE=data.entries.filter(e=>e.date===date);if(!dayE.length)return null;const dayT=dayE.reduce((s,e)=>s+e.seconds,0),dO=new Date(date+'T12:00:00'),td=date===today();
+      return<div key={date} style={S.dateGroup}><div style={S.dateHeader}><span style={{...S.dateLabel,fontWeight:td?700:600}}>{DN[i]} {dO.getDate()}/{dO.getMonth()+1}{td&&<span style={{color:'var(--sage)',marginLeft:6,fontSize:11}}>idag</span>}</span><span style={S.dateTotalBadge}>{fmtH(dayT)} h</span></div>
+        {dayE.map(en=>{const pr=data.projects.find(p=>p.id===en.projectId);const pi=data.projects.findIndex(p=>p.id===en.projectId);return<div key={en.id} style={S.entryRow}><div style={{...S.entryDot,background:pc(pi)}}/><div style={S.entryInfo}><span style={S.entryProject}>{pr?.name||'?'}</span><span style={S.entryMoment}>{en.startTime&&en.endTime?en.startTime+'–'+en.endTime+' · ':''}{en.moment}{en.note&&<span style={S.noteTag}> — {en.note}</span>}</span></div><span style={S.entryTime}>{fmtH(en.seconds)} h</span></div>})}</div>})}
+    {we.length===0&&<span style={S.hint}>Inga registreringar den här veckan</span>}
+  </div>
+}
+
+// ── Entries View (with edit) ──
+function EntriesView({data,setData,weekOffset,setWeekOffset}){
+  const toast=useToast();
+  const[subTab,setSubTab]=useState('time');
+  const[filter,setFilter]=useState('all');
+  const[search,setSearch]=useState('');
+  const histWeek=weekOffset;const setHistWeek=setWeekOffset;
+  const[editEntry,setEditEntry]=useState(null);
+  const[splitEntry,setSplitEntry]=useState(null);
+  const[editProj,setEditProj]=useState(null);
+  const[editClient,setEditClient]=useState(null);
+  const[showNewClient,setShowNewClient]=useState(false);
+  const[showClosed,setShowClosed]=useState(false);
+
+  const now=()=>new Date().toISOString();
+  const addTomb=(ids)=>{const t=now();const map={...(data.deletedIds||{})};ids.forEach(id=>{map[id]=t});return map};
+  const del=id=>{const entry=data.entries.find(e=>e.id===id);const u={...data,entries:data.entries.filter(e=>e.id!==id),deletedIds:addTomb([id])};setData(u);saveLocal(u);
+    const undo=()=>{const dd={...(u.deletedIds||{})};delete dd[id];const r={...u,entries:[...u.entries,entry],deletedIds:dd};setData(r);saveLocal(r)};undo.label='Ångra';toast('Tidspost borttagen',undo)};
+  const delExp=id=>{const exp=(data.expenses||[]).find(e=>e.id===id);const u={...data,expenses:(data.expenses||[]).filter(e=>e.id!==id),deletedIds:addTomb([id])};setData(u);saveLocal(u);
+    const undo=()=>{const dd={...(u.deletedIds||{})};delete dd[id];const r={...u,expenses:[...u.expenses,exp],deletedIds:dd};setData(r);saveLocal(r)};undo.label='Ångra';toast('Utlägg borttaget',undo)};
+  const delTrip=id=>{const trip=(data.trips||[]).find(e=>e.id===id);const u={...data,trips:(data.trips||[]).filter(e=>e.id!==id),deletedIds:addTomb([id])};setData(u);saveLocal(u);
+    const undo=()=>{const dd={...(u.deletedIds||{})};delete dd[id];const r={...u,trips:[...u.trips,trip],deletedIds:dd};setData(r);saveLocal(r)};undo.label='Ångra';toast('Resa borttagen',undo)};
+  const saveEntry=updated=>{const u={...data,entries:data.entries.map(e=>e.id===updated.id?{...updated,updatedAt:now()}:e)};setData(u);saveLocal(u);toast('✓ Uppdaterad')};
+  const splitEntryFn=(e1,e2)=>{const t=now();const u={...data,entries:data.entries.map(e=>e.id===e1.id?{...e1,updatedAt:t}:e).concat([{...e2,updatedAt:t}])};setData(u);saveLocal(u);toast('✓ Tidspost delad')};
+  const saveProj=updated=>{const u={...data,projects:data.projects.map(p=>p.id===updated.id?{...updated,updatedAt:now()}:p)};setData(u);saveLocal(u);toast('✓ Projekt uppdaterat')};
+  const delProj=pid=>{const projEntryIds=data.entries.filter(e=>e.projectId===pid).map(e=>e.id);const u={...data,projects:data.projects.filter(p=>p.id!==pid),entries:data.entries.filter(e=>e.projectId!==pid),deletedIds:addTomb([pid,...projEntryIds])};setData(u);saveLocal(u);if(filter===pid)setFilter('all')};
+  const saveClient=c=>{const exists=(data.clients||[]).find(x=>x.id===c.id);const withTs={...c,updatedAt:now()};const u={...data,clients:exists?(data.clients||[]).map(x=>x.id===c.id?withTs:x):[...(data.clients||[]),withTs]};setData(u);saveLocal(u);toast('✓ Kund sparad')};
+  const delClient=cid=>{const u={...data,clients:(data.clients||[]).filter(c=>c.id!==cid),projects:data.projects.map(p=>p.clientId===cid?{...p,clientId:undefined,updatedAt:now()}:p),deletedIds:addTomb([cid])};setData(u);saveLocal(u)};
+
+  const histWd=getWeekDates(histWeek);
+  const searchLower=search.toLowerCase();
+  const filtered=(filter==='all'?data.entries:data.entries.filter(e=>e.projectId===filter)).filter(e=>{
+    if(!histWd.includes(e.date))return false;
+    if(!search)return true;const proj=data.projects.find(p=>p.id===e.projectId);
+    return e.moment.toLowerCase().includes(searchLower)||(e.note||'').toLowerCase().includes(searchLower)||(proj?.name||'').toLowerCase().includes(searchLower)||e.date.includes(search)});
+  const sorted=[...filtered].sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));
+  const grouped={};sorted.forEach(e=>{if(!grouped[e.date])grouped[e.date]=[];grouped[e.date].push(e)});
+
+  return<div style={{paddingTop:8}}>
+    {editEntry&&<EditEntryModal entry={editEntry} data={data} onSave={saveEntry} onClose={()=>setEditEntry(null)}/>}
+    {splitEntry&&<SplitEntryModal entry={splitEntry} data={data} onSplit={splitEntryFn} onClose={()=>setSplitEntry(null)}/>}
+    {editProj&&<EditProjectModal project={editProj} data={data} onSave={saveProj} onClose={()=>setEditProj(null)}/>}
+    {(editClient||showNewClient)&&<ClientModal client={editClient} onSave={c=>{saveClient(c);setShowNewClient(false)}} onClose={()=>{setEditClient(null);setShowNewClient(false)}}/>}
+
+    {/* Sub-tabs */}
+    <div style={{display:'flex',gap:0,background:'var(--card)',borderRadius:12,marginBottom:16,border:'1px solid var(--border)',overflow:'hidden'}}>
+      {[{id:'time',l:'Tid'},{id:'expenses',l:'Utlägg & Resor'},{id:'projects',l:'Projekt'},{id:'clients',l:'Kunder'}].map(t=>
+        <button key={t.id} onClick={()=>setSubTab(t.id)} style={{flex:1,padding:'10px 4px',border:'none',background:subTab===t.id?'var(--sage-ghost)':'transparent',color:subTab===t.id?'var(--sage-deep)':'var(--text-muted)',fontSize:13,fontWeight:subTab===t.id?600:400,fontFamily:'inherit',borderBottom:subTab===t.id?'2.5px solid var(--sage-deep)':'2.5px solid transparent',cursor:'pointer'}}>{t.l}</button>)}
+    </div>
+
+    {/* TIME TAB */}
+    {subTab==='time'&&<div>
+      {/* Week navigation */}
+      <div style={S.weekNav}>
+        <button onClick={()=>setHistWeek(histWeek-1)} style={S.weekNavBtn}>{'◀'}</button>
+        <div style={S.weekNavCenter}>
+          <span style={S.weekLabel}>{weekLabel(histWd)}</span>
+          <span style={S.weekTotal}>{fmtH(filtered.reduce((s,e)=>s+e.seconds,0))} h · {filtered.length} poster</span>
+        </div>
+        <button onClick={()=>setHistWeek(histWeek+1)} style={{...S.weekNavBtn,opacity:histWeek>=0?.3:1}} disabled={histWeek>=0}>{'▶'}</button>
+        {histWeek!==0&&<button onClick={()=>setHistWeek(0)} style={S.weekTodayBtn}>Denna vecka</button>}
+      </div>
+      <input style={{...S.input,marginBottom:10}} placeholder="Sök moment, anteckning, projekt..." value={search} onChange={e=>setSearch(e.target.value)}/>
+      <div style={{...S.pillRow,marginBottom:12}}>
+        <Pill label="Alla" color="var(--sage-deep)" selected={filter==='all'} onClick={()=>setFilter('all')}/>
+        {data.projects.map((p,i)=><Pill key={p.id} label={p.name} color={pc(i)} selected={filter===p.id} onClick={()=>setFilter(p.id)}/>)}
+      </div>
+      {Object.keys(grouped).length===0&&<span style={S.hint}>Inga registreringar att visa</span>}
+      {Object.entries(grouped).map(([date,entries])=>{const total=entries.reduce((s,e)=>s+e.seconds,0);
+        return<div key={date} style={S.dateGroup}><div style={S.dateHeader}><span style={S.dateLabel}>{new Date(date+'T12:00:00').toLocaleDateString('sv-SE',{weekday:'short',day:'numeric',month:'short'})}</span><span style={S.dateTotalBadge}>{fmtH(total)} h</span></div>
+          {entries.map(en=>{const pr=data.projects.find(p=>p.id===en.projectId);const pi=data.projects.findIndex(p=>p.id===en.projectId);
+            return<div key={en.id} style={S.entryRow}><div style={{...S.entryDot,background:pc(pi)}}/><div style={S.entryInfo}><span style={S.entryProject}>{pr?.name||'?'}</span><span style={S.entryMoment}>{en.startTime&&en.endTime?en.startTime+'–'+en.endTime+' · ':''}{en.moment}{en.note&&<span style={S.noteTag}> — {en.note}</span>}</span></div><span style={S.entryTime}>{fmtH(en.seconds)} h</span><button onClick={()=>setSplitEntry(en)} style={{...S.editBtn,fontSize:13}} title="Dela upp">{'÷'}</button><button onClick={()=>setEditEntry(en)} style={S.editBtn} title="Redigera">{'✎'}</button><button onClick={()=>del(en.id)} style={S.deleteBtn} title="Ta bort">x</button></div>})}</div>})}
+    </div>}
+
+    {/* EXPENSES & TRIPS TAB */}
+    {subTab==='expenses'&&<div>
+      <span style={{...S.sectionTitle,marginBottom:12}}>Utlägg</span>
+      {(data.expenses||[]).length===0&&<span style={S.hint}>Inga utlägg</span>}
+      {[...(data.expenses||[])].sort((a,b)=>b.date.localeCompare(a.date)).map(exp=>{
+        const proj=data.projects.find(p=>p.id===exp.projectId);
+        return<div key={exp.id} style={S.entryRow}><div style={{...S.entryDot,background:'var(--accent)'}}/><div style={S.entryInfo}><span style={S.entryProject}>{exp.description}</span><span style={S.entryMoment}>{proj?.name||'?'} · {new Date(exp.date+'T12:00:00').toLocaleDateString('sv-SE',{day:'numeric',month:'short'})}</span></div><span style={S.entryTime}>{exp.amount} kr</span><button onClick={()=>delExp(exp.id)} style={S.deleteBtn}>x</button></div>})}
+
+      <span style={{...S.sectionTitle,marginTop:24,marginBottom:12}}>Resor</span>
+      {(data.trips||[]).length===0&&<span style={S.hint}>Inga resor</span>}
+      {[...(data.trips||[])].sort((a,b)=>b.date.localeCompare(a.date)).map(trip=>{
+        const proj=data.projects.find(p=>p.id===trip.projectId);
+        return<div key={trip.id} style={S.entryRow}><div style={{...S.entryDot,background:'var(--sage-light)'}}/><div style={S.entryInfo}><span style={S.entryProject}>{trip.description}</span><span style={S.entryMoment}>{proj?.name||'?'} · {trip.km} km · {new Date(trip.date+'T12:00:00').toLocaleDateString('sv-SE',{day:'numeric',month:'short'})}</span></div><span style={S.entryTime}>{trip.km*(data.kmRate||2.5)} kr</span><button onClick={()=>delTrip(trip.id)} style={S.deleteBtn}>x</button></div>})}
+    </div>}
+
+    {/* PROJECTS TAB */}
+    {subTab==='projects'&&<div>
+      {data.projects.length===0&&<span style={S.hint}>Inga projekt</span>}
+      {data.projects.map((p,i)=>{const pe=data.entries.filter(e=>e.projectId===p.id);const cl=(data.clients||[]).find(c=>c.id===p.clientId);const r=getRate(p,data);
+        const hasPeriods=(p.pricingPeriods||[]).length>0;
+        return<div key={p.id} style={{...S.entryRow,flexWrap:'wrap'}}>
+          <div style={{...S.entryDot,background:pc(i)}}/>
+          <div style={{...S.entryInfo,minWidth:0}}>
+            <span style={S.entryProject}>{p.name}</span>
+            <span style={S.entryMoment}>{pe.length} poster · {fmtH(pe.reduce((s,e)=>s+e.seconds,0))} h · {r} kr/h{hasSessionPrice(p)&&' · '+p.sessionPrice.toLocaleString('sv-SE')+' kr/tillfälle'}{isFixedPrice(p)&&' · Fastpris: '+(p.pricingPeriods||[]).filter(pp=>pp.type==='fixed').reduce((s,pp)=>s+pp.amount,0).toLocaleString('sv-SE')+' kr'}</span>
+            {cl&&<span style={S.clientBadge}>{cl.name}</span>}
+            {hasPeriods&&<div style={{marginTop:4}}>{(p.pricingPeriods||[]).map(pp=><span key={pp.id} style={{fontSize:11,color:'var(--text-muted)',display:'block'}}>{pp.startDate}{pp.endDate?' – '+pp.endDate:' →'}: {pp.type==='fixed'?pp.amount.toLocaleString('sv-SE')+' kr fast':pp.amount+' kr/h'}</span>)}</div>}
+          </div>
+          <button onClick={()=>setEditProj(p)} style={S.editBtn}>{'✎'}</button>
+          <button onClick={()=>{if(confirm('Ta bort "'+p.name+'" och alla tidsposter?'))delProj(p.id)}} style={S.deleteBtn}>x</button>
+        </div>})}
+    </div>}
+
+    {/* CLIENTS TAB */}
+    {subTab==='clients'&&<div>
+      <div style={{marginBottom:12}}><button onClick={()=>setShowNewClient(true)} style={S.addBtn}>+ Ny kund</button></div>
+      {(data.clients||[]).length===0&&<span style={S.hint}>Inga kunder tillagda</span>}
+      {[...(data.clients||[])].filter(c=>(c.status||'active')!=='closed').sort((a,b)=>a.name.localeCompare(b.name,'sv')).map(c=>{const projCount=data.projects.filter(p=>p.clientId===c.id).length;
+        const clientEntries=data.entries.filter(e=>{const p=data.projects.find(pr=>pr.id===e.projectId);return p?.clientId===c.id});
+        const clientH=fmtH(clientEntries.reduce((s,e)=>s+e.seconds,0));
+        const clientExp=(data.expenses||[]).filter(e=>{const p=data.projects.find(pr=>pr.id===e.projectId);return p?.clientId===c.id}).reduce((s,e)=>s+e.amount,0);
+        const clientTrips=(data.trips||[]).filter(e=>{const p=data.projects.find(pr=>pr.id===e.projectId);return p?.clientId===c.id}).reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
+        const statusColor=c.status==='paused'?'var(--accent)':'var(--sage)';
+        const statusLabel=c.status==='paused'?'Vilande':null;
+        return<div key={c.id} style={{...S.entryRow,flexWrap:'wrap'}}>
+          <div style={{...S.entryDot,background:statusColor}}/> 
+          <div style={{...S.entryInfo,minWidth:0}}>
+            <span style={S.entryProject}>{c.name}{statusLabel&&<span style={{fontSize:11,color:'var(--accent)',marginLeft:6,fontWeight:600}}>({statusLabel})</span>}{c.orgNr&&<span style={{fontWeight:400,color:'var(--text-muted)',fontSize:12,marginLeft:6}}>{c.orgNr}</span>}</span>
+            <span style={S.entryMoment}>{[c.contact,c.phone,c.email].filter(Boolean).join(' · ')}</span>
+            <span style={{fontSize:11,color:'var(--text-muted)'}}>{projCount} projekt · {clientH} h{clientExp>0&&(' · '+clientExp+' kr utlägg')}{clientTrips>0&&(' · '+clientTrips.toLocaleString('sv-SE',{maximumFractionDigits:0})+' kr resor')}</span>
+          </div>
+          <button onClick={()=>setEditClient(c)} style={S.editBtn}>{'✎'}</button>
+          <button onClick={()=>{if(confirm('Ta bort kund "'+c.name+'"?'))delClient(c.id)}} style={S.deleteBtn}>x</button>
+        </div>})}
+      {(data.clients||[]).some(c=>c.status==='closed')&&<button onClick={()=>setShowClosed(!showClosed)} style={S.manualToggle}>{showClosed?'▾ Dölj avslutade':'▸ Visa avslutade kunder ('+((data.clients||[]).filter(c=>c.status==='closed').length)+')'}</button>}
+      {showClosed&&(data.clients||[]).filter(c=>c.status==='closed').map(c=>
+        <div key={c.id} style={{...S.entryRow,opacity:.5}}>
+          <div style={{...S.entryDot,background:'var(--text-muted)'}}/> 
+          <div style={{...S.entryInfo,minWidth:0}}>
+            <span style={S.entryProject}>{c.name}<span style={{fontSize:10,color:'var(--text-muted)',marginLeft:6}}>(Avslutad)</span></span>
+          </div>
+          <button onClick={()=>setEditClient(c)} style={S.editBtn}>{'✎'}</button>
+        </div>)}
+    </div>}
+  </div>
+}
+
+
+// ── Report View ──
+function ReportView({data,setData}){
+  const toast=useToast();
+  const[period,setPeriod]=useState('month');const[groupBy,setGroupBy]=useState('project');const[showCompare,setShowCompare]=useState(false);const[exportClient,setExportClient]=useState('');const[exportProj,setExportProj]=useState('');
+  const[selMonth,setSelMonth]=useState(()=>{const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')});
+  const selMonthIdx=parseInt(selMonth.split('-')[1])-1;const selYear=parseInt(selMonth.split('-')[0]);
+
+  const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const printProjectReport=(projId)=>{
+    const proj=data.projects.find(p=>p.id===projId);if(!proj)return;
+    const cl=(data.clients||[]).find(c=>c.id===proj.clientId);
+    const rMonth=selMonthIdx;const rYear=selYear;
+    const monthFilter=d=>{const parts=d.split('-');return parseInt(parts[1])-1===rMonth&&parseInt(parts[0])===rYear};
+    const monthLabel=['januari','februari','mars','april','maj','juni','juli','augusti','september','oktober','november','december'][rMonth]+' '+rYear;
+    const pEntries=data.entries.filter(e=>e.projectId===projId&&monthFilter(e.date)).sort((a,b)=>a.date.localeCompare(b.date));
+    const pExp=(data.expenses||[]).filter(e=>e.projectId===projId&&monthFilter(e.date));
+    const pTrips=(data.trips||[]).filter(e=>e.projectId===projId&&monthFilter(e.date));
+    const pRate=getRate(proj,data);
+    const totalH=pEntries.reduce((s,e)=>s+e.seconds,0)/3600;
+    // Calculate time cost based on pricing model
+    let totalTimeCost=0;
+    if(hasSessionPrice(proj)){totalTimeCost=getSessionRevenue(proj,pEntries)}
+    else if(isFixedPrice(proj)){
+      // For fixed price projects in monthly report, calculate the monthly portion
+      const mStart=rYear+'-'+String(rMonth+1).padStart(2,'0')+'-01';
+      const mEndDay=new Date(rYear,rMonth+1,0).getDate();
+      const mEnd=rYear+'-'+String(rMonth+1).padStart(2,'0')+'-'+String(mEndDay).padStart(2,'0');
+      (proj.pricingPeriods||[]).forEach(pp=>{
+        if(pp.type!=='fixed'||!pp.amount)return;
+        const start=pp.startDate;const end=pp.endDate;
+        if(!end){if(start>=mStart&&start<=mEnd)totalTimeCost+=pp.amount;return}
+        if(mStart>end||mEnd<start)return;
+        const sY=parseInt(start.slice(0,4)),sM=parseInt(start.slice(5,7))-1;
+        const eY=parseInt(end.slice(0,4)),eM=parseInt(end.slice(5,7))-1;
+        const totalMonths=Math.max(1,(eY-sY)*12+(eM-sM)+1);
+        totalTimeCost+=Math.round(pp.amount/totalMonths);
+      });
+    }
+    else{totalTimeCost=Math.round(totalH*pRate)}
+    const totalExp=pExp.reduce((s,e)=>s+e.amount,0);
+    const totalTrip=pTrips.reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
+    const periodLabel=monthLabel;
+
+    const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Månadsrapport – ${esc(proj.name)}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Calibri,Arial,sans-serif;padding:40px;color:#1A1816;font-size:14px;background:#F1EBDE}
+    h1{font-size:22px;color:#1F2F22;margin-bottom:4px}h2{font-size:16px;color:#3A4B3E;margin:20px 0 8px;border-bottom:2px solid #EFEADD;padding-bottom:4px}
+    .meta{color:#6F6959;font-size:13px;margin-bottom:20px}.logo{font-size:11px;color:#6F6959;text-align:right;margin-bottom:20px}
+    table{width:100%;border-collapse:collapse;margin:8px 0 16px}th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#6F6959;padding:6px 8px;border-bottom:2px solid #E5DFD1}
+    td{padding:6px 8px;border-bottom:1px solid #EFEADD;font-size:13px}td.num{text-align:right;font-variant-numeric:tabular-nums}
+    .total-row td{font-weight:700;border-top:2px solid #1F2F22;border-bottom:none;padding-top:10px}
+    .summary{background:#EFEADD;border-radius:8px;padding:16px;margin:16px 0;display:flex;gap:24px}
+    .summary div{flex:1}.summary .label{font-size:11px;color:#6F6959;text-transform:uppercase}.summary .value{font-size:20px;font-weight:700;color:#1F2F22}
+    @media print{body{padding:20px;background:#fff}}</style></head><body>
+    <div class="logo">In Vision</div>
+    <h1>${esc(proj.name)}</h1>
+    <div class="meta">${cl?esc(cl.name)+(cl.orgNr?' · '+esc(cl.orgNr):''):''} · ${esc(periodLabel)}</div>
+    <div class="summary">
+      <div><div class="label">Tid</div><div class="value">${totalH.toFixed(1)} h</div></div>
+      <div><div class="label">${hasSessionPrice(proj)?'Tillfällen':isFixedPrice(proj)?'Fastpris':'Timpris'}</div><div class="value">${hasSessionPrice(proj)?getSessionCount(proj,pEntries)+' st':isFixedPrice(proj)?totalTimeCost.toLocaleString('sv-SE')+' kr':pRate+' kr/h'}</div></div>
+      <div><div class="label">Arvode</div><div class="value">${totalTimeCost.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</div></div>
+    </div>
+    <h2>Tidsposter</h2>
+    <table><tr><th>Datum</th><th>Tid</th><th>Moment</th><th>Anteckning</th><th class="num">Timmar</th></tr>
+    ${pEntries.map(e=>`<tr><td>${esc(e.date)}</td><td>${e.startTime&&e.endTime?esc(e.startTime)+'–'+esc(e.endTime):''}</td><td>${esc(e.moment)}</td><td>${esc(e.note||'')}</td><td class="num">${(e.seconds/3600).toFixed(1)}</td></tr>`).join('')}
+    <tr class="total-row"><td colspan="4">Summa tid</td><td class="num">${totalH.toFixed(1)} h</td></tr></table>
+    ${pExp.length?`<h2>Utlägg</h2><table><tr><th>Datum</th><th>Beskrivning</th><th class="num">Belopp</th></tr>
+    ${pExp.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(e.description)}</td><td class="num">${e.amount} kr</td></tr>`).join('')}
+    <tr class="total-row"><td colspan="2">Summa utlägg</td><td class="num">${totalExp.toLocaleString('sv-SE')} kr</td></tr></table>`:''}
+    ${pTrips.length?`<h2>Resor</h2><table><tr><th>Datum</th><th>Beskrivning</th><th class="num">Km</th><th class="num">Belopp</th></tr>
+    ${pTrips.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(e.description)}</td><td class="num">${e.km}</td><td class="num">${(e.km*(data.kmRate||2.5)).toFixed(0)} kr</td></tr>`).join('')}
+    <tr class="total-row"><td colspan="3">Summa resor (milersättning ${data.kmRate||2.5} kr/km)</td><td class="num">${Math.round(totalTrip).toLocaleString('sv-SE')} kr</td></tr></table>`:''}
+    <div style="margin-top:24px;padding-top:16px;border-top:2px solid #EFEADD">
+      <table style="width:100%;border:none">
+        <tr><td style="border:none;padding:4px 0;font-size:15px">Arvode (tid)</td><td style="border:none;padding:4px 0;text-align:right;font-size:15px;font-variant-numeric:tabular-nums">${totalTimeCost.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</td></tr>
+        ${totalExp>0?'<tr><td style="border:none;padding:4px 0;font-size:15px">Utlägg</td><td style="border:none;padding:4px 0;text-align:right;font-size:15px;font-variant-numeric:tabular-nums">'+totalExp.toLocaleString('sv-SE')+' kr</td></tr>':''}
+        ${totalTrip>0?'<tr><td style="border:none;padding:4px 0;font-size:15px">Resor</td><td style="border:none;padding:4px 0;text-align:right;font-size:15px;font-variant-numeric:tabular-nums">'+Math.round(totalTrip).toLocaleString('sv-SE')+' kr</td></tr>':''}
+        <tr style="border-top:2px solid #1F2F22"><td style="border:none;padding:8px 0 0;font-size:16px;font-weight:700;color:#1F2F22">Summa</td><td style="border:none;padding:8px 0 0;text-align:right;font-size:16px;font-weight:700;color:#1F2F22;font-variant-numeric:tabular-nums">${(totalTimeCost+totalExp+totalTrip).toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</td></tr>
+      </table>
+    </div>
+    <script>window.addEventListener('load',function(){setTimeout(function(){try{window.focus();window.print()}catch(e){}},300)});<\/script>
+    </body></html>`;
+
+    // Försök 1: dold iframe (funkar i installerad PWA där popups blockeras)
+    try{
+      const iframe=document.createElement('iframe');
+      iframe.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+      document.body.appendChild(iframe);
+      let printed=false;
+      iframe.onload=()=>{
+        if(printed)return;printed=true;
+        try{iframe.contentWindow.focus();iframe.contentWindow.print()}
+        catch(e){toast('✗ Kunde inte starta utskrift: '+(e&&e.message||e))}
+        setTimeout(()=>{try{document.body.removeChild(iframe)}catch{}},20000);
+      };
+      iframe.srcdoc=html;
+      // Försök 2: om iframe-laddning inte triggar inom 3 s, fall tillbaka på blob-URL i ny flik
+      setTimeout(()=>{
+        if(printed)return;
+        try{document.body.removeChild(iframe)}catch{}
+        const blob=new Blob([html],{type:'text/html'});
+        const url=URL.createObjectURL(blob);
+        const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';
+        document.body.appendChild(a);a.click();document.body.removeChild(a);
+        setTimeout(()=>URL.revokeObjectURL(url),60000);
+      },3000);
+    }catch(e){toast('✗ Kunde inte skapa rapport: '+(e&&e.message||e))}
+  };
+
+  const now=new Date();
+  const periodFilter=d=>{
+    const parts=d.split('-');const m=parseInt(parts[1])-1;const y=parseInt(parts[0]);
+    if(period==='week'){const wa=new Date(now.getFullYear(),now.getMonth(),now.getDate()-7,12,0,0);return d>=localDateStr(wa)}
+    if(period==='month')return m===selMonthIdx&&y===selYear;
+    return true
+  };
+  const filtered=data.entries.filter(e=>periodFilter(e.date));
+  const filteredExp=(data.expenses||[]).filter(e=>periodFilter(e.date));
+  const filteredTrips=(data.trips||[]).filter(e=>periodFilter(e.date));
+  const byProj={};filtered.forEach(e=>{if(!byProj[e.projectId])byProj[e.projectId]=[];byProj[e.projectId].push(e)});
+  const totSec=filtered.reduce((s,e)=>s+e.seconds,0),totH=totSec/3600;
+  let totTimeCost=calcRevenue(filtered,data);
+  // Add fixed price portions for filtered period
+  if(period==='month'){totTimeCost+=calcFixedMonthly(data,selYear,selMonthIdx)}
+  else if(period==='all'){const countedFixedPeriods=new Set();data.projects.forEach(p=>{(p?.pricingPeriods||[]).forEach(pp=>{if(pp.type!=='fixed'||countedFixedPeriods.has(pp.id))return;countedFixedPeriods.add(pp.id);totTimeCost+=pp.amount})})}
+  const totExpenses=filteredExp.reduce((s,e)=>s+e.amount,0);
+
+  // Compare month data
+  const prevMonth=selMonthIdx===0?11:selMonthIdx-1;const prevYear=selMonthIdx===0?selYear-1:selYear;
+  const prevFilter=d=>{const parts=d.split('-');const m=parseInt(parts[1])-1;const y=parseInt(parts[0]);return m===prevMonth&&y===prevYear};
+  const prevEntries=data.entries.filter(e=>prevFilter(e.date));
+  const prevH=prevEntries.reduce((s,e)=>s+e.seconds,0)/3600;
+  let prevCost=calcRevenue(prevEntries,data)+calcFixedMonthly(data,prevYear,prevMonth);
+  const prevExpenses=(data.expenses||[]).filter(e=>prevFilter(e.date)).reduce((s,e)=>s+e.amount,0);
+  const prevTrips=(data.trips||[]).filter(e=>prevFilter(e.date)).reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
+  const prevTotal=prevCost+prevExpenses+prevTrips;
+  const monthNames2=['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+  const totTrips=filteredTrips.reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
+  const totCost=totTimeCost+totExpenses+totTrips;
+  const maxPS=Math.max(...Object.values(byProj).map(a=>a.reduce((s,e)=>s+e.seconds,0)),1);
+
+  // Group by client
+  const byClient={};
+  if(groupBy==='client'){
+    filtered.forEach(e=>{const p=data.projects.find(x=>x.id===e.projectId);const cid=p?.clientId||'_none';if(!byClient[cid])byClient[cid]={entries:[],expenses:[],trips:[]};byClient[cid].entries.push(e)});
+    filteredExp.forEach(e=>{const p=data.projects.find(x=>x.id===e.projectId);const cid=p?.clientId||'_none';if(!byClient[cid])byClient[cid]={entries:[],expenses:[],trips:[]};byClient[cid].expenses.push(e)});
+    filteredTrips.forEach(e=>{const p=data.projects.find(x=>x.id===e.projectId);const cid=p?.clientId||'_none';if(!byClient[cid])byClient[cid]={entries:[],expenses:[],trips:[]};byClient[cid].trips.push(e)});
+  }
+
+  const exportXLSX=()=>{
+    const rows=[];
+    [...filtered].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{const p=data.projects.find(x=>x.id===e.projectId);const cl=(data.clients||[]).find(c=>c.id===p?.clientId);const rt=getRate(p,data);const h=e.seconds/3600;const fixed=isFixedPrice(p);const session=hasSessionPrice(p);
+      const typ=session?'Tid (per tillfälle)':fixed?'Tid (fastpris)':'Tid';
+      const belopp=session?'':fixed?'':Math.round(h*rt);
+      rows.push({Typ:typ,Datum:e.date,Projekt:p?.name||'?',Kund:cl?.name||'',Beskrivning:e.moment,Timmar:Math.round(h*100)/100,Km:'',Timpris:session?p.sessionPrice+'/tillfälle':fixed?'fastpris':rt,Belopp:belopp,Anteckning:e.note||''})});
+    filteredExp.forEach(e=>{const p=data.projects.find(x=>x.id===e.projectId);const cl=(data.clients||[]).find(c=>c.id===p?.clientId);
+      rows.push({Typ:'Utlägg',Datum:e.date,Projekt:p?.name||'?',Kund:cl?.name||'',Beskrivning:e.description,Timmar:'',Km:'',Timpris:'',Belopp:e.amount,Anteckning:''})});
+    filteredTrips.forEach(e=>{const p=data.projects.find(x=>x.id===e.projectId);const cl=(data.clients||[]).find(c=>c.id===p?.clientId);const kr=e.km*(data.kmRate||2.5);
+      rows.push({Typ:'Resa',Datum:e.date,Projekt:p?.name||'?',Kund:cl?.name||'',Beskrivning:e.description,Timmar:'',Km:e.km,Timpris:'',Belopp:Math.round(kr*100)/100,Anteckning:''})});
+    const ws=XLSX.utils.json_to_sheet(rows);
+    ws['!cols']=[{wch:14},{wch:12},{wch:20},{wch:20},{wch:25},{wch:8},{wch:6},{wch:12},{wch:10},{wch:20}];
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Tidsrapport');
+    XLSX.writeFile(wb,`invisiontid-${today()}.xlsx`);
+  };
+
+  const exportClientXLSX=(clientId)=>{
+    const cl=(data.clients||[]).find(c=>c.id===clientId);if(!cl)return;
+    const clientProjects=data.projects.filter(p=>p.clientId===clientId);
+    const pids=clientProjects.map(p=>p.id);
+    const cEntries=filtered.filter(e=>pids.includes(e.projectId));
+    const cExp=filteredExp.filter(e=>pids.includes(e.projectId));
+    const cTrips=filteredTrips.filter(e=>pids.includes(e.projectId));
+    const rows=[];
+    [...cEntries].sort((a,b)=>a.date.localeCompare(b.date)).forEach(e=>{const p=data.projects.find(x=>x.id===e.projectId);const rt=getRate(p,data);const h=e.seconds/3600;const fixed=isFixedPrice(p);
+      const session=hasSessionPrice(p);rows.push({Datum:e.date,Projekt:p?.name||'?',Beskrivning:e.moment,Timmar:Math.round(h*100)/100,Pris:session?p.sessionPrice+'/tillfälle':fixed?'fastpris':rt,Belopp:session?'':fixed?'':Math.round(h*rt),Anteckning:e.note||''})});
+    cExp.forEach(e=>{const p=data.projects.find(x=>x.id===e.projectId);rows.push({Datum:e.date,Projekt:p?.name||'?',Beskrivning:'Utlägg: '+e.description,Timmar:'',Belopp:e.amount,Anteckning:''})});
+    cTrips.forEach(e=>{const p=data.projects.find(x=>x.id===e.projectId);rows.push({Datum:e.date,Projekt:p?.name||'?',Beskrivning:'Resa: '+e.description+' ('+e.km+' km)',Timmar:'',Belopp:Math.round(e.km*(data.kmRate||2.5)*100)/100,Anteckning:''})});
+    if(!rows.length){return}
+    const ws=XLSX.utils.json_to_sheet(rows);
+    ws['!cols']=[{wch:12},{wch:22},{wch:30},{wch:8},{wch:10},{wch:20}];
+    const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,cl.name.slice(0,30));
+    XLSX.writeFile(wb,`${cl.name}-${today()}.xlsx`);
+  };
+
+  return<div style={{paddingTop:8}}>
+    <div style={S.section}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <div style={S.pillRow}>{[{id:'week',l:'Vecka'},{id:'month',l:'Månad'},{id:'all',l:'Totalt'}].map(p=><Pill key={p.id} label={p.l} color="var(--sage-deep)" selected={period===p.id} onClick={()=>setPeriod(p.id)}/>)}</div>
+        {period==='month'&&<input type="month" style={{...S.input,width:'auto',padding:'6px 10px',fontSize:14}} value={selMonth} onChange={e=>setSelMonth(e.target.value)}/>}
+      </div>
+    </div>
+    <div style={S.cardRow}>
+      <div style={S.summaryCard}><span style={S.cardLabel}>Tid</span><span style={S.cardValue}>{totH.toFixed(1)} h</span></div>
+      <div style={S.summaryCard}><span style={S.cardLabel}>Utlägg & resor</span><span style={S.cardValue}>{(totExpenses+totTrips).toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span></div>
+      <div style={{...S.summaryCard,...S.summaryCardAccent}}><span style={S.cardLabel}>Totalt</span><span style={S.cardValue}>{totCost.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span></div>
+    </div>
+
+    <div style={S.section}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <span style={{...S.sectionTitle,marginBottom:0}}>Sammanställning</span>
+        <div style={S.pillRow}>
+          <Pill label="Projekt" color="var(--sage-deep)" selected={groupBy==='project'} onClick={()=>setGroupBy('project')}/>
+          <Pill label="Kund" color="var(--sage-deep)" selected={groupBy==='client'} onClick={()=>setGroupBy('client')}/>
+        </div>
+      </div>
+
+      {/* Per project view */}
+      {groupBy==='project'&&<div>
+      {Object.entries(byProj).map(([pid,entries])=>{const proj=data.projects.find(p=>p.id===pid);const pi=data.projects.findIndex(p=>p.id===pid);const cl=(data.clients||[]).find(c=>c.id===proj?.clientId);const projRate=getRate(proj,data);const ps=entries.reduce((s,e)=>s+e.seconds,0);const ph=ps/3600;const pct=(ps/maxPS)*100;
+        const projExp=filteredExp.filter(e=>e.projectId===pid).reduce((s,e)=>s+e.amount,0);
+        const projTripsList=filteredTrips.filter(e=>e.projectId===pid);
+        const projTripKm=projTripsList.reduce((s,e)=>s+e.km,0);
+        const projTrips=projTripKm*(data.kmRate||2.5);
+        const fixed=(proj?.pricingPeriods||[]).some(p=>p.type==='fixed');
+        const sessRev=hasSessionPrice(proj)?getSessionRevenue(proj,entries):0;
+        const hourlyCost=hasSessionPrice(proj)?sessRev:(ph*projRate);
+        const sessCount=hasSessionPrice(proj)?getSessionCount(proj,entries):0;
+        const fixedTotal=(proj?.pricingPeriods||[]).filter(p=>p.type==='fixed').reduce((s,p)=>s+p.amount,0);const projTotal=(fixed?fixedTotal:hourlyCost)+projExp+projTrips;
+        const effectiveRate=fixed&&ph>0?Math.round(fixedTotal/ph):null;
+        const byM={};entries.forEach(e=>{if(!byM[e.moment])byM[e.moment]=0;byM[e.moment]+=e.seconds});
+        const invKey=pid+'|'+selMonth;
+        const inv=(data.invoices||[]).find(i=>i.projectId===pid&&i.month===selMonth);
+        const toggleInv=()=>{if(inv){const u={...data,invoices:(data.invoices||[]).filter(i=>!(i.projectId===pid&&i.month===selMonth))};setData(u);saveLocal(u)}else{const u={...data,invoices:[...(data.invoices||[]),{projectId:pid,month:selMonth,invoicedAt:today()}]};setData(u);saveLocal(u)}};
+        return<div key={pid} style={S.projectBreakdown}>
+          <div style={S.projectBarHeader}>
+            <div style={{...S.entryDot,background:pc(pi)}}/>
+            <span style={{...S.entryProject,flex:1}}>{proj?.name||'?'}{cl&&<span style={{...S.clientBadge,marginLeft:6}}>{cl.name}</span>}</span>
+            <span style={S.projectBarHours}>{projTotal.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span>
+            {period==='month'&&<button onClick={toggleInv} title={inv?'Fakturerad '+inv.invoicedAt:'Markera som fakturerad'} style={{marginLeft:8,background:inv?'var(--sage)':'var(--sage-ghost)',border:inv?'none':'1.5px dashed var(--border)',borderRadius:8,padding:'4px 10px',fontSize:12,fontWeight:600,color:inv?'#fff':'var(--text-muted)',cursor:'pointer',whiteSpace:'nowrap'}}>{inv?'✓ Fakturerad':'Fakturera'}</button>}
+          </div>
+          {inv&&<div style={{fontSize:11,color:'var(--sage)',marginBottom:4,marginLeft:20}}>Fakturerad {inv.invoicedAt}</div>}
+          <div style={S.barTrack}><div style={{...S.barFill,width:`${pct}%`,background:pc(pi)}}/></div>
+          <div style={S.momentList}>
+            {hasSessionPrice(proj)&&<div style={{background:'var(--sage-ghost)',borderRadius:8,padding:'8px 10px',marginBottom:6}}>
+              <div style={S.momentRow}><span style={{fontWeight:600}}>{getSessionCount(proj,entries)} tillfällen × {proj.sessionPrice.toLocaleString('sv-SE')} kr</span><span style={{...S.momentHours,fontWeight:700}}>{sessRev.toLocaleString('sv-SE')} kr</span></div>
+              {ph>0&&<div style={S.momentRow}><span style={{fontStyle:'italic'}}>Effektiv timkostnad</span><span style={{...S.momentHours,color:'var(--text-muted)'}}>{Math.round(sessRev/ph)} kr/h</span></div>}
+            </div>}
+            {fixed&&!hasSessionPrice(proj)&&<div style={{background:'var(--sage-ghost)',borderRadius:8,padding:'8px 10px',marginBottom:6}}>
+              {(proj?.pricingPeriods||[]).filter(pp=>pp.type==='fixed').map(pp=>{
+                const ppStart=pp.startDate;const ppEnd=pp.endDate;
+                const ppLabel=ppStart+(ppEnd?' – '+ppEnd:' →');
+                // Calculate how much of this period falls in current report period
+                let periodShare=pp.amount;
+                if(ppEnd&&period==='month'){
+                  const mStart=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-01';
+                  const mEndDay=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
+                  const mEnd=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(mEndDay).padStart(2,'0');
+                  if(mStart>ppEnd||mEnd<ppStart){periodShare=0}else{
+                    const sY=parseInt(ppStart.slice(0,4)),sM=parseInt(ppStart.slice(5,7))-1;
+                    const eY=parseInt(ppEnd.slice(0,4)),eM=parseInt(ppEnd.slice(5,7))-1;
+                    const totalMonths=Math.max(1,(eY-sY)*12+(eM-sM)+1);
+                    periodShare=Math.round(pp.amount/totalMonths);
+                  }
+                }
+                return<div key={pp.id}>
+                  <div style={S.momentRow}><span style={{fontWeight:600}}>Fastpris: {pp.amount.toLocaleString('sv-SE')} kr</span></div>
+                  <div style={S.momentRow}><span style={{fontSize:12,color:'var(--text-muted)'}}>Period: {ppLabel}</span>
+                    {ppEnd&&period==='month'&&<span style={{fontSize:12,color:'var(--text-muted)'}}>Denna månad: {periodShare.toLocaleString('sv-SE')} kr</span>}
+                  </div>
+                </div>})}
+              <div style={{...S.momentRow,marginTop:4,borderTop:'1px solid var(--border)',paddingTop:4}}><span style={{fontWeight:700}}>Totalt fastpris</span><span style={{...S.momentHours,fontWeight:700}}>{fixedTotal.toLocaleString('sv-SE')} kr</span></div>
+              {effectiveRate&&<div style={S.momentRow}><span style={{fontStyle:'italic'}}>Effektiv timkostnad ({ph.toFixed(1)} h)</span><span style={{...S.momentHours,color:'var(--text-muted)'}}>{effectiveRate} kr/h</span></div>}
+            </div>}
+            {!fixed&&!hasSessionPrice(proj)&&<div style={S.momentRow}><span style={{fontWeight:600}}>{ph.toFixed(1)} h × {projRate} kr/h</span><span style={{...S.momentHours,fontWeight:600}}>{hourlyCost.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span></div>}
+            {Object.entries(byM).sort((a,b)=>b[1]-a[1]).map(([m,sec])=><div key={m} style={S.momentRow}><span>{m}</span><span style={S.momentHours}>{(sec/3600).toFixed(1)} h{!fixed&&' · '+((sec/3600)*projRate).toLocaleString('sv-SE',{maximumFractionDigits:0})+' kr'}</span></div>)}
+            {projExp>0&&<div style={S.momentRow}><span>Utlägg</span><span style={{...S.momentHours,color:'var(--accent)'}}>{projExp} kr</span></div>}
+            {projTrips>0&&<div style={S.momentRow}><span>Resor: {projTripKm.toLocaleString('sv-SE')} km × {data.kmRate||2.5} kr/km</span><span style={{...S.momentHours,color:'var(--sage)'}}>{projTrips.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span></div>}
+          </div>
+        </div>})}
+      {Object.keys(byProj).length===0&&<span style={S.hint}>Inga tidsposter för perioden</span>}
+      </div>}
+
+      {/* Per client view */}
+      {groupBy==='client'&&<div>
+      {Object.entries(byClient).map(([cid,cData])=>{
+        const client=cid==='_none'?null:(data.clients||[]).find(c=>c.id===cid);
+        const cName=client?client.name:'Utan kund';
+        const cSec=cData.entries.reduce((s,e)=>s+e.seconds,0);const cH=cSec/3600;
+        let cTimeCost=0;
+        cTimeCost=calcRevenue(cData.entries,data);
+        const cExp=cData.expenses.reduce((s,e)=>s+e.amount,0);
+        const cTrip=cData.trips.reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
+        const cTotal=cTimeCost+cExp+cTrip;
+        // Group entries by project within this client
+        const cByProj={};cData.entries.forEach(e=>{if(!cByProj[e.projectId])cByProj[e.projectId]=[];cByProj[e.projectId].push(e)});
+
+        return<div key={cid} style={{...S.projectBreakdown,background:'var(--card)',borderRadius:16,padding:16,border:'1px solid var(--border)',boxShadow:'0 2px 12px rgba(0,0,0,.04)',marginBottom:14}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:10}}>
+            <div>
+              <div style={{fontSize:16,fontWeight:700,color:'var(--sage-deep)'}}>{cName}</div>
+              {client&&<div style={{fontSize:12,color:'var(--text-muted)',marginTop:2}}>{[client.contact,client.phone,client.email].filter(Boolean).join(' · ')}{client.orgNr&&` · ${client.orgNr}`}</div>}
+            </div>
+            <div style={{textAlign:'right'}}>
+              <div style={{fontSize:18,fontWeight:700,color:'var(--sage-deep)'}}>{cTotal.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</div>
+              <div style={{fontSize:11,color:'var(--text-muted)'}}>{cH.toFixed(1)} h</div>
+            </div>
+          </div>
+          {Object.entries(cByProj).map(([pid,entries])=>{
+            const proj=data.projects.find(p=>p.id===pid);const pi=data.projects.findIndex(p=>p.id===pid);
+            const projRate=getRate(proj,data);const ph=entries.reduce((s,e)=>s+e.seconds,0)/3600;
+            const pExp=cData.expenses.filter(e=>e.projectId===pid).reduce((s,e)=>s+e.amount,0);
+            const pTrip=cData.trips.filter(e=>e.projectId===pid).reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
+            const fixed=(proj?.pricingPeriods||[]).some(p=>p.type==='fixed');const pFixedTotal=(proj?.pricingPeriods||[]).filter(p=>p.type==='fixed').reduce((s,p)=>s+p.amount,0);const pSessRev=hasSessionPrice(proj)?getSessionRevenue(proj,entries):0;const pTimeCost=hasSessionPrice(proj)?pSessRev:(fixed?pFixedTotal:(ph*projRate));const pSessCount=hasSessionPrice(proj)?getSessionCount(proj,entries):0;
+            return<div key={pid} style={{padding:'6px 0',borderTop:'1px solid var(--sage-ghost)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:6}}>
+                <div style={{...S.entryDot,background:pc(pi)}}/>
+                <span style={{fontSize:13,fontWeight:600,color:'var(--text)',flex:1}}>{proj?.name||'?'}{fixed&&<span style={{fontSize:10,color:'var(--sage)',marginLeft:4}}>Fastpris</span>}</span>
+                <span style={{fontSize:12,color:'var(--text-light)',fontVariantNumeric:'tabular-nums'}}>{ph.toFixed(1)} h · {(pTimeCost+pExp+pTrip).toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span>
+              </div>
+            </div>})}
+          {cExp>0&&<div style={{...S.momentRow,borderTop:'1px solid var(--sage-ghost)',paddingTop:6}}><span>Utlägg</span><span style={{...S.momentHours,color:'var(--accent)'}}>{cExp} kr</span></div>}
+          {cTrip>0&&<div style={S.momentRow}><span>Resor: {cData.trips.reduce((s,e)=>s+e.km,0).toLocaleString('sv-SE')} km × {data.kmRate||2.5} kr/km</span><span style={{...S.momentHours,color:'var(--sage)'}}>{cTrip.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span></div>}
+        </div>})}
+      {Object.keys(byClient).length===0&&<span style={S.hint}>Inga poster för perioden</span>}
+      </div>}
+    </div>
+    {/* Month comparison */}
+    {period==='month'&&<div style={S.section}>
+      <button onClick={()=>setShowCompare(!showCompare)} style={S.manualToggle}>{showCompare?'▾ Dölj jämförelse':'▸ Jämför med '+monthNames2[prevMonth]}</button>
+      {showCompare&&<div style={{background:'var(--card)',borderRadius:16,padding:16,marginTop:8,border:'1px solid var(--border)'}}>
+        <div style={{display:'flex',gap:16}}>
+          <div style={{flex:1,textAlign:'center'}}>
+            <div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1px'}}>{monthNames2[selMonthIdx]}</div>
+            <div style={{fontSize:22,fontWeight:700,color:'var(--sage-deep)',fontVariantNumeric:'tabular-nums',marginTop:4}}>{totH.toFixed(1)} h</div>
+            <div style={{fontSize:16,fontWeight:600,color:'var(--sage-deep)',marginTop:2}}>{totCost.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</div>
+          </div>
+          <div style={{width:1,background:'var(--border)'}}/>
+          <div style={{flex:1,textAlign:'center'}}>
+            <div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1px'}}>{monthNames2[prevMonth]}</div>
+            <div style={{fontSize:22,fontWeight:700,color:'var(--text-light)',fontVariantNumeric:'tabular-nums',marginTop:4}}>{prevH.toFixed(1)} h</div>
+            <div style={{fontSize:16,fontWeight:600,color:'var(--text-light)',marginTop:2}}>{prevTotal.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</div>
+          </div>
+        </div>
+        <div style={{textAlign:'center',marginTop:12,fontSize:14,fontWeight:600,color:totCost>=prevTotal?'var(--sage)':'var(--accent)'}}>
+          {totCost>=prevTotal?'+':'−'}{Math.abs(totCost-prevTotal).toLocaleString('sv-SE',{maximumFractionDigits:0})} kr ({totH>=prevH?'+':'−'}{Math.abs(totH-prevH).toFixed(1)} h)
+        </div>
+      </div>}
+    </div>}
+
+    {/* Export */}
+    <div style={S.section}>
+      <button onClick={exportXLSX} style={S.exportBtn}>Exportera Excel</button>
+      {(data.clients||[]).length>0&&<div style={{marginTop:12}}>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <select style={{...S.input,flex:1}} value={exportClient} onChange={e=>setExportClient(e.target.value)}>
+            <option value="">Exportera per kund...</option>
+            {(data.clients||[]).filter(c=>(c.status||'active')!=='closed').sort((a,b)=>a.name.localeCompare(b.name,'sv')).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button onClick={()=>{if(exportClient)exportClientXLSX(exportClient)}} style={{...S.confirmBtn,opacity:exportClient?1:.4}}>Exportera</button>
+        </div>
+      </div>}
+      {data.projects.length>0&&<div style={{marginTop:12}}>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <select style={{...S.input,flex:1}} value={exportProj} onChange={e=>setExportProj(e.target.value)}>
+            <option value="">Rapport föregående månad...</option>
+            {data.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <button onClick={()=>{if(exportProj)printProjectReport(exportProj)}} style={{...S.confirmBtn,opacity:exportProj?1:.4}}>Skriv ut</button>
+        </div>
+      </div>}
+    </div>
+  </div>
+}
+
+// ── Sync View ──
+function SyncView({data,setData,syncStatus,onSync,msConnected,onLogin,onLogout}){
+  const[importStatus,setIS]=useState(null);const[showClear,setSC]=useState(false);
+  const clr=()=>{setData(defaultData);saveLocal(defaultData);setSC(false);setIS('All data rensad.')};
+  const exportAll=()=>{
+    const json=JSON.stringify(data,null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='invisiontid-backup-'+today()+'.json';a.click();
+    setIS('Backup exporterad.');
+  };
+  const importFile=(file)=>{
+    if(!file)return;const reader=new FileReader();
+    reader.onload=e=>{try{
+      const imported=JSON.parse(e.target.result);
+      if(!imported.projects||!imported.entries){setIS('error');return}
+      if(!confirm('Ersätt all nuvarande data med innehållet i backupen? Denna åtgärd kan inte ångras.'))return;
+      setData(imported);saveLocal(imported);setIS('Backup importerad ('+(imported.entries||[]).length+' poster).');
+    }catch{setIS('error')}};
+    reader.readAsText(file);
+  };
+  const tp=data.projects.length,te=data.entries.length,th=(data.entries.reduce((s,e)=>s+e.seconds,0)/3600).toFixed(1);
+  const cs={background:'var(--card)',borderRadius:16,padding:18,border:'1px solid var(--border)',marginBottom:12,boxShadow:'0 4px 20px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.03)'};
+  const ct={fontSize:14,fontWeight:700,color:'var(--sage-deep)',marginBottom:8,display:'flex',alignItems:'center',gap:8};
+  const cd={fontSize:13,color:'var(--text-light)',lineHeight:1.5,marginBottom:12};
+  const bp={...S.confirmBtn,width:'100%',padding:'12px 18px',textAlign:'center'};
+  const bo={...S.exportBtn,fontSize:14,padding:'12px'};
+
+  return<div style={{paddingTop:8}}>
+    <div style={{...cs,background:'linear-gradient(135deg,var(--sage-deep) 0%,var(--sage-dark) 100%)',border:'none',color:'#fff',boxShadow:'0 6px 24px rgba(61,79,66,.25)'}}>
+      <div style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'1.5px',opacity:.6,marginBottom:8}}>Din data</div>
+      <div style={{display:'flex',gap:16}}><div><span style={{fontSize:24,fontWeight:700}}>{tp}</span><span style={{fontSize:12,opacity:.7,marginLeft:4}}>projekt</span></div><div><span style={{fontSize:24,fontWeight:700}}>{te}</span><span style={{fontSize:12,opacity:.7,marginLeft:4}}>poster</span></div><div><span style={{fontSize:24,fontWeight:700}}>{th}</span><span style={{fontSize:12,opacity:.7,marginLeft:4}}>timmar</span></div></div>
+      {syncStatus&&<div style={{fontSize:11,opacity:.6,marginTop:8}}>{syncStatus}</div>}
+    </div>
+    <div style={{...cs,borderColor:msConnected?'var(--sage-light)':'var(--border)'}}>
+      <div style={ct}>OneDrive-synk {msConnected&&<span style={{fontSize:11,background:'var(--sage-pale)',color:'var(--sage-deep)',padding:'3px 10px',borderRadius:10,fontWeight:600}}>Ansluten</span>}</div>
+      {msConnected?<div><p style={cd}>Data synkas automatiskt mellan dina enheter. Kalendern visas i Vecka-fliken.</p><button onClick={onSync} style={bp}>Synka nu</button><button onClick={onLogout} style={{...bo,marginTop:8,color:'var(--text-muted)',borderColor:'var(--border)'}}>Logga ut</button></div>
+      :<div><p style={cd}>Logga in med Microsoft för att synka data och kalender mellan telefon och dator.</p><button onClick={onLogin} style={{...bp,background:'#0078d4'}}>Logga in med Microsoft</button></div>}
+    </div>
+    <div style={cs}>
+      <div style={ct}>Backup</div>
+      <p style={cd}>Exportera all data som JSON-fil eller återställ från en tidigare backup.</p>
+      <button onClick={exportAll} style={bp}>Exportera backup</button>
+      <label style={{...bo,marginTop:8,display:'block',textAlign:'center',cursor:'pointer'}}>
+        Importera backup
+        <input type="file" accept="application/json,.json" style={{display:'none'}} onChange={e=>{importFile(e.target.files?.[0]);e.target.value=''}}/>
+      </label>
+    </div>
+    <div style={{...cs,borderColor:'var(--accent-light)'}}><div style={ct}>Rensa data</div>{!showClear?<button onClick={()=>setSC(true)} style={{...bo,color:'var(--accent)',borderColor:'var(--accent)'}}>Radera all data</button>:<div><p style={{...cd,color:'var(--accent)',fontWeight:600}}>All data tas bort permanent.</p><div style={{display:'flex',gap:8}}><button onClick={clr} style={{...bp,background:'var(--accent)',flex:1}}>Radera</button><button onClick={()=>setSC(false)} style={{...bo,flex:1}}>Avbryt</button></div></div>}</div>
+    {importStatus&&<div style={{background:importStatus==='error'?'#fef2f2':'#e8f5ee',color:importStatus==='error'?'#E07A5F':'#2D6A4F',padding:'12px 16px',borderRadius:10,fontSize:13,fontWeight:500,marginTop:8}}>{importStatus==='error'?'Kunde inte läsa filen.':importStatus}</div>}
+  </div>
+}
+
+// ── Main App ──
+function App(){
+  const[data,setData]=useState(loadLocal());const[tab,setTab]=useState('timer');const[syncStatus,setSS]=useState(null);const[msC,setMsC]=useState(false);const stRef=useRef(null);const lsRef=useRef(JSON.stringify(data));
+  const[showSettings,setShowSettings]=useState(false);
+  const[weekOffset,setWeekOffset]=useState(0);
+
+  useEffect(()=>{const rt=checkAuthRedirect();const t=rt||getMsToken();if(t){setMsC(true);setSS('Synkar...');oneDriveRead(t).then(remote=>{if(remote){const m=mergeData(loadLocal(),remote);setData(m);saveLocal(m);lsRef.current=JSON.stringify(m);setSS('Synkad ✓')}else{oneDriveWrite(t,loadLocal());setSS('Uppladdad ✓')}setTimeout(()=>setSS(null),3000)})};},[]);
+
+  useEffect(()=>{saveLocal(data);const ds=JSON.stringify(data);if(ds===lsRef.current)return;const t=getMsToken();if(!t)return;if(stRef.current)clearTimeout(stRef.current);stRef.current=setTimeout(async()=>{setSS('Sparar...');const ok=await oneDriveWrite(t,data);if(ok){lsRef.current=ds;setSS('Synkad ✓')}else{setSS('Kunde inte synka');setMsC(!!getMsToken())}setTimeout(()=>setSS(null),3000)},2000)},[data]);
+
+  const doSync=async()=>{const t=getMsToken();if(!t){setMsC(false);return}setSS('Synkar...');const r=await oneDriveRead(t);if(r){const m=mergeData(data,r);setData(m);saveLocal(m);await oneDriveWrite(t,m);lsRef.current=JSON.stringify(m);setSS('Synkad ✓')}else{await oneDriveWrite(t,data);lsRef.current=JSON.stringify(data);setSS('Uppladdad ✓')}setTimeout(()=>setSS(null),3000)};
+  const doLogin=()=>{window.location.href=msLoginUrl()};const doLogout=()=>{clearMsToken();setMsC(false);setSS(null)};
+
+  const tabs=[{id:'timer',l:'Logga'},{id:'dash',l:'Dashboard'},{id:'week',l:'Vecka'},{id:'entries',l:'Historik'},{id:'report',l:'Rapport'}];
+
+  return<div id="root-inner">
+    <InstallBanner/>
+    {showSettings&&<div className="modal-overlay" onClick={()=>setShowSettings(false)}><div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:500}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+        <span style={S.modalTitle}>Synk & data</span>
+        <button onClick={()=>setShowSettings(false)} style={{...S.deleteBtn,fontSize:24}}>x</button>
+      </div>
+      <div style={{marginBottom:18}}>
+        <span style={{fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:'1.5px',color:'var(--text-muted)',display:'block',marginBottom:10}}>Inställningar</span>
+        <div style={{display:'flex',gap:10,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Timpris (kr/h)</label><input type="number" style={{padding:'10px 12px',borderRadius:14,border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',width:'100%',marginTop:4}} value={data.hourlyRate} onChange={e=>{const n=parseInt(e.target.value)||0;const u={...data,hourlyRate:n};setData(u);saveLocal(u)}}/></div>
+          <div style={{flex:1,minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Milersättning (kr/km)</label><input type="number" step="0.5" style={{padding:'10px 12px',borderRadius:14,border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',width:'100%',marginTop:4}} value={data.kmRate||2.5} onChange={e=>{const n=parseFloat(e.target.value)||0;const u={...data,kmRate:n};setData(u);saveLocal(u)}}/></div>
+          <div style={{flex:1,minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Veckomål (kr)</label><input type="number" step="1000" style={{padding:'10px 12px',borderRadius:14,border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',width:'100%',marginTop:4}} placeholder="0" value={data.weeklyGoal||''} onChange={e=>{const n=parseInt(e.target.value)||0;const u={...data,weeklyGoal:n};setData(u);saveLocal(u)}}/></div>
+        </div>
+      </div>
+      <SyncView data={data} setData={setData} syncStatus={syncStatus} onSync={doSync} msConnected={msC} onLogin={doLogin} onLogout={doLogout}/>
+    </div></div>}
+    {/* Desktop sidebar */}
+    <div className="desktop-sidebar">
+      <button onClick={()=>setShowSettings(true)} style={{background:'none',border:'none',padding:0,display:'flex',alignItems:'center',gap:8,cursor:'pointer',marginBottom:24}} title="Inställningar">
+        <img src={LOGO_SRC} alt="In Vision" style={{height:24}}/>
+        <span style={S.logoSub}>tid</span>
+      </button>
+      {syncStatus&&<div style={{fontSize:11,color:'var(--text-muted)',marginBottom:16}}>{syncStatus}{msC&&<span style={{display:'inline-block',width:6,height:6,borderRadius:'50%',background:'var(--sage)',marginLeft:6,verticalAlign:'middle'}}/>}</div>}
+      <div style={{display:'flex',flexDirection:'column',gap:4}}>
+        {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:12,border:'none',background:tab===t.id?'var(--sage-ghost)':'transparent',color:tab===t.id?'var(--sage-deep)':'var(--text-muted)',fontFamily:'inherit',fontSize:14,fontWeight:tab===t.id?600:400,cursor:'pointer',textAlign:'left'}}><Icon id={t.id} size={18}/>{t.l}</button>)}
+      </div>
+      <div style={{marginTop:'auto'}}>
+        <button onClick={()=>setShowSettings(true)} style={{display:'flex',alignItems:'center',gap:8,padding:'10px 14px',borderRadius:12,border:'none',background:'transparent',color:'var(--text-muted)',fontFamily:'inherit',fontSize:13,cursor:'pointer',width:'100%'}}>Inställningar</button>
+      </div>
+    </div>
+
+    {/* Main content */}
+    <div className="desktop-main">
+      {/* Mobile header */}
+      <div style={S.header} className="mobile-header">
+        <button onClick={()=>setShowSettings(true)} style={{background:'none',border:'none',padding:0,display:'flex',alignItems:'center',gap:8,cursor:'pointer'}} title="Synk och data">
+          <img src={LOGO_SRC} alt="In Vision" style={{height:28}}/>
+          <span style={S.logoSub}>tid</span>
+        </button>
+        <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
+          {syncStatus&&<span style={{fontSize:11,color:'var(--text-muted)',animation:'fadeIn 0.3s ease'}}>{syncStatus}</span>}
+          {msC&&<div style={{width:8,height:8,borderRadius:'50%',background:'var(--sage)',boxShadow:'0 0 0 3px var(--sage-pale)'}} title="OneDrive ansluten"/>}
+        </div>
+      </div>
+      <div className="mobile-nav"><TabBar active={tab} onChange={setTab}/></div>
+
+    <div style={S.content}>
+      {tab==='timer'&&<TimerView data={data} setData={setData} openSettings={()=>setShowSettings(true)}/>}
+      {tab==='dash'&&<DashboardView data={data} weekOffset={weekOffset} setWeekOffset={setWeekOffset}/>}
+      {tab==='week'&&<WeekView data={data} setData={setData} msConnected={msC} weekOffset={weekOffset} setWeekOffset={setWeekOffset}/>}
+      {tab==='entries'&&<EntriesView data={data} setData={setData} weekOffset={weekOffset} setWeekOffset={setWeekOffset}/>}
+      {tab==='report'&&<ReportView data={data} setData={setData}/>}
+    </div>
+    </div>
+  </div>
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<ToastProvider><App/></ToastProvider>);
+</script>
+<script>
+window.addEventListener('error',function(e){var r=document.getElementById('root');if(r&&!r.hasChildNodes()){r.innerHTML='<div style="padding:20px;font-family:system-ui;max-width:600px;margin:auto;"><h2 style="color:#E07A5F;">Fel vid laddning</h2><p>'+e.message+'</p><p>Rad: '+e.lineno+', Kolumn: '+e.colno+'</p><p>Fil: '+(e.filename||'okänd')+'</p></div>'}});
+window.onerror=function(msg,src,line,col,err){var r=document.getElementById('root');if(r&&!r.hasChildNodes()){r.innerHTML='<div style="padding:20px;font-family:system-ui;max-width:600px;margin:auto;"><h2 style="color:#E07A5F;">Fel vid laddning</h2><p>'+msg+'</p><p>Rad: '+line+', Kolumn: '+col+'</p>'+(err?'<pre style="font-size:12px;overflow:auto;background:#f5f5f5;padding:10px;border-radius:8px">'+err.stack+'</pre>':'')+'</div>'}}
+</script>
+</body>
+</html>

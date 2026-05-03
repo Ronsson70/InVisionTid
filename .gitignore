@@ -1,0 +1,18 @@
+# Privata data — får aldrig publiceras
+invisiontid-data.json
+invisiontid-backup-*.json
+invisiontid-manual.docx
+
+# Wrangler / Cloudflare
+.wrangler/
+.deploy-tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
