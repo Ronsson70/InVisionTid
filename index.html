@@ -61,10 +61,10 @@ button:active{transform:scale(0.97)}
 </head>
 <body>
 <div id="root"></div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" integrity="sha384-DGyLxAyjq0f9SPpVevD6IgztCFlnMF6oW/XQGmfe+IsZ8TqEiDrcHkMLKI6fiB/Z" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" integrity="sha384-gTGxhz21lVGYNMcdJOyq01Edg0jhn/c22nsx0kyqP0TxaV5WVdsSH1fSDUf5YJj1" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js" integrity="sha384-AISI5AuDG6E8DeEiFMVB3rGQxhZt24OU0avMp+GMV64+tpnA3+Z6F5MT0f96iPva" crossorigin="anonymous"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
 <script>
 if('serviceWorker' in navigator){const sw=`self.addEventListener('install',e=>{self.skipWaiting()});self.addEventListener('activate',e=>{e.waitUntil(clients.claim())});self.addEventListener('fetch',e=>{e.respondWith(fetch(e.request).catch(()=>new Response('Offline')))});`;const b=new Blob([sw],{type:'application/javascript'});navigator.serviceWorker.register(URL.createObjectURL(b)).catch(()=>{})}
 let deferredPrompt=null;
@@ -95,7 +95,7 @@ const TOKEN_EXPIRY_KEY='invisiontid-ms-expiry';
 const defaultData={clients:[],projects:[],entries:[],expenses:[],trips:[],invoices:[],deletedIds:{},hourlyRate:850,kmRate:2.5,weeklyGoal:0};
 
 // ── Storage ──
-function loadLocal(){try{const r=localStorage.getItem(STORAGE_KEY);const d=r?JSON.parse(r):defaultData;if(!d.clients)d.clients=[];if(!d.expenses)d.expenses=[];if(!d.trips)d.trips=[];if(!d.invoices)d.invoices=[];if(!d.deletedIds)d.deletedIds={};if(!d.kmRate)d.kmRate=2.5;if(!d.weeklyGoal&&d.weeklyGoal!==0)d.weeklyGoal=0;return d}catch{return defaultData}}
+function loadLocal(){try{const r=localStorage.getItem(STORAGE_KEY);const d=r?JSON.parse(r):defaultData;if(!d.clients)d.clients=[];if(!d.expenses)d.expenses=[];if(!d.trips)d.trips=[];if(!d.invoices)d.invoices=[];if(!d.deletedIds)d.deletedIds={};if(d.kmRate==null)d.kmRate=2.5;if(d.weeklyGoal==null)d.weeklyGoal=0;return d}catch{return defaultData}}
 function saveLocal(d){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(d))}catch(e){console.error(e)}}
 
 // ── MS Auth ──
@@ -137,7 +137,7 @@ function mergeData(local,remote){
   };
   // Merge invoices: keep latest per project+month (no tombstones needed; small identity)
   const mergedInvoices=[...new Map([...(remote.invoices||[]),...(local.invoices||[])].map(i=>[i.projectId+'|'+i.month,i])).values()];
-  return{clients:merge(local.clients,remote.clients),projects:merge(local.projects,remote.projects),entries:merge(local.entries,remote.entries),expenses:merge(local.expenses,remote.expenses),trips:merge(local.trips,remote.trips),invoices:mergedInvoices,deletedIds:mergedDeleted,hourlyRate:local.hourlyRate||remote.hourlyRate||850,kmRate:local.kmRate||remote.kmRate||2.5,weeklyGoal:local.weeklyGoal||remote.weeklyGoal||0};
+  return{clients:merge(local.clients,remote.clients),projects:merge(local.projects,remote.projects),entries:merge(local.entries,remote.entries),expenses:merge(local.expenses,remote.expenses),trips:merge(local.trips,remote.trips),invoices:mergedInvoices,deletedIds:mergedDeleted,hourlyRate:local.hourlyRate??remote.hourlyRate??850,kmRate:local.kmRate??remote.kmRate??2.5,weeklyGoal:local.weeklyGoal??remote.weeklyGoal??0};
 }
 
 // ── Calendar API ──
@@ -205,7 +205,7 @@ function pc(i){return PC[i%PC.length]}
 // 2. Pris per tillfälle (session): project.sessionPrice - each unique logged date = 1 session
 // 3. Fastpris över period (fixed): project.pricingPeriods with type='fixed' - distributed over days
 
-function getRate(project,data){return project?.hourlyRate||data.hourlyRate||850}
+function getRate(project,data){return project?.hourlyRate??data.hourlyRate??850}
 function hasSessionPrice(project){return project?.sessionPrice>0}
 function isFixedPrice(project){return(project?.pricingPeriods||[]).some(p=>p.type==='fixed')}
 function getActivePeriod(project,date){if(!project?.pricingPeriods?.length)return null;return project.pricingPeriods.find(p=>date>=p.startDate&&(!p.endDate||date<=p.endDate))||null}
@@ -447,7 +447,7 @@ function SplitEntryModal({entry,data,onSplit,onClose}){
   const remaining=totalMin-splitMin;
   const split=()=>{if(splitMin<=0||splitMin>=totalMin)return;
     const e1={...entry,seconds:splitMin*60};
-    const e2={id:gid(),projectId:proj2,moment:moment2||'Allmänt',seconds:remaining*60,date:entry.date,startTime:undefined,endTime:undefined,createdAt:new Date().toISOString()};
+    const e2={id:gid(),projectId:proj2,moment:moment2||'Allmänt',seconds:remaining*60,date:entry.date,startTime:undefined,endTime:undefined,note:entry.note,createdAt:new Date().toISOString()};
     onSplit(e1,e2);onClose()};
   return<div className="modal-overlay" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
     <div style={S.modalTitle}>Dela upp tidspost</div>
@@ -1256,10 +1256,10 @@ function ReportView({data,setData}){
     ${pEntries.map(e=>`<tr><td>${esc(e.date)}</td><td>${e.startTime&&e.endTime?esc(e.startTime)+'–'+esc(e.endTime):''}</td><td>${esc(e.moment)}</td><td>${esc(e.note||'')}</td><td class="num">${(e.seconds/3600).toFixed(1)}</td></tr>`).join('')}
     <tr class="total-row"><td colspan="4">Summa tid</td><td class="num">${totalH.toFixed(1)} h</td></tr></table>
     ${pExp.length?`<h2>Utlägg</h2><table><tr><th>Datum</th><th>Beskrivning</th><th class="num">Belopp</th></tr>
-    ${pExp.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(e.description)}</td><td class="num">${e.amount} kr</td></tr>`).join('')}
+    ${pExp.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(e.description)}</td><td class="num">${esc(Number(e.amount)||0)} kr</td></tr>`).join('')}
     <tr class="total-row"><td colspan="2">Summa utlägg</td><td class="num">${totalExp.toLocaleString('sv-SE')} kr</td></tr></table>`:''}
     ${pTrips.length?`<h2>Resor</h2><table><tr><th>Datum</th><th>Beskrivning</th><th class="num">Km</th><th class="num">Belopp</th></tr>
-    ${pTrips.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(e.description)}</td><td class="num">${e.km}</td><td class="num">${(e.km*(data.kmRate||2.5)).toFixed(0)} kr</td></tr>`).join('')}
+    ${pTrips.map(e=>`<tr><td>${esc(e.date)}</td><td>${esc(e.description)}</td><td class="num">${esc(Number(e.km)||0)}</td><td class="num">${((Number(e.km)||0)*(data.kmRate??2.5)).toFixed(0)} kr</td></tr>`).join('')}
     <tr class="total-row"><td colspan="3">Summa resor (milersättning ${data.kmRate||2.5} kr/km)</td><td class="num">${Math.round(totalTrip).toLocaleString('sv-SE')} kr</td></tr></table>`:''}
     <div style="margin-top:24px;padding-top:16px;border-top:2px solid #EFEADD">
       <table style="width:100%;border:none">
@@ -1612,11 +1612,11 @@ function App(){
   const[showSettings,setShowSettings]=useState(false);
   const[weekOffset,setWeekOffset]=useState(0);
 
-  useEffect(()=>{const rt=checkAuthRedirect();const t=rt||getMsToken();if(t){setMsC(true);setSS('Synkar...');oneDriveRead(t).then(remote=>{if(remote){const m=mergeData(loadLocal(),remote);setData(m);saveLocal(m);lsRef.current=JSON.stringify(m);setSS('Synkad ✓')}else{oneDriveWrite(t,loadLocal());setSS('Uppladdad ✓')}setTimeout(()=>setSS(null),3000)})};},[]);
+  useEffect(()=>{const rt=checkAuthRedirect();const t=rt||getMsToken();if(t){setMsC(true);setSS('Synkar...');oneDriveRead(t).then(async remote=>{if(remote){const m=mergeData(loadLocal(),remote);setData(m);saveLocal(m);lsRef.current=JSON.stringify(m);setSS('Synkad ✓');setTimeout(()=>setSS(null),3000)}else{const ok=await oneDriveWrite(t,loadLocal());if(ok){setSS('Uppladdad ✓');setTimeout(()=>setSS(null),3000)}else{setSS('⚠ Kunde inte synka – klicka för att försöka igen');setMsC(!!getMsToken())}}})};},[]);
 
-  useEffect(()=>{saveLocal(data);const ds=JSON.stringify(data);if(ds===lsRef.current)return;const t=getMsToken();if(!t)return;if(stRef.current)clearTimeout(stRef.current);stRef.current=setTimeout(async()=>{setSS('Sparar...');const ok=await oneDriveWrite(t,data);if(ok){lsRef.current=ds;setSS('Synkad ✓')}else{setSS('Kunde inte synka');setMsC(!!getMsToken())}setTimeout(()=>setSS(null),3000)},2000)},[data]);
+  useEffect(()=>{saveLocal(data);const ds=JSON.stringify(data);if(ds===lsRef.current)return;const t=getMsToken();if(!t)return;if(stRef.current)clearTimeout(stRef.current);stRef.current=setTimeout(async()=>{setSS('Sparar...');const ok=await oneDriveWrite(t,data);if(ok){lsRef.current=ds;setSS('Synkad ✓');setTimeout(()=>setSS(null),3000)}else{setSS('⚠ Kunde inte synka – klicka för att försöka igen');setMsC(!!getMsToken())}},2000)},[data]);
 
-  const doSync=async()=>{const t=getMsToken();if(!t){setMsC(false);return}setSS('Synkar...');const r=await oneDriveRead(t);if(r){const m=mergeData(data,r);setData(m);saveLocal(m);await oneDriveWrite(t,m);lsRef.current=JSON.stringify(m);setSS('Synkad ✓')}else{await oneDriveWrite(t,data);lsRef.current=JSON.stringify(data);setSS('Uppladdad ✓')}setTimeout(()=>setSS(null),3000)};
+  const doSync=async()=>{const t=getMsToken();if(!t){setMsC(false);return}setSS('Synkar...');const r=await oneDriveRead(t);let ok=true;if(r){const m=mergeData(data,r);setData(m);saveLocal(m);ok=await oneDriveWrite(t,m);if(ok){lsRef.current=JSON.stringify(m);setSS('Synkad ✓')}}else{ok=await oneDriveWrite(t,data);if(ok){lsRef.current=JSON.stringify(data);setSS('Uppladdad ✓')}}if(ok){setTimeout(()=>setSS(null),3000)}else{setSS('⚠ Kunde inte synka – klicka för att försöka igen');setMsC(!!getMsToken())}};
   const doLogin=()=>{window.location.href=msLoginUrl()};const doLogout=()=>{clearMsToken();setMsC(false);setSS(null)};
 
   const tabs=[{id:'timer',l:'Logga'},{id:'dash',l:'Dashboard'},{id:'week',l:'Vecka'},{id:'entries',l:'Historik'},{id:'report',l:'Rapport'}];
@@ -1644,7 +1644,7 @@ function App(){
         <img src={LOGO_SRC} alt="In Vision" style={{height:24}}/>
         <span style={S.logoSub}>tid</span>
       </button>
-      {syncStatus&&<div style={{fontSize:11,color:'var(--text-muted)',marginBottom:16}}>{syncStatus}{msC&&<span style={{display:'inline-block',width:6,height:6,borderRadius:'50%',background:'var(--sage)',marginLeft:6,verticalAlign:'middle'}}/>}</div>}
+      {syncStatus&&<div onClick={syncStatus.startsWith('⚠')?doSync:undefined} style={{fontSize:11,color:syncStatus.startsWith('⚠')?'var(--accent)':'var(--text-muted)',marginBottom:16,cursor:syncStatus.startsWith('⚠')?'pointer':'default',fontWeight:syncStatus.startsWith('⚠')?600:400}}>{syncStatus}{msC&&<span style={{display:'inline-block',width:6,height:6,borderRadius:'50%',background:'var(--sage)',marginLeft:6,verticalAlign:'middle'}}/>}</div>}
       <div style={{display:'flex',flexDirection:'column',gap:4}}>
         {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:12,border:'none',background:tab===t.id?'var(--sage-ghost)':'transparent',color:tab===t.id?'var(--sage-deep)':'var(--text-muted)',fontFamily:'inherit',fontSize:14,fontWeight:tab===t.id?600:400,cursor:'pointer',textAlign:'left'}}><Icon id={t.id} size={18}/>{t.l}</button>)}
       </div>
@@ -1662,7 +1662,7 @@ function App(){
           <span style={S.logoSub}>tid</span>
         </button>
         <div style={{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}}>
-          {syncStatus&&<span style={{fontSize:11,color:'var(--text-muted)',animation:'fadeIn 0.3s ease'}}>{syncStatus}</span>}
+          {syncStatus&&<span onClick={syncStatus.startsWith('⚠')?doSync:undefined} style={{fontSize:11,color:syncStatus.startsWith('⚠')?'var(--accent)':'var(--text-muted)',animation:'fadeIn 0.3s ease',cursor:syncStatus.startsWith('⚠')?'pointer':'default',fontWeight:syncStatus.startsWith('⚠')?600:400}}>{syncStatus}</span>}
           {msC&&<div style={{width:8,height:8,borderRadius:'50%',background:'var(--sage)',boxShadow:'0 0 0 3px var(--sage-pale)'}} title="OneDrive ansluten"/>}
         </div>
       </div>
@@ -1682,8 +1682,9 @@ function App(){
 ReactDOM.createRoot(document.getElementById('root')).render(<ToastProvider><App/></ToastProvider>);
 </script>
 <script>
-window.addEventListener('error',function(e){var r=document.getElementById('root');if(r&&!r.hasChildNodes()){r.innerHTML='<div style="padding:20px;font-family:system-ui;max-width:600px;margin:auto;"><h2 style="color:#E07A5F;">Fel vid laddning</h2><p>'+e.message+'</p><p>Rad: '+e.lineno+', Kolumn: '+e.colno+'</p><p>Fil: '+(e.filename||'okänd')+'</p></div>'}});
-window.onerror=function(msg,src,line,col,err){var r=document.getElementById('root');if(r&&!r.hasChildNodes()){r.innerHTML='<div style="padding:20px;font-family:system-ui;max-width:600px;margin:auto;"><h2 style="color:#E07A5F;">Fel vid laddning</h2><p>'+msg+'</p><p>Rad: '+line+', Kolumn: '+col+'</p>'+(err?'<pre style="font-size:12px;overflow:auto;background:#f5f5f5;padding:10px;border-radius:8px">'+err.stack+'</pre>':'')+'</div>'}}
+function _esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+window.addEventListener('error',function(e){var r=document.getElementById('root');if(r&&!r.hasChildNodes()){r.innerHTML='<div style="padding:20px;font-family:system-ui;max-width:600px;margin:auto;"><h2 style="color:#E07A5F;">Fel vid laddning</h2><p>'+_esc(e.message)+'</p><p>Rad: '+_esc(e.lineno)+', Kolumn: '+_esc(e.colno)+'</p><p>Fil: '+_esc(e.filename||'okänd')+'</p></div>'}});
+window.onerror=function(msg,src,line,col,err){var r=document.getElementById('root');if(r&&!r.hasChildNodes()){r.innerHTML='<div style="padding:20px;font-family:system-ui;max-width:600px;margin:auto;"><h2 style="color:#E07A5F;">Fel vid laddning</h2><p>'+_esc(msg)+'</p><p>Rad: '+_esc(line)+', Kolumn: '+_esc(col)+'</p>'+(err?'<pre style="font-size:12px;overflow:auto;background:#f5f5f5;padding:10px;border-radius:8px">'+_esc(err.stack)+'</pre>':'')+'</div>'}}
 </script>
 </body>
 </html>
