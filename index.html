@@ -823,15 +823,15 @@ function DashboardView({data,weekOffset,setWeekOffset}){
       const wExtra=wExp+wTrips;const wTotal=wRev+wExtra;
       const fmtKr=v=>v.toLocaleString('sv-SE',{maximumFractionDigits:0});
       return<div style={{background:'var(--sage-ghost)',borderRadius:16,padding:'16px',marginBottom:16}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
           <div><div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Veckan</div>
             <div style={{fontSize:24,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)'}}>{wH.toFixed(1)} h</div></div>
           <div style={{textAlign:'right'}}><div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Totalt</div>
-            <div style={{fontSize:20,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)'}}>{fmtKr(wTotal)} kr</div></div>
+            <div style={{fontSize:28,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)',lineHeight:1.05}}>{fmtKr(wTotal)} kr</div></div>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',gap:12,marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)',fontSize:13,color:'var(--text-muted)'}}>
-          <span>Arvode <strong style={{color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>{fmtKr(wRev)} kr</strong></span>
-          <span>Utlägg & resor <strong style={{color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>{fmtKr(wExtra)} kr</strong></span>
+        <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:6}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'var(--text-muted)'}}><span>Arvode</span><span style={{fontVariantNumeric:'tabular-nums'}}>{fmtKr(wRev)} kr</span></div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'var(--text-muted)'}}><span>Utlägg &amp; resor</span><span style={{fontVariantNumeric:'tabular-nums'}}>{fmtKr(wExtra)} kr</span></div>
         </div>
       </div>})()}
 
