@@ -818,12 +818,20 @@ function DashboardView({data,weekOffset,setWeekOffset}){
       const wEntries=data.entries.filter(e=>wd.includes(e.date));
       const wH=wEntries.reduce((s,e)=>s+e.seconds,0)/3600;
       const wRev=calcWeekRevenue(data,wd);
+      const wExp=(data.expenses||[]).filter(e=>wd.includes(e.date)).reduce((s,e)=>s+e.amount,0);
+      const wTrips=(data.trips||[]).filter(e=>wd.includes(e.date)).reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
+      const wExtra=wExp+wTrips;const wTotal=wRev+wExtra;
+      const fmtKr=v=>v.toLocaleString('sv-SE',{maximumFractionDigits:0});
       return<div style={{background:'var(--sage-ghost)',borderRadius:16,padding:'16px',marginBottom:16}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <div><div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Veckan</div>
             <div style={{fontSize:24,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)'}}>{wH.toFixed(1)} h</div></div>
-          <div style={{textAlign:'right'}}><div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Intäkt</div>
-            <div style={{fontSize:20,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)'}}>{wRev.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</div></div>
+          <div style={{textAlign:'right'}}><div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Totalt</div>
+            <div style={{fontSize:20,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)'}}>{fmtKr(wTotal)} kr</div></div>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',gap:12,marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)',fontSize:13,color:'var(--text-muted)'}}>
+          <span>Arvode <strong style={{color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>{fmtKr(wRev)} kr</strong></span>
+          <span>Utlägg & resor <strong style={{color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>{fmtKr(wExtra)} kr</strong></span>
         </div>
       </div>})()}
 
