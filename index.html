@@ -1299,9 +1299,10 @@ function ReportView({data,setData}){
   };
 
   const now=new Date();
+  const curWeek=getWeekDates(0); // kalendervecka mån–sön, samma som dashboarden
   const periodFilter=d=>{
     const parts=d.split('-');const m=parseInt(parts[1])-1;const y=parseInt(parts[0]);
-    if(period==='week'){const wa=new Date(now.getFullYear(),now.getMonth(),now.getDate()-7,12,0,0);return d>=localDateStr(wa)}
+    if(period==='week')return curWeek.includes(d);
     if(period==='month')return m===selMonthIdx&&y===selYear;
     return true
   };
@@ -1313,6 +1314,7 @@ function ReportView({data,setData}){
   let totTimeCost=calcRevenue(filtered,data);
   // Add fixed price portions for filtered period
   if(period==='month'){totTimeCost+=calcFixedMonthly(data,selYear,selMonthIdx)}
+  else if(period==='week'){data.projects.forEach(p=>{totTimeCost+=getFixedWeeklyAmount(p,curWeek)})}
   else if(period==='all'){const countedFixedPeriods=new Set();data.projects.forEach(p=>{(p?.pricingPeriods||[]).forEach(pp=>{if(pp.type!=='fixed'||countedFixedPeriods.has(pp.id))return;countedFixedPeriods.add(pp.id);totTimeCost+=pp.amount})})}
   const totExpenses=filteredExp.reduce((s,e)=>s+e.amount,0);
 
