@@ -92,10 +92,31 @@ const TOKEN_EXPIRY_KEY='invisiontid-ms-expiry';
 // expense = { id, projectId, amount, description, date, createdAt }
 // trip = { id, projectId, km, description, date, createdAt }
 // invoice = { projectId, month:'2026-03', invoicedAt:'2026-04-02' }
-const defaultData={clients:[],projects:[],entries:[],expenses:[],trips:[],invoices:[],deletedIds:{},hourlyRate:850,kmRate:2.5,weeklyGoal:0};
+const SCHEMA_VERSION=1;
+const defaultData={schemaVersion:SCHEMA_VERSION,clients:[],projects:[],entries:[],expenses:[],trips:[],invoices:[],deletedIds:{},hourlyRate:850,kmRate:2.5,weeklyGoal:0};
 
 // ── Storage ──
-function loadLocal(){try{const r=localStorage.getItem(STORAGE_KEY);const d=r?JSON.parse(r):defaultData;if(!d.clients)d.clients=[];if(!d.expenses)d.expenses=[];if(!d.trips)d.trips=[];if(!d.invoices)d.invoices=[];if(!d.deletedIds)d.deletedIds={};if(d.kmRate==null)d.kmRate=2.5;if(d.weeklyGoal==null)d.weeklyGoal=0;return d}catch{return defaultData}}
+// migrate() är enda stället som normaliserar/uppgraderar datamodellen.
+// Körs på allt som läses in (localStorage, OneDrive, importerad backup) så
+// gammal data alltid får dagens struktur. Lägg framtida steg som
+// `if(d.schemaVersion<N){…}` före versionsstämpeln.
+function migrate(d){
+  d=(d&&typeof d==='object')?d:{};
+  if(!Array.isArray(d.clients))d.clients=[];
+  if(!Array.isArray(d.projects))d.projects=[];
+  if(!Array.isArray(d.entries))d.entries=[];
+  if(!Array.isArray(d.expenses))d.expenses=[];
+  if(!Array.isArray(d.trips))d.trips=[];
+  if(!Array.isArray(d.invoices))d.invoices=[];
+  if(!d.deletedIds||typeof d.deletedIds!=='object')d.deletedIds={};
+  if(d.hourlyRate==null)d.hourlyRate=850;
+  if(d.kmRate==null)d.kmRate=2.5;
+  if(d.weeklyGoal==null)d.weeklyGoal=0;
+  // Framtida migreringar här, t.ex.: if((d.schemaVersion||0)<2){ … }
+  d.schemaVersion=SCHEMA_VERSION;
+  return d;
+}
+function loadLocal(){try{const r=localStorage.getItem(STORAGE_KEY);return migrate(r?JSON.parse(r):{...defaultData})}catch{return migrate({...defaultData})}}
 function saveLocal(d){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(d))}catch(e){console.error(e)}}
 
 // ── MS Auth ──
@@ -106,8 +127,22 @@ function msLoginUrl(){const p=new URLSearchParams({client_id:MS_CLIENT_ID,respon
 function checkAuthRedirect(){const h=window.location.hash;if(h.includes('access_token')){const p=new URLSearchParams(h.substring(1));const t=p.get('access_token');const ei=parseInt(p.get('expires_in')||'3600');if(t){saveMsToken(t,ei);window.history.replaceState(null,'',window.location.pathname+window.location.search);return t}}return null}
 
 // ── OneDrive ──
-async function oneDriveRead(token){try{const r=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/InVisionTid/${ONEDRIVE_FILENAME}:/content`,{headers:{Authorization:`Bearer ${token}`}});if(r.status===404)return null;if(!r.ok){if(r.status===401)clearMsToken();return null}return await r.json()}catch(e){console.error(e);return null}}
-async function oneDriveWrite(token,data){try{const r=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/InVisionTid/${ONEDRIVE_FILENAME}:/content`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({...data,lastSync:new Date().toISOString()})});if(r.status===401)clearMsToken();return r.ok}catch(e){console.error(e);return false}}
+// Returnerar null ENBART vid 404 (ingen fil ännu → säkert att ladda upp lokal data).
+// Kastar vid alla andra fel så anroparen vet att fjärrdata kan finnas och INTE
+// får skrivas över av lokal data (skyddar mot dataförlust vid tillfälliga fel).
+async function oneDriveRead(token){
+  const r=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/InVisionTid/${ONEDRIVE_FILENAME}:/content`,{headers:{Authorization:`Bearer ${token}`}});
+  if(r.status===404)return null;
+  if(r.status===401){clearMsToken();throw new Error('Inloggningen har gått ut – logga in igen')}
+  if(!r.ok)throw new Error('OneDrive svarade '+r.status+' vid läsning');
+  return await r.json();
+}
+async function oneDriveWrite(token,data){
+  const r=await fetch(`https://graph.microsoft.com/v1.0/me/drive/root:/InVisionTid/${ONEDRIVE_FILENAME}:/content`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({...data,lastSync:new Date().toISOString()})});
+  if(r.status===401){clearMsToken();throw new Error('Inloggningen har gått ut – logga in igen')}
+  if(!r.ok)throw new Error('OneDrive svarade '+r.status+' vid skrivning');
+  return true;
+}
 
 // ── Merge ──
 // Merges local+remote using:
@@ -137,7 +172,7 @@ function mergeData(local,remote){
   };
   // Merge invoices: keep latest per project+month (no tombstones needed; small identity)
   const mergedInvoices=[...new Map([...(remote.invoices||[]),...(local.invoices||[])].map(i=>[i.projectId+'|'+i.month,i])).values()];
-  return{clients:merge(local.clients,remote.clients),projects:merge(local.projects,remote.projects),entries:merge(local.entries,remote.entries),expenses:merge(local.expenses,remote.expenses),trips:merge(local.trips,remote.trips),invoices:mergedInvoices,deletedIds:mergedDeleted,hourlyRate:local.hourlyRate??remote.hourlyRate??850,kmRate:local.kmRate??remote.kmRate??2.5,weeklyGoal:local.weeklyGoal??remote.weeklyGoal??0};
+  return migrate({clients:merge(local.clients,remote.clients),projects:merge(local.projects,remote.projects),entries:merge(local.entries,remote.entries),expenses:merge(local.expenses,remote.expenses),trips:merge(local.trips,remote.trips),invoices:mergedInvoices,deletedIds:mergedDeleted,hourlyRate:local.hourlyRate??remote.hourlyRate??850,kmRate:local.kmRate??remote.kmRate??2.5,weeklyGoal:local.weeklyGoal??remote.weeklyGoal??0});
 }
 
 // ── Calendar API ──
@@ -193,6 +228,7 @@ function calEventTimeStr(ev) {
 }
 
 // ── Helpers ──
+/* PURE-START */ /* allt mellan PURE-START och PURE-END är rena funktioner utan React/DOM-beroende — test.html återanvänder exakt denna kod */
 function gid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
 function fmtDur(s){const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`}
 function fmtH(s){return(s/3600).toFixed(1)}
@@ -283,6 +319,18 @@ function calcWeekRevenue(data,weekDates){
   return rev;
 }
 
+// Gemensam vecko-sammanfattning – ENDA källan för veckans siffror.
+// Används av både DashboardView och ReportView så de aldrig kan glida isär.
+// Returnerar: entries, hours, arvode (tid+fastpris), expenses, trips, extra, total.
+function weekSummary(data,weekDates){
+  const entries=data.entries.filter(e=>weekDates.includes(e.date));
+  const hours=entries.reduce((s,e)=>s+e.seconds,0)/3600;
+  const arvode=calcWeekRevenue(data,weekDates);
+  const expenses=(data.expenses||[]).filter(e=>weekDates.includes(e.date)).reduce((s,e)=>s+e.amount,0);
+  const trips=(data.trips||[]).filter(e=>weekDates.includes(e.date)).reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
+  return{entries,hours,arvode,expenses,trips,extra:expenses+trips,total:arvode+expenses+trips};
+}
+
 // ── ICS ──
 function genICS(entries,projects){const p2=n=>String(n).padStart(2,'0');const fd=(ds,om)=>{const d=new Date(ds+'T08:00:00');d.setMinutes(d.getMinutes()+om);return d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'T'+p2(d.getHours())+p2(d.getMinutes())+'00'};let l=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//In Vision Tid//SV","CALSCALE:GREGORIAN","METHOD:PUBLISH","X-WR-CALNAME:In Vision Tid"];const bd={};entries.forEach(e=>{if(!bd[e.date])bd[e.date]=[];bd[e.date].push(e)});Object.entries(bd).forEach(([date,de])=>{let o=0;de.forEach(en=>{const pr=projects.find(p=>p.id===en.projectId);const dur=Math.max(Math.round(en.seconds/60),1);const sm=pr?`${pr.name}: ${en.moment}`:en.moment;l.push("BEGIN:VEVENT",`DTSTART:${fd(date,o)}`,`DTEND:${fd(date,o+dur)}`,`SUMMARY:${sm}`,`UID:${en.id}@invisiontid`,"END:VEVENT");o+=dur})});l.push("END:VCALENDAR");return l.join("\r\n")}
 function dlICS(entries,projects,fn){const b=new Blob([genICS(entries,projects)],{type:'text/calendar;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=fn||'tidsrapport.ics';a.click()}
@@ -292,6 +340,7 @@ function localDateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padSt
 function getWeekDates(off=0){const n=new Date(),dw=n.getDay(),mo=dw===0?-6:1-dw;const mon=new Date(n);mon.setDate(n.getDate()+mo+off*7);mon.setHours(12,0,0,0);return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return localDateStr(d)})}
 function weekLabel(ds){const o={day:'numeric',month:'short'};return`${new Date(ds[0]+'T12:00:00').toLocaleDateString('sv-SE',o)} – ${new Date(ds[6]+'T12:00:00').toLocaleDateString('sv-SE',o)}`}
 const DN=["Mån","Tis","Ons","Tor","Fre","Lör","Sön"];
+/* PURE-END */
 
 // ── Styles ──
 const S={
@@ -815,12 +864,8 @@ function DashboardView({data,weekOffset,setWeekOffset}){
     {/* Week summary card */}
     {(()=>{
       const wd=getWeekDates(dashWeek);
-      const wEntries=data.entries.filter(e=>wd.includes(e.date));
-      const wH=wEntries.reduce((s,e)=>s+e.seconds,0)/3600;
-      const wRev=calcWeekRevenue(data,wd);
-      const wExp=(data.expenses||[]).filter(e=>wd.includes(e.date)).reduce((s,e)=>s+e.amount,0);
-      const wTrips=(data.trips||[]).filter(e=>wd.includes(e.date)).reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
-      const wExtra=wExp+wTrips;const wTotal=wRev+wExtra;
+      const ws=weekSummary(data,wd);
+      const wH=ws.hours,wRev=ws.arvode,wExtra=ws.extra,wTotal=ws.total;
       const fmtKr=v=>v.toLocaleString('sv-SE',{maximumFractionDigits:0});
       return<div style={{background:'var(--sage-ghost)',borderRadius:16,padding:'16px',marginBottom:16}}>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
@@ -1322,7 +1367,7 @@ function ReportView({data,setData}){
   let totTimeCost=calcRevenue(filtered,data);
   // Add fixed price portions for filtered period
   if(period==='month'){totTimeCost+=calcFixedMonthly(data,selYear,selMonthIdx)}
-  else if(period==='week'){data.projects.forEach(p=>{totTimeCost+=getFixedWeeklyAmount(p,curWeek)})}
+  else if(period==='week'){totTimeCost=weekSummary(data,curWeek).arvode} // samma källa som dashboarden
   else if(period==='all'){const countedFixedPeriods=new Set();data.projects.forEach(p=>{(p?.pricingPeriods||[]).forEach(pp=>{if(pp.type!=='fixed'||countedFixedPeriods.has(pp.id))return;countedFixedPeriods.add(pp.id);totTimeCost+=pp.amount})})}
   const totExpenses=filteredExp.reduce((s,e)=>s+e.amount,0);
 
@@ -1577,9 +1622,10 @@ function SyncView({data,setData,syncStatus,onSync,msConnected,onLogin,onLogout})
   const importFile=(file)=>{
     if(!file)return;const reader=new FileReader();
     reader.onload=e=>{try{
-      const imported=JSON.parse(e.target.result);
-      if(!imported.projects||!imported.entries){setIS('error');return}
+      const raw=JSON.parse(e.target.result);
+      if(!raw.projects||!raw.entries){setIS('error');return}
       if(!confirm('Ersätt all nuvarande data med innehållet i backupen? Denna åtgärd kan inte ångras.'))return;
+      const imported=migrate(raw);
       setData(imported);saveLocal(imported);setIS('Backup importerad ('+(imported.entries||[]).length+' poster).');
     }catch{setIS('error')}};
     reader.readAsText(file);
@@ -1621,12 +1667,25 @@ function App(){
   const[data,setData]=useState(loadLocal());const[tab,setTab]=useState('timer');const[syncStatus,setSS]=useState(null);const[msC,setMsC]=useState(false);const stRef=useRef(null);const lsRef=useRef(JSON.stringify(data));
   const[showSettings,setShowSettings]=useState(false);
   const[weekOffset,setWeekOffset]=useState(0);
+  const toast=useToast();
+  // Gemensam felvisning: behåller '⚠ … – klicka …'-prefixet så befintlig
+  // klicka-för-att-försöka-igen-logik fortsätter funka, plus en tydlig toast.
+  const syncFail=(e,phase)=>{const msg=(e&&e.message)||'Kunde inte synka';setSS('⚠ '+msg+' – klicka för att försöka igen');setMsC(!!getMsToken());toast('✗ Synk misslyckades'+(phase?' ('+phase+')':'')+': '+msg);console.error('Sync error',phase,e);};
 
-  useEffect(()=>{const rt=checkAuthRedirect();const t=rt||getMsToken();if(t){setMsC(true);setSS('Synkar...');oneDriveRead(t).then(async remote=>{if(remote){const m=mergeData(loadLocal(),remote);setData(m);saveLocal(m);lsRef.current=JSON.stringify(m);setSS('Synkad ✓');setTimeout(()=>setSS(null),3000)}else{const ok=await oneDriveWrite(t,loadLocal());if(ok){setSS('Uppladdad ✓');setTimeout(()=>setSS(null),3000)}else{setSS('⚠ Kunde inte synka – klicka för att försöka igen');setMsC(!!getMsToken())}}})};},[]);
+  useEffect(()=>{const rt=checkAuthRedirect();const t=rt||getMsToken();if(!t)return;setMsC(true);setSS('Synkar...');(async()=>{try{
+    const remote=await oneDriveRead(t);
+    if(remote){const m=mergeData(loadLocal(),remote);setData(m);saveLocal(m);lsRef.current=JSON.stringify(m);setSS('Synkad ✓');setTimeout(()=>setSS(null),3000)}
+    else{await oneDriveWrite(t,loadLocal());setSS('Uppladdad ✓');setTimeout(()=>setSS(null),3000)} // remote===null ⇒ 404, ingen fil ännu
+  }catch(e){syncFail(e,'inläsning')}})();},[]);
 
-  useEffect(()=>{saveLocal(data);const ds=JSON.stringify(data);if(ds===lsRef.current)return;const t=getMsToken();if(!t)return;if(stRef.current)clearTimeout(stRef.current);stRef.current=setTimeout(async()=>{setSS('Sparar...');const ok=await oneDriveWrite(t,data);if(ok){lsRef.current=ds;setSS('Synkad ✓');setTimeout(()=>setSS(null),3000)}else{setSS('⚠ Kunde inte synka – klicka för att försöka igen');setMsC(!!getMsToken())}},2000)},[data]);
+  useEffect(()=>{saveLocal(data);const ds=JSON.stringify(data);if(ds===lsRef.current)return;const t=getMsToken();if(!t)return;if(stRef.current)clearTimeout(stRef.current);stRef.current=setTimeout(async()=>{setSS('Sparar...');try{await oneDriveWrite(t,data);lsRef.current=ds;setSS('Synkad ✓');setTimeout(()=>setSS(null),3000)}catch(e){syncFail(e,'sparning')}},2000)},[data]);
 
-  const doSync=async()=>{const t=getMsToken();if(!t){setMsC(false);return}setSS('Synkar...');const r=await oneDriveRead(t);let ok=true;if(r){const m=mergeData(data,r);setData(m);saveLocal(m);ok=await oneDriveWrite(t,m);if(ok){lsRef.current=JSON.stringify(m);setSS('Synkad ✓')}}else{ok=await oneDriveWrite(t,data);if(ok){lsRef.current=JSON.stringify(data);setSS('Uppladdad ✓')}}if(ok){setTimeout(()=>setSS(null),3000)}else{setSS('⚠ Kunde inte synka – klicka för att försöka igen');setMsC(!!getMsToken())}};
+  const doSync=async()=>{const t=getMsToken();if(!t){setMsC(false);return}setSS('Synkar...');try{
+    const r=await oneDriveRead(t);
+    if(r){const m=mergeData(data,r);setData(m);saveLocal(m);await oneDriveWrite(t,m);lsRef.current=JSON.stringify(m);setSS('Synkad ✓')}
+    else{await oneDriveWrite(t,data);lsRef.current=JSON.stringify(data);setSS('Uppladdad ✓')} // 404 ⇒ säkert att ladda upp lokal data
+    setTimeout(()=>setSS(null),3000);
+  }catch(e){syncFail(e,'synk')}};
   const doLogin=()=>{window.location.href=msLoginUrl()};const doLogout=()=>{clearMsToken();setMsC(false);setSS(null)};
 
   const tabs=[{id:'timer',l:'Logga'},{id:'dash',l:'Dashboard'},{id:'week',l:'Vecka'},{id:'entries',l:'Historik'},{id:'report',l:'Rapport'}];

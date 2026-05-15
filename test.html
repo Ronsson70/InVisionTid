@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<title>In Vision Tid – enhetstester</title>
+<style>
+  body{font-family:'JetBrains Mono',ui-monospace,Menlo,Consolas,monospace;background:#1A1816;color:#E8E3D6;padding:24px;font-size:14px;line-height:1.6}
+  h1{font-size:18px;color:#9DB3A2}
+  .pass{color:#7FB28A}.fail{color:#E08A6A;font-weight:700}
+  .sum{margin-top:16px;padding:12px;border-radius:8px;background:#222019}
+  code{color:#C4A55A}
+</style>
+</head>
+<body>
+<h1>In Vision Tid – enhetstester</h1>
+<p>Återanvänder de rena funktionerna direkt ur <code>index.html</code> (sektionen mellan PURE-START och PURE-END). Ingen byggprocess, ingen dubblerad logik.</p>
+<div id="out">Laddar index.html…</div>
+
+<script>
+(async function(){
+  const out=document.getElementById('out');
+  let passed=0,failed=0;const lines=[];
+  const log=(ok,name,extra)=>{ok?passed++:failed++;lines.push(`<div class="${ok?'pass':'fail'}">${ok?'✓':'✗'} ${name}${extra?` — ${extra}`:''}</div>`);};
+  const eq=(name,a,b)=>log(JSON.stringify(a)===JSON.stringify(b),name,JSON.stringify(a)===JSON.stringify(b)?'':`fick ${JSON.stringify(a)}, väntade ${JSON.stringify(b)}`);
+  const near=(name,a,b,tol=0.5)=>log(Math.abs(a-b)<=tol,name,Math.abs(a-b)<=tol?'':`fick ${a}, väntade ~${b}`);
+  const ok=(name,cond,extra)=>log(!!cond,name,extra);
+
+  let M;
+  try{
+    const src=await (await fetch('index.html')).text();
+    const m=src.match(/\/\* PURE-START \*\/([\s\S]*?)\/\* PURE-END \*\//);
+    if(!m) throw new Error('Hittade inte PURE-START/PURE-END i index.html');
+    const exports='gid,fmtH,today,localDateStr,getWeekDates,weekLabel,getRate,hasSessionPrice,isFixedPrice,getActivePeriod,getSessionCount,getSessionRevenue,calcRevenue,calcFixedMonthly,getFixedWeeklyAmount,calcWeekRevenue,weekSummary';
+    M=new Function(m[1]+`;return{${exports}};`)();
+  }catch(e){
+    out.innerHTML=`<div class="fail">✗ Kunde inte ladda funktioner: ${e.message}<br>Kör via en lokal server (fetch fungerar inte på file://).</div>`;
+    return;
+  }
+
+  // ── localDateStr / getWeekDates ──
+  eq('localDateStr formaterar YYYY-MM-DD', M.localDateStr(new Date(2026,4,3,12,0,0)), '2026-05-03');
+  const wk=M.getWeekDates(0);
+  eq('getWeekDates ger 7 datum', wk.length, 7);
+  ok('getWeekDates: alla YYYY-MM-DD', wk.every(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)));
+  ok('getWeekDates: stigande ordning', wk.every((d,i)=>i===0||d>wk[i-1]));
+  eq('getWeekDates: [0] är måndag', new Date(wk[0]+'T12:00:00').getDay(), 1);
+  eq('getWeekDates: [6] är söndag', new Date(wk[6]+'T12:00:00').getDay(), 0);
+  ok('getWeekDates(-1) ligger före getWeekDates(0)', M.getWeekDates(-1)[6] < wk[0]);
+
+  // ── Prissättningsmodeller ──
+  const dHourly={projects:[{id:'p1',hourlyRate:1000}],entries:[],expenses:[],trips:[]};
+  eq('calcRevenue: timpris 1h*1000', M.calcRevenue([{projectId:'p1',date:'2026-05-12',seconds:3600}],dHourly), 1000);
+  eq('calcRevenue: timpris 2.5h*1000', M.calcRevenue([{projectId:'p1',date:'2026-05-12',seconds:9000}],dHourly), 2500);
+
+  const dSession={projects:[{id:'s1',sessionPrice:2000}],entries:[],expenses:[],trips:[]};
+  eq('calcRevenue: session – två poster samma dag = 1 tillfälle',
+     M.calcRevenue([{projectId:'s1',date:'2026-05-12',seconds:3600},{projectId:'s1',date:'2026-05-12',seconds:1800}],dSession), 2000);
+  eq('calcRevenue: session – två olika dagar = 2 tillfällen',
+     M.calcRevenue([{projectId:'s1',date:'2026-05-12',seconds:3600},{projectId:'s1',date:'2026-05-13',seconds:3600}],dSession), 4000);
+
+  const dFixed={projects:[{id:'f1',pricingPeriods:[{id:'pp1',type:'fixed',startDate:'2026-03-01',endDate:'2026-06-30',amount:100000}]}],entries:[],expenses:[],trips:[]};
+  eq('calcRevenue: fastpris räknas EJ per timme (0)', M.calcRevenue([{projectId:'f1',date:'2026-05-12',seconds:7200}],dFixed), 0);
+  eq('calcFixedMonthly: 100000 över 4 mån → 25000/mån', M.calcFixedMonthly(dFixed,2026,4), 25000);
+  near('getFixedWeeklyAmount: 25000/mån ≈ 5774/vecka', M.getFixedWeeklyAmount(dFixed.projects[0], ['2026-05-11','2026-05-12','2026-05-13','2026-05-14','2026-05-15','2026-05-16','2026-05-17']), 5774, 1);
+  eq('getFixedWeeklyAmount: vecka utanför period = 0',
+     M.getFixedWeeklyAmount(dFixed.projects[0], ['2026-01-05','2026-01-06','2026-01-07','2026-01-08','2026-01-09','2026-01-10','2026-01-11']), 0);
+
+  const dHourlyPeriod={projects:[{id:'h1',hourlyRate:850,pricingPeriods:[{id:'hp1',type:'hourly',startDate:'2026-05-01',endDate:'2026-05-31',amount:1200}]}],entries:[],expenses:[],trips:[]};
+  eq('calcRevenue: hourly-period 1200 slår projektets 850', M.calcRevenue([{projectId:'h1',date:'2026-05-12',seconds:3600}],dHourlyPeriod), 1200);
+
+  // ── weekSummary: enda källan för dashboard + rapport ──
+  const week=['2026-05-11','2026-05-12','2026-05-13','2026-05-14','2026-05-15','2026-05-16','2026-05-17'];
+  const dWeek={
+    kmRate:5.5,
+    projects:[{id:'p1',hourlyRate:1000},{id:'f1',pricingPeriods:[{id:'pp1',type:'fixed',startDate:'2026-03-01',endDate:'2026-06-30',amount:100000}]}],
+    entries:[
+      {projectId:'p1',date:'2026-05-12',seconds:3600},   // 1h * 1000 = 1000
+      {projectId:'p1',date:'2026-05-13',seconds:7200},   // 2h * 1000 = 2000
+      {projectId:'f1',date:'2026-05-14',seconds:3600},   // fastpris, ej per timme
+      {projectId:'p1',date:'2026-04-30',seconds:3600},   // UTANFÖR veckan – ska ignoreras
+    ],
+    expenses:[{projectId:'p1',date:'2026-05-12',amount:300},{projectId:'p1',date:'2026-04-30',amount:999}],
+    trips:[{projectId:'p1',date:'2026-05-13',km:10}], // 10*5.5 = 55
+  };
+  const ws=M.weekSummary(dWeek,week);
+  // 1h + 2h timpris + 1h fastpris = 4h; posten 2026-04-30 ligger utanför veckan och ignoreras
+  eq('weekSummary.hours = 4h (all tid i veckan, även fastpris; poster utanför ignoreras)', ws.hours, 4);
+  near('weekSummary.arvode = 3000 timpris + 5774 fastpris', ws.arvode, 8774, 1);
+  eq('weekSummary.expenses (bara veckans)', ws.expenses, 300);
+  eq('weekSummary.trips = 10km*5.5', ws.trips, 55);
+  eq('weekSummary.extra = expenses + trips', ws.extra, 355);
+  near('weekSummary.total = arvode + extra', ws.total, 8774+355, 1);
+  ok('weekSummary.total == calcWeekRevenue + extra (dashboard/rapport matchar)',
+     Math.abs(ws.total - (M.calcWeekRevenue(dWeek,week)+ws.extra)) < 0.5);
+
+  out.innerHTML=lines.join('')+
+    `<div class="sum"><strong class="${failed?'fail':'pass'}">${passed} godkända, ${failed} misslyckade</strong></div>`;
+})();
+</script>
+</body>
+</html>
