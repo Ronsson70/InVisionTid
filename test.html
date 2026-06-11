@@ -61,9 +61,21 @@
   const dFixed={projects:[{id:'f1',pricingPeriods:[{id:'pp1',type:'fixed',startDate:'2026-03-01',endDate:'2026-06-30',amount:100000}]}],entries:[],expenses:[],trips:[]};
   eq('calcRevenue: fastpris räknas EJ per timme (0)', M.calcRevenue([{projectId:'f1',date:'2026-05-12',seconds:7200}],dFixed), 0);
   eq('calcFixedMonthly: 100000 över 4 mån → 25000/mån', M.calcFixedMonthly(dFixed,2026,4), 25000);
-  near('getFixedWeeklyAmount: 25000/mån ≈ 5774/vecka', M.getFixedWeeklyAmount(dFixed.projects[0], ['2026-05-11','2026-05-12','2026-05-13','2026-05-14','2026-05-15','2026-05-16','2026-05-17']), 5774, 1);
+  near('getFixedWeeklyAmount: 25000/mån, hel maj-vecka = 7*(25000/31) ≈ 5645', M.getFixedWeeklyAmount(dFixed.projects[0], ['2026-05-11','2026-05-12','2026-05-13','2026-05-14','2026-05-15','2026-05-16','2026-05-17']), 5645, 1);
   eq('getFixedWeeklyAmount: vecka utanför period = 0',
      M.getFixedWeeklyAmount(dFixed.projects[0], ['2026-01-05','2026-01-06','2026-01-07','2026-01-08','2026-01-09','2026-01-10','2026-01-11']), 0);
+  // Avstämning: summan av alla veckor som nuddar mars ska bli månadsbeloppet (ingen 4.33-överskattning)
+  const dMar={projects:[{id:'fm',pricingPeriods:[{id:'ppm',type:'fixed',startDate:'2026-03-01',endDate:'2026-03-31',amount:18400}]}],entries:[],expenses:[],trips:[]};
+  const marWeeks=[
+    ['2026-02-23','2026-02-24','2026-02-25','2026-02-26','2026-02-27','2026-02-28','2026-03-01'],
+    ['2026-03-02','2026-03-03','2026-03-04','2026-03-05','2026-03-06','2026-03-07','2026-03-08'],
+    ['2026-03-09','2026-03-10','2026-03-11','2026-03-12','2026-03-13','2026-03-14','2026-03-15'],
+    ['2026-03-16','2026-03-17','2026-03-18','2026-03-19','2026-03-20','2026-03-21','2026-03-22'],
+    ['2026-03-23','2026-03-24','2026-03-25','2026-03-26','2026-03-27','2026-03-28','2026-03-29'],
+    ['2026-03-30','2026-03-31','2026-04-01','2026-04-02','2026-04-03','2026-04-04','2026-04-05'],
+  ];
+  const marSum=marWeeks.reduce((s,w)=>s+M.getFixedWeeklyAmount(dMar.projects[0],w),0);
+  near('getFixedWeeklyAmount: veckosummorna stämmer mot månadsbeloppet (18400, ej ~25500)', marSum, 18400, 5);
 
   const dHourlyPeriod={projects:[{id:'h1',hourlyRate:850,pricingPeriods:[{id:'hp1',type:'hourly',startDate:'2026-05-01',endDate:'2026-05-31',amount:1200}]}],entries:[],expenses:[],trips:[]};
   eq('calcRevenue: hourly-period 1200 slår projektets 850', M.calcRevenue([{projectId:'h1',date:'2026-05-12',seconds:3600}],dHourlyPeriod), 1200);
@@ -85,11 +97,11 @@
   const ws=M.weekSummary(dWeek,week);
   // 1h + 2h timpris + 1h fastpris = 4h; posten 2026-04-30 ligger utanför veckan och ignoreras
   eq('weekSummary.hours = 4h (all tid i veckan, även fastpris; poster utanför ignoreras)', ws.hours, 4);
-  near('weekSummary.arvode = 3000 timpris + 5774 fastpris', ws.arvode, 8774, 1);
+  near('weekSummary.arvode = 3000 timpris + 5645 fastpris', ws.arvode, 8645, 1);
   eq('weekSummary.expenses (bara veckans)', ws.expenses, 300);
   eq('weekSummary.trips = 10km*5.5', ws.trips, 55);
   eq('weekSummary.extra = expenses + trips', ws.extra, 355);
-  near('weekSummary.total = arvode + extra', ws.total, 8774+355, 1);
+  near('weekSummary.total = arvode + extra', ws.total, 8645+355, 1);
   ok('weekSummary.total == calcWeekRevenue + extra (dashboard/rapport matchar)',
      Math.abs(ws.total - (M.calcWeekRevenue(dWeek,week)+ws.extra)) < 0.5);
 

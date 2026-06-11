@@ -301,14 +301,27 @@ function getFixedWeeklyAmount(project,weekDates){
     const start=p.startDate;const end=p.endDate;
     if(!end){if(weekDates[0]<=start&&start<=weekDates[6])total+=p.amount;return}
     if(weekDates[6]<start||weekDates[0]>end)return;
-    // Monthly amount divided by weeks in a month (~4.33)
+    // Fördela fastpriset per DAG så att veckosummorna summerar till månadsbeloppet
+    // (calcFixedMonthly). Månadsbelopp = amount/totalMonths; dagsbelopp = månadsbeloppet
+    // delat på periodens täckta dagar i just den månaden. Bara dagar inom perioden räknas,
+    // så gränsveckor mellan månader fördelas rätt istället för att räknas som hela veckor.
     const sY=parseInt(start.slice(0,4)),sM=parseInt(start.slice(5,7))-1;
     const eY=parseInt(end.slice(0,4)),eM=parseInt(end.slice(5,7))-1;
     const totalMonths=Math.max(1,(eY-sY)*12+(eM-sM)+1);
     const monthlyAmount=p.amount/totalMonths;
-    total+=Math.round(monthlyAmount/4.33);
+    weekDates.forEach(d=>{
+      if(d<start||d>end)return;
+      const y=parseInt(d.slice(0,4)),mo=parseInt(d.slice(5,7))-1;
+      const dim=new Date(y,mo+1,0).getDate();
+      const mFirst=`${y}-${String(mo+1).padStart(2,'0')}-01`;
+      const mLast=`${y}-${String(mo+1).padStart(2,'0')}-${String(dim).padStart(2,'0')}`;
+      const cStartDay=parseInt((start>mFirst?start:mFirst).slice(8,10));
+      const cEndDay=parseInt((end<mLast?end:mLast).slice(8,10));
+      const coveredDays=Math.max(1,cEndDay-cStartDay+1);
+      total+=monthlyAmount/coveredDays;
+    });
   });
-  return total;
+  return Math.round(total);
 }
 
 // Calculate total weekly revenue (for weekly goal)
