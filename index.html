@@ -85,15 +85,16 @@ const TOKEN_KEY='invisiontid-ms-token';
 const TOKEN_EXPIRY_KEY='invisiontid-ms-expiry';
 
 // ── Data model ──
-// data = { clients:[], projects:[], entries:[], expenses:[], trips:[], invoices:[], hourlyRate:850, kmRate:2.5, weeklyGoal:0 }
+// data = { clients:[], projects:[], entries:[], expenses:[], trips:[], invoices:[], hourlyRate:850, kmRate:2.5, weeklyGoal:0, settings:{} }
+// settings = { staleWarningDays:7 }   // appinställningar som inte är belopp
 // client = { id, name, contact, phone, email, orgNr, address, status?:'active'|'paused'|'closed' }
-// project = { id, name, clientId?, hourlyRate?, sessionPrice?, pricingPeriods?:[{id,startDate,endDate?,type:'hourly'|'fixed',amount}] }
+// project = { id, name, clientId?, hourlyRate?, sessionPrice?, defaultTripKm?, pricingPeriods?:[{id,startDate,endDate?,type:'hourly'|'fixed',amount}] }
 // entry = { id, projectId, moment, seconds, date, startTime?, endTime?, createdAt, note?, calEventId? }
 // expense = { id, projectId, amount, description, date, createdAt }
 // trip = { id, projectId, km, description, date, createdAt }
 // invoice = { projectId, month:'2026-03', invoicedAt:'2026-04-02' }
 const SCHEMA_VERSION=1;
-const defaultData={schemaVersion:SCHEMA_VERSION,clients:[],projects:[],entries:[],expenses:[],trips:[],invoices:[],deletedIds:{},hourlyRate:850,kmRate:2.5,weeklyGoal:0};
+const defaultData={schemaVersion:SCHEMA_VERSION,clients:[],projects:[],entries:[],expenses:[],trips:[],invoices:[],deletedIds:{},hourlyRate:850,kmRate:2.5,weeklyGoal:0,settings:{staleWarningDays:7}};
 
 // ── Storage ──
 // migrate() är enda stället som normaliserar/uppgraderar datamodellen.
@@ -112,6 +113,8 @@ function migrate(d){
   if(d.hourlyRate==null)d.hourlyRate=850;
   if(d.kmRate==null)d.kmRate=2.5;
   if(d.weeklyGoal==null)d.weeklyGoal=0;
+  if(!d.settings||typeof d.settings!=='object')d.settings={};
+  if(d.settings.staleWarningDays==null)d.settings.staleWarningDays=7;
   // Framtida migreringar här, t.ex.: if((d.schemaVersion||0)<2){ … }
   d.schemaVersion=SCHEMA_VERSION;
   return d;
@@ -172,7 +175,7 @@ function mergeData(local,remote){
   };
   // Merge invoices: keep latest per project+month (no tombstones needed; small identity)
   const mergedInvoices=[...new Map([...(remote.invoices||[]),...(local.invoices||[])].map(i=>[i.projectId+'|'+i.month,i])).values()];
-  return migrate({clients:merge(local.clients,remote.clients),projects:merge(local.projects,remote.projects),entries:merge(local.entries,remote.entries),expenses:merge(local.expenses,remote.expenses),trips:merge(local.trips,remote.trips),invoices:mergedInvoices,deletedIds:mergedDeleted,hourlyRate:local.hourlyRate??remote.hourlyRate??850,kmRate:local.kmRate??remote.kmRate??2.5,weeklyGoal:local.weeklyGoal??remote.weeklyGoal??0});
+  return migrate({clients:merge(local.clients,remote.clients),projects:merge(local.projects,remote.projects),entries:merge(local.entries,remote.entries),expenses:merge(local.expenses,remote.expenses),trips:merge(local.trips,remote.trips),invoices:mergedInvoices,deletedIds:mergedDeleted,hourlyRate:local.hourlyRate??remote.hourlyRate??850,kmRate:local.kmRate??remote.kmRate??2.5,weeklyGoal:local.weeklyGoal??remote.weeklyGoal??0,settings:{...(remote.settings||{}),...(local.settings||{})}});
 }
 
 // ── Calendar API ──
@@ -353,6 +356,55 @@ function localDateStr(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padSt
 function getWeekDates(off=0){const n=new Date(),dw=n.getDay(),mo=dw===0?-6:1-dw;const mon=new Date(n);mon.setDate(n.getDate()+mo+off*7);mon.setHours(12,0,0,0);return Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return localDateStr(d)})}
 function weekLabel(ds){const o={day:'numeric',month:'short'};return`${new Date(ds[0]+'T12:00:00').toLocaleDateString('sv-SE',o)} – ${new Date(ds[6]+'T12:00:00').toLocaleDateString('sv-SE',o)}`}
 const DN=["Mån","Tis","Ons","Tor","Fre","Lör","Sön"];
+// ── Reseförslag (F3) och eftersläpningsvarning (F4) ──
+// project.defaultTripKm är uppdragets normala avstånd tur och retur. Saknas det
+// föreslås ingenting. Förslaget bygger på att en resa hör ihop med ett DATUM och
+// ett PROJEKT, inte med en enskild tidspost, så flera poster samma dag ger ett förslag.
+function getDefaultTripKm(project){const v=project?.defaultTripKm;return(typeof v==='number'&&v>0)?v:null}
+function hasTripOn(data,projectId,date){return(data.trips||[]).some(t=>t.projectId===projectId&&t.date===date)}
+// Returnerar {projectId,date,km,projectName} eller null om inget ska föreslås.
+function suggestTrip(data,projectId,date){
+  if(!date)return null;
+  const p=(data.projects||[]).find(x=>x.id===projectId);
+  const km=getDefaultTripKm(p);
+  if(!km)return null;
+  if(hasTripOn(data,projectId,date))return null;
+  return{projectId,date,km,projectName:p.name};
+}
+function addDays(dateStr,n){const d=new Date(dateStr+'T12:00:00');d.setDate(d.getDate()+n);return localDateStr(d)}
+// Säkerhetsnät bakåt i tiden: dagar med loggad tid på ett projekt med standardavstånd
+// men utan registrerad resa. Fångar poster som aldrig passerar förslaget vid sparning
+// (kalenderimport, upprepa igår, poster inlagda på annan enhet).
+function missingTrips(data,todayDate,days=14){
+  const from=addDays(todayDate,-days);const seen=new Set();const out=[];
+  (data.entries||[]).forEach(e=>{
+    if(!e.date||e.date<from||e.date>todayDate)return;
+    const key=e.projectId+'|'+e.date;if(seen.has(key))return;seen.add(key);
+    const s=suggestTrip(data,e.projectId,e.date);if(s)out.push(s);
+  });
+  return out.sort((a,b)=>b.date.localeCompare(a.date));
+}
+// Senaste registrerade dagen, oavsett om det är tid, utlägg eller resa.
+function lastActivityDate(data){
+  let last=null;const scan=a=>(a||[]).forEach(x=>{if(x&&x.date&&(!last||x.date>last))last=x.date});
+  scan(data?.entries);scan(data?.expenses);scan(data?.trips);return last;
+}
+function daysBetween(fromDate,toDate){
+  if(!fromDate||!toDate)return null;
+  const a=new Date(fromDate+'T12:00:00'),b=new Date(toDate+'T12:00:00');
+  if(isNaN(a.getTime())||isNaN(b.getTime()))return null;
+  return Math.round((b-a)/86400000);
+}
+// {lastDate, days, limit, stale}. days är null när ingenting alls är registrerat,
+// och då är stale false – en tom app ska inte klaga, den har inget att släpa efter med.
+function staleStatus(data,todayDate){
+  const limit=data?.settings?.staleWarningDays??7;
+  const lastDate=lastActivityDate(data);
+  const days=daysBetween(lastDate,todayDate);
+  return{lastDate,days,limit,stale:days!=null&&days>limit};
+}
+function lastActivityLabel(days){if(days==null)return null;if(days<=0)return'idag';if(days===1)return'igår';return'för '+days+' dagar sedan'}
+
 /* PURE-END */
 
 // ── Styles ──
@@ -449,7 +501,8 @@ function Icon({id,size=18}){
 const ToastCtx=React.createContext();
 function ToastProvider({children}){
   const[toast,setToast]=useState(null);const tRef=useRef(null);
-  const show=(msg,action)=>{if(tRef.current)clearTimeout(tRef.current);setToast({msg,action});tRef.current=setTimeout(()=>setToast(null),action?5000:2500)};
+  // ms är valfri – frågor som kräver ett svar (t.ex. reseförslaget) får längre tid.
+  const show=(msg,action,ms)=>{if(tRef.current)clearTimeout(tRef.current);setToast({msg,action});tRef.current=setTimeout(()=>setToast(null),ms||(action?5000:2500))};
   const dismiss=()=>{if(tRef.current)clearTimeout(tRef.current);setToast(null)};
   return<ToastCtx.Provider value={show}>{children}{toast&&<div className="toast"><span style={{flex:1}}>{toast.msg}</span>{toast.action&&<button onClick={()=>{toast.action();dismiss()}}>{toast.action.label||'Ångra'}</button>}</div>}</ToastCtx.Provider>
 }
@@ -538,13 +591,14 @@ function EditProjectModal({project,data,onSave,onClose}){
   const[clientId,setCid]=useState(project.clientId||'');
   const[rate,setRate]=useState(project.hourlyRate!=null?String(project.hourlyRate):'');
   const[sessionPrice,setSessionPrice]=useState(project.sessionPrice!=null?String(project.sessionPrice):'');
+  const[tripKm,setTripKm]=useState(project.defaultTripKm!=null?String(project.defaultTripKm):'');
   const[periods,setPeriods]=useState(project.pricingPeriods||[]);
   const addPeriod=()=>setPeriods([...periods,{id:gid(),startDate:today(),endDate:'',type:'fixed',amount:0}]);
   const updPeriod=(id,field,val)=>setPeriods(periods.map(p=>p.id===id?{...p,[field]:val}:p));
   const delPeriod=(id)=>setPeriods(periods.filter(p=>p.id!==id));
   const hasSession=sessionPrice&&parseFloat(sessionPrice)>0;
   const hasPeriods=periods.length>0;
-  const save=()=>{if(!name.trim())return;onSave({...project,name:name.trim(),clientId:clientId||undefined,hourlyRate:(!hasSession&&!hasPeriods&&rate)?parseInt(rate):undefined,sessionPrice:sessionPrice?parseFloat(sessionPrice):undefined,pricingPeriods:periods.length?periods.map(p=>({...p,amount:parseFloat(p.amount)||0})):undefined,fixedPrice:undefined});onClose()};
+  const save=()=>{if(!name.trim())return;onSave({...project,name:name.trim(),clientId:clientId||undefined,hourlyRate:(!hasSession&&!hasPeriods&&rate)?parseInt(rate):undefined,sessionPrice:sessionPrice?parseFloat(sessionPrice):undefined,defaultTripKm:tripKm&&parseFloat(tripKm)>0?parseFloat(tripKm):undefined,pricingPeriods:periods.length?periods.map(p=>({...p,amount:parseFloat(p.amount)||0})):undefined,fixedPrice:undefined});onClose()};
   return<div className="modal-overlay" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
     <div style={S.modalTitle}>Redigera projekt</div>
     <div style={S.modalField}><label style={S.fieldLabel}>Projektnamn</label><input style={{...S.input,marginTop:4,width:'100%'}} value={name} onChange={e=>setName(e.target.value)} autoFocus/></div>
@@ -555,6 +609,10 @@ function EditProjectModal({project,data,onSave,onClose}){
     </div>
     {hasSession&&!hasPeriods&&<div style={{fontSize:12,color:'var(--sage)',marginTop:-8,marginBottom:8}}>Pris per tillfälle aktivt – varje loggad dag räknas som ett tillfälle</div>}
     {hasPeriods&&<div style={{fontSize:12,color:'var(--sage)',marginTop:-8,marginBottom:8}}>Prisperioder aktivt – timpris och tillfällepris ignoreras</div>}
+    <div style={S.modalField}><label style={S.fieldLabel}>Standardresa tur och retur (km)</label>
+      <input type="number" step="1" min="0" style={{...S.input,marginTop:4}} placeholder="Valfritt – t.ex. 23" value={tripKm} onChange={e=>setTripKm(e.target.value)}/>
+      <div style={{...S.hint,paddingTop:6}}>Appen föreslår resan när du loggar tid på projektet en dag som saknar registrerad resa.</div>
+    </div>
     <div style={S.modalField}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}><label style={S.fieldLabel}>Prisperioder</label><button onClick={addPeriod} style={{...S.addBtn,padding:'4px 12px',fontSize:12}}>+ Ny period</button></div>
       {periods.length===0&&<span style={{...S.hint,padding:'6px 0'}}>Inga prisperioder – standard timpris gäller</span>}
@@ -639,10 +697,23 @@ function TimerView({data,setData,openSettings}){
   useEffect(()=>{if(running){startRef.current=Date.now()-elapsed*1000;intRef.current=setInterval(()=>setElapsed(Math.floor((Date.now()-startRef.current)/1000)),1000)}else clearInterval(intRef.current);return()=>clearInterval(intRef.current)},[running]);
 
   const startTimer=()=>{if(!selProj)return;const startedAt=Date.now()-elapsed*1000;try{localStorage.setItem(TIMER_KEY,JSON.stringify({running:true,startedAt,selProj,moment,note}))}catch{}setRunning(true)};
-  const stop=()=>{setRunning(false);try{localStorage.removeItem(TIMER_KEY)}catch{}if(elapsed>0&&selProj){const e={id:gid(),projectId:selProj,moment:moment||'Allmänt',seconds:elapsed,date:today(),createdAt:new Date().toISOString(),note:note.trim()||undefined};const u={...data,entries:[...data.entries,e]};setData(u);saveLocal(u);toast('✓ Tid sparad')}setElapsed(0);setMom('');setNote('')};
+  const stop=()=>{setRunning(false);try{localStorage.removeItem(TIMER_KEY)}catch{}if(elapsed>0&&selProj){const e={id:gid(),projectId:selProj,moment:moment||'Allmänt',seconds:elapsed,date:today(),createdAt:new Date().toISOString(),note:note.trim()||undefined};const u={...data,entries:[...data.entries,e]};setData(u);saveLocal(u);savedWithTripHint(u,selProj,e.date,'✓ Tid sparad')}setElapsed(0);setMom('');setNote('')};
   const cancelTimer=()=>{setRunning(false);setElapsed(0);try{localStorage.removeItem(TIMER_KEY)}catch{}};
+  // F3 – reseförslag. Lägger till mot senaste state (setData med funktion) eftersom
+  // förslaget kan bli kvar på skärmen i flera sekunder och annat kan hinna sparas emellan.
+  const addTrip=(s)=>{
+    const tr={id:gid(),projectId:s.projectId,km:s.km,description:'Resa',date:s.date,createdAt:new Date().toISOString()};
+    setData(prev=>{const u={...prev,trips:[...(prev.trips||[]),tr]};saveLocal(u);return u});
+    toast('✓ Resa '+s.km+' km tillagd');
+  };
+  const savedWithTripHint=(updated,projectId,date,okMsg)=>{
+    const s=suggestTrip(updated,projectId,date);
+    if(!s){toast(okMsg);return}
+    const act=()=>addTrip(s);act.label='Lägg till';
+    toast('Lägg till resa '+s.km+' km för '+s.projectName+'?',act,9000);
+  };
   const addProj=()=>{if(!newName.trim())return;const p={id:gid(),name:newName.trim(),clientId:newClient||undefined,hourlyRate:newRate?parseInt(newRate):undefined};const u={...data,projects:[...data.projects,p]};setData(u);saveLocal(u);setSelProj(p.id);setNewName('');setNewClient('');setNewRate('');setShowNew(false)};
-  const addManual=()=>{const p=mProj||selProj;if(!p)return;const s=((parseInt(mH)||0)*3600)+((parseInt(mM)||0)*60);if(s<=0)return;const e={id:gid(),projectId:p,moment:mMom||'Allmänt',seconds:s,date:mDate,startTime:mStart||undefined,endTime:mEnd||undefined,createdAt:new Date().toISOString(),note:mNote.trim()||undefined};const u={...data,entries:[...data.entries,e]};setData(u);saveLocal(u);setMH('');setMM('');setMMom('');setMNote('');setMStart('');setMEnd('');toast('✓ Tid sparad')};
+  const addManual=()=>{const p=mProj||selProj;if(!p)return;const s=((parseInt(mH)||0)*3600)+((parseInt(mM)||0)*60);if(s<=0)return;const e={id:gid(),projectId:p,moment:mMom||'Allmänt',seconds:s,date:mDate,startTime:mStart||undefined,endTime:mEnd||undefined,createdAt:new Date().toISOString(),note:mNote.trim()||undefined};const u={...data,entries:[...data.entries,e]};setData(u);saveLocal(u);setMH('');setMM('');setMMom('');setMNote('');setMStart('');setMEnd('');savedWithTripHint(u,p,mDate,'✓ Tid sparad')};
   const addExpense=()=>{const p=expProj||selProj;if(!p)return;if(expType==='expense'){const amt=parseFloat(expAmount);if(!amt||amt<=0)return;const ex={id:gid(),projectId:p,amount:amt,description:expDesc||'Utlägg',date:expDate,createdAt:new Date().toISOString()};const u={...data,expenses:[...(data.expenses||[]),ex]};setData(u);saveLocal(u);toast('✓ Utlägg sparat')}else{const km=parseFloat(expKm);if(!km||km<=0)return;const tr={id:gid(),projectId:p,km:km,description:expDesc||'Resa',date:expDate,createdAt:new Date().toISOString()};const u={...data,trips:[...(data.trips||[]),tr]};setData(u);saveLocal(u);toast('✓ Resa sparad')}setExpDesc('');setExpAmount('');setExpKm('');setShowExpense(false)};
   const repeatYesterday=()=>{
     const y=new Date();y.setDate(y.getDate()-1);const yDate=localDateStr(y);
@@ -686,7 +757,44 @@ function TimerView({data,setData,openSettings}){
           </div>
         </>}
         {!goal&&<button onClick={openSettings} style={{fontSize:13,color:'var(--accent)',background:'none',border:'none',padding:0,cursor:'pointer',textDecoration:'underline',fontFamily:'inherit',textAlign:'left'}}>Sätt veckomål →</button>}
-        {tH>0&&<div style={{fontSize:13,color:'var(--text-muted)',marginTop:goal>0?10:8,paddingTop:10,borderTop:'1px solid var(--sage-ghost)'}}>Idag: <span style={{fontWeight:600,color:'var(--text)'}}>{tH.toFixed(1)} h</span> loggat</div>}
+        {(()=>{
+          // F4 – dagar sedan senaste registrering, alltid synlig i startvyn
+          const st=staleStatus(data,todayDate);const lbl=lastActivityLabel(st.days);
+          if(tH<=0&&!lbl)return null;
+          return<div style={{fontSize:13,color:'var(--text-muted)',marginTop:goal>0?10:8,paddingTop:10,borderTop:'1px solid var(--sage-ghost)',display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:6}}>
+            <span>{tH>0?<>Idag: <span style={{fontWeight:600,color:'var(--text)'}}>{tH.toFixed(1)} h</span> loggat</>:''}</span>
+            {lbl&&<span style={{color:st.stale?'var(--accent)':'var(--text-muted)',fontWeight:st.stale?600:400}}>Senast registrerat {lbl}</span>}
+          </div>;
+        })()}
+      </div>;
+    })()}
+
+    {/* F4 – eftersläpningsvarning */}
+    {(()=>{
+      const st=staleStatus(data,today());
+      if(!st.stale)return null;
+      return<div style={{background:'var(--card)',border:'1.5px solid var(--accent)',borderRadius:16,padding:16,marginBottom:20}}>
+        <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:4}}>Inget registrerat på {st.days} dagar</div>
+        <div style={{fontSize:13,color:'var(--text-muted)'}}>Senaste posten är från {st.lastDate}. Gränsen är {st.limit} dagar och ändras i inställningarna.</div>
+      </div>;
+    })()}
+
+    {/* F3 – dagar med tid men utan resa, säkerhetsnät bakåt */}
+    {(()=>{
+      const miss=missingTrips(data,today(),14);
+      if(!miss.length)return null;
+      const shown=miss.slice(0,6);
+      return<div style={{background:'var(--card)',border:'1.5px solid var(--accent)',borderRadius:16,padding:16,marginBottom:20}}>
+        <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginBottom:2}}>Saknade resor</div>
+        <div style={{fontSize:13,color:'var(--text-muted)',marginBottom:6}}>Tid är loggad men ingen resa registrerad.</div>
+        {shown.map(s=><div key={s.projectId+'|'+s.date} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:'1px solid var(--sage-ghost)'}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:14,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.projectName}</div>
+            <div style={{fontSize:12,color:'var(--text-muted)'}}>{s.date} · {s.km} km</div>
+          </div>
+          <button onClick={()=>addTrip(s)} style={S.addBtn}>+ Lägg till</button>
+        </div>)}
+        {miss.length>shown.length&&<div style={{...S.hint,paddingTop:8}}>+ {miss.length-shown.length} till längre bak</div>}
       </div>;
     })()}
 
@@ -1716,6 +1824,7 @@ function App(){
           <div style={{flex:1,minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Timpris (kr/h)</label><input type="number" style={{padding:'10px 12px',borderRadius:14,border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',width:'100%',marginTop:4}} value={data.hourlyRate} onChange={e=>{const n=parseInt(e.target.value)||0;const u={...data,hourlyRate:n};setData(u);saveLocal(u)}}/></div>
           <div style={{flex:1,minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Milersättning (kr/km)</label><input type="number" step="0.5" style={{padding:'10px 12px',borderRadius:14,border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',width:'100%',marginTop:4}} value={data.kmRate||2.5} onChange={e=>{const n=parseFloat(e.target.value)||0;const u={...data,kmRate:n};setData(u);saveLocal(u)}}/></div>
           <div style={{flex:1,minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Veckomål (kr)</label><input type="number" step="1000" style={{padding:'10px 12px',borderRadius:14,border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',width:'100%',marginTop:4}} placeholder="0" value={data.weeklyGoal||''} onChange={e=>{const n=parseInt(e.target.value)||0;const u={...data,weeklyGoal:n};setData(u);saveLocal(u)}}/></div>
+          <div style={{flex:1,minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Varna efter (dagar)</label><input type="number" min="1" style={{padding:'10px 12px',borderRadius:14,border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',width:'100%',marginTop:4}} value={data.settings?.staleWarningDays??7} onChange={e=>{const n=parseInt(e.target.value)||0;const u={...data,settings:{...(data.settings||{}),staleWarningDays:n>0?n:7}};setData(u);saveLocal(u)}}/></div>
         </div>
       </div>
       <SyncView data={data} setData={setData} syncStatus={syncStatus} onSync={doSync} msConnected={msC} onLogin={doLogin} onLogout={doLogout}/>

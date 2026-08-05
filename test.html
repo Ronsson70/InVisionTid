@@ -30,7 +30,7 @@
     const src=await (await fetch('index.html')).text();
     const m=src.match(/\/\* PURE-START \*\/([\s\S]*?)\/\* PURE-END \*\//);
     if(!m) throw new Error('Hittade inte PURE-START/PURE-END i index.html');
-    const exports='gid,fmtH,today,localDateStr,getWeekDates,weekLabel,getRate,hasSessionPrice,isFixedPrice,getActivePeriod,getSessionCount,getSessionRevenue,calcRevenue,calcFixedMonthly,getFixedWeeklyAmount,calcWeekRevenue,weekSummary';
+    const exports='gid,fmtH,today,localDateStr,getWeekDates,weekLabel,getRate,hasSessionPrice,isFixedPrice,getActivePeriod,getSessionCount,getSessionRevenue,calcRevenue,calcFixedMonthly,getFixedWeeklyAmount,calcWeekRevenue,weekSummary,getDefaultTripKm,hasTripOn,suggestTrip,addDays,missingTrips,lastActivityDate,daysBetween,staleStatus,lastActivityLabel';
     M=new Function(m[1]+`;return{${exports}};`)();
   }catch(e){
     out.innerHTML=`<div class="fail">✗ Kunde inte ladda funktioner: ${e.message}<br>Kör via en lokal server (fetch fungerar inte på file://).</div>`;
@@ -104,6 +104,66 @@
   near('weekSummary.total = arvode + extra', ws.total, 8645+355, 1);
   ok('weekSummary.total == calcWeekRevenue + extra (dashboard/rapport matchar)',
      Math.abs(ws.total - (M.calcWeekRevenue(dWeek,week)+ws.extra)) < 0.5);
+
+  // ── F3: reseförslag ──
+  // Sauna HVB, 23 km tur och retur. Kravspec v2, testfall T7.
+  const dTrip={
+    projects:[
+      {id:'sauna',name:'Sauna HVB',defaultTripKm:23,sessionPrice:2400},
+      {id:'nord',name:'Nordsjögården',hourlyRate:850},              // inget standardavstånd
+    ],
+    entries:[
+      {id:'e1',projectId:'sauna',date:'2026-07-30',seconds:10800},  // 3 tim, ingen resa
+      {id:'e2',projectId:'sauna',date:'2026-07-28',seconds:7200},   // har resa, se nedan
+      {id:'e3',projectId:'sauna',date:'2026-07-28',seconds:1800},   // samma dag igen
+      {id:'e4',projectId:'nord',date:'2026-07-29',seconds:7200},
+      {id:'e5',projectId:'sauna',date:'2026-06-02',seconds:7200},   // utanför 14-dagarsfönstret
+    ],
+    trips:[{id:'t1',projectId:'sauna',date:'2026-07-28',km:23}],
+    expenses:[],
+  };
+  eq('T7: 3 tim på Sauna 30 juli utan resa → förslag 23 km',
+     M.suggestTrip(dTrip,'sauna','2026-07-30'), {projectId:'sauna',date:'2026-07-30',km:23,projectName:'Sauna HVB'});
+  eq('suggestTrip: dag som redan har resa ger inget förslag', M.suggestTrip(dTrip,'sauna','2026-07-28'), null);
+  eq('suggestTrip: projekt utan standardavstånd ger inget förslag', M.suggestTrip(dTrip,'nord','2026-07-29'), null);
+  eq('suggestTrip: okänt projekt ger inget förslag', M.suggestTrip(dTrip,'finns-ej','2026-07-30'), null);
+  eq('getDefaultTripKm: 0 och saknat värde räknas som inget', [M.getDefaultTripKm({defaultTripKm:0}),M.getDefaultTripKm({}),M.getDefaultTripKm(null)], [null,null,null]);
+  eq('hasTripOn: rätt projekt och datum', [M.hasTripOn(dTrip,'sauna','2026-07-28'),M.hasTripOn(dTrip,'sauna','2026-07-30'),M.hasTripOn(dTrip,'nord','2026-07-28')], [true,false,false]);
+
+  eq('addDays: bakåt över månadsskifte', M.addDays('2026-08-05',-14), '2026-07-22');
+  const miss=M.missingTrips(dTrip,'2026-08-05',14);
+  eq('missingTrips: bara 30 juli saknar resa inom fönstret', miss.map(m=>m.date), ['2026-07-30']);
+  eq('missingTrips: förslaget bär projektnamn och km', [miss[0].projectName,miss[0].km], ['Sauna HVB',23]);
+  eq('missingTrips: två poster samma dag ger max ett förslag',
+     M.missingTrips({...dTrip,trips:[]},'2026-08-05',14).filter(m=>m.date==='2026-07-28').length, 1);
+  eq('missingTrips: nyast först',
+     M.missingTrips({...dTrip,trips:[]},'2026-08-05',14).map(m=>m.date), ['2026-07-30','2026-07-28']);
+  eq('missingTrips: poster utanför fönstret ignoreras',
+     M.missingTrips({...dTrip,trips:[]},'2026-08-05',14).some(m=>m.date==='2026-06-02'), false);
+  eq('missingTrips: större fönster tar med den',
+     M.missingTrips({...dTrip,trips:[]},'2026-08-05',90).some(m=>m.date==='2026-06-02'), true);
+  eq('missingTrips: framtida datum ignoreras', M.missingTrips({...dTrip,trips:[]},'2026-07-29',14).map(m=>m.date), ['2026-07-28']);
+
+  // ── F4: eftersläpningsvarning ──
+  eq('daysBetween: 30 juli → 5 augusti = 6 dagar', M.daysBetween('2026-07-30','2026-08-05'), 6);
+  eq('daysBetween: saknat datum ger null', [M.daysBetween(null,'2026-08-05'),M.daysBetween('2026-08-05',null)], [null,null]);
+  eq('lastActivityDate: senaste av tid, utlägg och resa',
+     M.lastActivityDate({entries:[{date:'2026-07-30'}],expenses:[{date:'2026-08-01'}],trips:[{date:'2026-07-15'}]}), '2026-08-01');
+  eq('lastActivityDate: tom app ger null', M.lastActivityDate({entries:[],expenses:[],trips:[]}), null);
+
+  const dStale={entries:[{date:'2026-07-30'}],expenses:[],trips:[],settings:{staleWarningDays:7}};
+  const st6=M.staleStatus(dStale,'2026-08-05');
+  eq('staleStatus: 6 dagar med gräns 7 → ingen varning', [st6.days,st6.stale], [6,false]);
+  eq('staleStatus: 8 dagar med gräns 7 → varning', (()=>{const s=M.staleStatus(dStale,'2026-08-07');return[s.days,s.stale]})(), [8,true]);
+  eq('staleStatus: egen gräns 3 dagar slår igenom',
+     (()=>{const s=M.staleStatus({...dStale,settings:{staleWarningDays:3}},'2026-08-05');return[s.limit,s.stale]})(), [3,true]);
+  eq('staleStatus: gräns saknas → standard 7',
+     M.staleStatus({entries:[{date:'2026-07-30'}],expenses:[],trips:[]},'2026-08-05').limit, 7);
+  eq('staleStatus: tom app varnar inte',
+     (()=>{const s=M.staleStatus({entries:[],expenses:[],trips:[]},'2026-08-05');return[s.days,s.stale]})(), [null,false]);
+  eq('lastActivityLabel: idag, igår, längre bak, inget',
+     [M.lastActivityLabel(0),M.lastActivityLabel(1),M.lastActivityLabel(6),M.lastActivityLabel(null)],
+     ['idag','igår','för 6 dagar sedan',null]);
 
   out.innerHTML=lines.join('')+
     `<div class="sum"><strong class="${failed?'fail':'pass'}">${passed} godkända, ${failed} misslyckade</strong></div>`;
