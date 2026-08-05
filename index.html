@@ -336,7 +336,7 @@ function calcWeekRevenue(data,weekDates){
 }
 
 // Gemensam vecko-sammanfattning – ENDA källan för veckans siffror.
-// Används av både DashboardView och ReportView så de aldrig kan glida isär.
+// Används av Uppföljning och av veckoberäkningen så de aldrig kan glida isär.
 // Returnerar: entries, hours, arvode (tid+fastpris), expenses, trips, extra, total.
 function weekSummary(data,weekDates){
   const entries=data.entries.filter(e=>weekDates.includes(e.date));
@@ -405,6 +405,72 @@ function staleStatus(data,todayDate){
 }
 function lastActivityLabel(days){if(days==null)return null;if(days<=0)return'idag';if(days===1)return'igår';return'för '+days+' dagar sedan'}
 
+// ── Faktureringsunderlag ──
+// Belopp per projekt och månad, med samma prioritet som calcRevenue:
+// pris per tillfälle > fastprisperiod > timpris. Modellen följer med i svaret så
+// vyn kan skriva ut hur beloppet räknats fram i stället för att bara visa en siffra.
+function projectMonthSummary(data,projectId,ym){
+  const p=(data?.projects||[]).find(x=>x.id===projectId)||null;
+  const inMonth=d=>typeof d==='string'&&d.slice(0,7)===ym;
+  const entries=(data?.entries||[]).filter(e=>e.projectId===projectId&&inMonth(e.date));
+  const trips=(data?.trips||[]).filter(t=>t.projectId===projectId&&inMonth(t.date));
+  const expenses=(data?.expenses||[]).filter(x=>x.projectId===projectId&&inMonth(x.date));
+  const hours=entries.reduce((s,e)=>s+e.seconds,0)/3600;
+  const kmSum=trips.reduce((s,t)=>s+t.km,0);
+  const tripAmount=kmSum*(data?.kmRate??2.5);
+  const expenseAmount=expenses.reduce((s,x)=>s+x.amount,0);
+  let model='hourly',arvode=0,units=null;
+  if(hasSessionPrice(p)){
+    model='session';
+    units=new Set(entries.map(e=>e.date)).size;
+    arvode=units*p.sessionPrice;
+  }else if(isFixedPrice(p)){
+    model='fixed';
+    const y=parseInt(ym.slice(0,4)),m=parseInt(ym.slice(5,7))-1;
+    arvode=calcFixedMonthly({projects:[p]},y,m);
+  }else{
+    arvode=hours*getRate(p,data);
+  }
+  return{projectId,name:p?.name||'?',model,units,hours,kmSum,arvode,tripAmount,expenseAmount,
+    rate:getRate(p,data),sessionPrice:p?.sessionPrice??null,
+    total:arvode+tripAmount+expenseAmount,
+    count:entries.length+trips.length+expenses.length};
+}
+// Kunder med aktivitet en viss månad. Fakturan hör till kunden, inte till projektet.
+function clientMonthSummaries(data,ym){
+  const byClient={};
+  (data?.projects||[]).forEach(p=>{
+    const s=projectMonthSummary(data,p.id,ym);
+    if(!s.count&&!s.arvode)return;
+    const cid=p.clientId||'_none';
+    if(!byClient[cid])byClient[cid]={key:cid,projects:[],total:0,hours:0};
+    byClient[cid].projects.push(s);
+    byClient[cid].total+=s.total;
+    byClient[cid].hours+=s.hours;
+  });
+  return Object.keys(byClient).map(cid=>{
+    const c=(data?.clients||[]).find(x=>x.id===cid);
+    return{...byClient[cid],name:c?c.name:'Utan kund'};
+  }).sort((a,b)=>b.total-a.total);
+}
+
+// ── Snabb tid ──
+// Projekt sorterade efter senaste loggade datum, nyast först.
+function recentProjectIds(data,limit=3){
+  const last={};
+  (data?.entries||[]).forEach(e=>{if(!e.projectId||!e.date)return;if(!last[e.projectId]||e.date>last[e.projectId])last[e.projectId]=e.date});
+  return Object.keys(last).sort((a,b)=>last[b].localeCompare(last[a])).slice(0,limit);
+}
+// Senaste posten på ett projekt, så snabbknappen kan föreslå samma moment och längd igen.
+function lastEntryFor(data,projectId){
+  let best=null;
+  (data?.entries||[]).forEach(e=>{
+    if(e.projectId!==projectId)return;
+    if(!best||e.date>best.date||(e.date===best.date&&(e.createdAt||'')>(best.createdAt||'')))best=e;
+  });
+  return best;
+}
+
 /* PURE-END */
 
 // ── Styles ──
@@ -415,7 +481,9 @@ const S={
   logoSub:{fontSize:13,fontWeight:400,color:'var(--text-muted)',letterSpacing:'1.5px',textTransform:'uppercase',marginTop:2},
   tabBar:{display:'flex',gap:0,padding:'0 16px',background:'var(--card)',borderRadius:'var(--radius)',margin:'0 16px 16px',boxShadow:'0 2px 12px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04)',overflow:'hidden'},
   tab:{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:3,padding:'12px 4px',border:'none',background:'transparent',color:'var(--text-muted)',borderBottom:'2.5px solid transparent',transition:'all 0.25s ease',fontSize:'inherit',minWidth:0},
-  tabActive:{color:'var(--sage-deep)',borderBottomColor:'var(--sage-deep)',background:'var(--sage-ghost)'},
+  // Hela borderBottom, inte bara färgen: att blanda kortform och långform på
+  // samma egenskap under omrendering ger stylingbuggar (React varnar för det).
+  tabActive:{color:'var(--sage-deep)',borderBottom:'2.5px solid var(--sage-deep)',background:'var(--sage-ghost)'},
   content:{padding:'0 16px 16px'},
   section:{marginBottom:20,animation:'fadeIn 0.3s ease'},
   sectionHeader:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10},
@@ -423,6 +491,20 @@ const S={
   sectionSubtle:{fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:'1.5px',color:'var(--text-muted)',marginBottom:10,display:'block'},
   groupTitle:{fontSize:18,fontWeight:700,color:'var(--text)',marginBottom:8,display:'block'},
   addBtn:{background:'var(--sage-ghost)',border:'1.5px dashed var(--sage-light)',borderRadius:10,padding:'8px 16px',fontSize:14,color:'var(--sage-dark)',fontWeight:500},
+  // Att fixa: eftersläpning och saknade resor i EN ruta överst i Idag
+  alertBox:{background:'#FBF0E9',borderRadius:16,padding:'14px 16px',marginBottom:16,display:'flex',flexDirection:'column',gap:10},
+  alertRow:{display:'flex',alignItems:'center',gap:10},
+  alertTitle:{fontSize:14,fontWeight:600,color:'var(--text)'},
+  alertSub:{fontSize:12,color:'var(--text-muted)'},
+  alertBtn:{background:'transparent',border:'1px solid var(--accent)',borderRadius:10,padding:'6px 12px',fontSize:12,color:'var(--accent)',fontWeight:600,whiteSpace:'nowrap',flexShrink:0},
+  // Timern, överst i Idag och alltid synlig
+  timerCard:{background:'var(--sage-deep)',borderRadius:18,padding:'18px 16px',marginBottom:16,display:'flex',flexDirection:'column',gap:10,boxShadow:'0 14px 34px -18px rgba(31,47,34,.9)'},
+  timerSelect:{padding:'10px 12px',borderRadius:12,border:'1px solid rgba(255,255,255,.22)',background:'rgba(255,255,255,.08)',color:'#fff',fontSize:15,fontFamily:'inherit',width:'100%'},
+  timerInput:{padding:'10px 12px',borderRadius:12,border:'1px solid rgba(255,255,255,.22)',background:'rgba(255,255,255,.08)',color:'#fff',fontSize:15,fontFamily:'inherit',width:'100%'},
+  timerBig:{fontSize:38,fontWeight:700,color:'#fff',textAlign:'center',fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',letterSpacing:'1px',padding:'2px 0'},
+  timerGo:{background:'var(--sage-light)',color:'var(--sage-deep)',border:'none',borderRadius:12,padding:'11px 30px',fontSize:14,fontWeight:700,fontFamily:'inherit'},
+  timerCancel:{background:'rgba(255,255,255,.12)',color:'#fff',border:'none',borderRadius:12,padding:'11px 20px',fontSize:14,fontWeight:600,fontFamily:'inherit'},
+  quickCard:{background:'var(--card)',borderRadius:16,padding:'6px 16px 12px',border:'1px solid var(--border)',boxShadow:'0 2px 12px rgba(0,0,0,.05)'},
   pillRow:{display:'flex',flexWrap:'wrap',gap:8},
   pill:{padding:'9px 18px',borderRadius:24,fontSize:14,transition:'all 0.2s ease',whiteSpace:'nowrap',fontWeight:500},
   inlineForm:{display:'flex',gap:8,marginBottom:10},
@@ -488,9 +570,11 @@ const S={
 // ── Icons ──
 function Icon({id,size=18}){
   const common={width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:"2",strokeLinecap:"round",strokeLinejoin:"round",style:{flexShrink:0}};
-  if(id==='timer')return <svg {...common}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+  if(id==='timer'||id==='idag')return <svg {...common}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
+  if(id==='faktura')return <svg {...common}><path d="M5 3h14v18l-3-2-2 2-2-2-2 2-2-2-3 2z"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="9" y1="12" x2="15" y2="12"/></svg>;
+  if(id==='uppfoljning')return <svg {...common}><line x1="4" y1="20" x2="4" y2="10"/><line x1="10" y1="20" x2="10" y2="4"/><line x1="16" y1="20" x2="16" y2="13"/><line x1="2" y1="20" x2="22" y2="20"/></svg>;
   if(id==='dash')return <svg {...common}><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>;
-  if(id==='week')return <svg {...common}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+  if(id==='week'||id==='vecka')return <svg {...common}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
   if(id==='entries')return <svg {...common}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><circle cx="3.5" cy="6" r="1"/><circle cx="3.5" cy="12" r="1"/><circle cx="3.5" cy="18" r="1"/></svg>;
   if(id==='report')return <svg {...common}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>;
   return null;
@@ -514,11 +598,10 @@ function Pill({label,color,selected,onClick}){return<button onClick={onClick} st
 
 function TabBar({active,onChange}){
   const tabs=[
-    {id:'timer',label:'Logga'},
-    {id:'dash',label:'Dashboard'},
-    {id:'week',label:'Vecka'},
-    {id:'entries',label:'Historik'},
-    {id:'report',label:'Rapport'}
+    {id:'idag',label:'Idag'},
+    {id:'vecka',label:'Vecka'},
+    {id:'faktura',label:'Fakturera'},
+    {id:'uppfoljning',label:'Uppföljning'}
   ];
   return<div style={S.tabBar}>{tabs.map(t=><button key={t.id} onClick={()=>onChange(t.id)} style={{...S.tab,...(active===t.id?S.tabActive:{})}}><Icon id={t.id} size={22}/><span className="tab-label" style={{fontSize:12,fontWeight:active===t.id?600:400}}>{t.label}</span></button>)}</div>
 }
@@ -660,8 +743,11 @@ function ClientModal({client,onSave,onClose}){
   </div></div>
 }
 
-// ── Timer View ──
-function TimerView({data,setData,openSettings}){
+// ── Idag ──
+// Registreringsvyn. En uppgift: få in dagens verklighet.
+// Timern överst, snabbknappar för de uppdrag som loggas oftast, och
+// det som skaver samlat i en ruta. Projekt- och kundlistor bor i grunddata.
+function TodayView({data,setData,openSettings}){
   const toast=useToast();
   const[running,setRunning]=useState(false);const[elapsed,setElapsed]=useState(0);
   const[selProj,setSelProj]=useState(null);const[moment,setMom]=useState('');const[note,setNote]=useState('');
@@ -670,7 +756,6 @@ function TimerView({data,setData,openSettings}){
   const[showManual,setShowManual]=useState(false);const[mDate,setMDate]=useState(today());const[mH,setMH]=useState('');const[mM,setMM]=useState('');const[mMom,setMMom]=useState('');const[mProj,setMProj]=useState(null);const[mNote,setMNote]=useState('');const[mStart,setMStart]=useState('');const[mEnd,setMEnd]=useState('');
   const[showExpense,setShowExpense]=useState(false);const[expType,setExpType]=useState('expense');const[expDate,setExpDate]=useState(today());const[expProj,setExpProj]=useState('');const[expDesc,setExpDesc]=useState('');const[expAmount,setExpAmount]=useState('');const[expKm,setExpKm]=useState('');
   const[showExtra,setShowExtra]=useState(false);
-  const[projSearch,setProjSearch]=useState('');
 
   // Auto-calc hours/minutes when start/end times change
   useEffect(()=>{
@@ -689,7 +774,7 @@ function TimerView({data,setData,openSettings}){
         if(saved.selProj)setSelProj(saved.selProj);
         if(saved.moment)setMom(saved.moment);
         if(saved.note)setNote(saved.note);
-        setElapsed(el);setRunning(true);setShowManual(true);
+        setElapsed(el);setRunning(true);
       }
     }catch{}
   },[]);
@@ -705,6 +790,12 @@ function TimerView({data,setData,openSettings}){
     const tr={id:gid(),projectId:s.projectId,km:s.km,description:'Resa',date:s.date,createdAt:new Date().toISOString()};
     setData(prev=>{const u={...prev,trips:[...(prev.trips||[]),tr]};saveLocal(u);return u});
     toast('✓ Resa '+s.km+' km tillagd');
+  };
+  // Snabb tid: samma projekt, samma moment och samma längd som förra gången.
+  const quickAdd=(projectId,seconds,momentLabel)=>{
+    const e={id:gid(),projectId,moment:momentLabel||'Allmänt',seconds,date:today(),createdAt:new Date().toISOString()};
+    const u={...data,entries:[...data.entries,e]};setData(u);saveLocal(u);
+    savedWithTripHint(u,projectId,e.date,'✓ '+fmtH(seconds)+' h sparad');
   };
   const savedWithTripHint=(updated,projectId,date,okMsg)=>{
     const s=suggestTrip(updated,projectId,date);
@@ -729,77 +820,80 @@ function TimerView({data,setData,openSettings}){
   };
 
   return<div style={{paddingTop:8}}>
-    {/* Week revenue - primary focus */}
-    {(()=>{
-      const wd=getWeekDates(0);
-      const wRev=calcWeekRevenue(data,wd);
-      const goal=data.weeklyGoal||0;
-      const pct=goal>0?Math.min(Math.round(wRev/goal*100),100):0;
-      const remaining=goal>0?Math.max(goal-wRev,0):0;
-      const reached=goal>0&&wRev>=goal;
-      const todayDate=today();
-      const tH=data.entries.filter(e=>e.date===todayDate).reduce((s,e)=>s+e.seconds,0)/3600;
-      return<div style={{background:'var(--card)',borderRadius:16,padding:'20px',marginBottom:20,border:'1px solid var(--border)',boxShadow:'0 2px 10px rgba(0,0,0,.04)'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:8}}>
-          <span style={S.sectionSubtle}>Veckan</span>
-          {goal>0&&<span style={{fontSize:14,fontWeight:700,color:reached?'var(--success)':'var(--text-muted)'}}>{pct}%</span>}
-        </div>
-        <div style={{fontSize:32,fontWeight:700,color:'var(--text)',fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginBottom:goal>0?12:4,lineHeight:1.1}}>
-          {wRev.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr
-          {goal>0&&<span style={{fontSize:15,fontWeight:500,color:'var(--text-muted)',fontFamily:"'Outfit',system-ui,sans-serif",marginLeft:10}}>av {goal.toLocaleString('sv-SE')} kr</span>}
-        </div>
-        {goal>0&&<>
-          <div style={{height:10,background:'var(--sage-ghost)',borderRadius:5,overflow:'hidden'}}>
-            <div style={{height:'100%',width:`${pct}%`,background:reached?'var(--success)':'var(--sage-deep)',borderRadius:5,transition:'width 0.6s ease'}}/>
-          </div>
-          <div style={{fontSize:13,color:reached?'var(--success)':'var(--text-muted)',marginTop:8,fontWeight:reached?600:400}}>
-            {reached?'Mål uppnått!':remaining.toLocaleString('sv-SE',{maximumFractionDigits:0})+' kr kvar denna vecka'}
-          </div>
-        </>}
-        {!goal&&<button onClick={openSettings} style={{fontSize:13,color:'var(--accent)',background:'none',border:'none',padding:0,cursor:'pointer',textDecoration:'underline',fontFamily:'inherit',textAlign:'left'}}>Sätt veckomål →</button>}
-        {(()=>{
-          // F4 – dagar sedan senaste registrering, alltid synlig i startvyn
-          const st=staleStatus(data,todayDate);const lbl=lastActivityLabel(st.days);
-          if(tH<=0&&!lbl)return null;
-          return<div style={{fontSize:13,color:'var(--text-muted)',marginTop:goal>0?10:8,paddingTop:10,borderTop:'1px solid var(--sage-ghost)',display:'flex',justifyContent:'space-between',flexWrap:'wrap',gap:6}}>
-            <span>{tH>0?<>Idag: <span style={{fontWeight:600,color:'var(--text)'}}>{tH.toFixed(1)} h</span> loggat</>:''}</span>
-            {lbl&&<span style={{color:st.stale?'var(--accent)':'var(--text-muted)',fontWeight:st.stale?600:400}}>Senast registrerat {lbl}</span>}
-          </div>;
-        })()}
-      </div>;
-    })()}
-
-    {/* F4 – eftersläpningsvarning */}
+    {/* Att fixa – eftersläpning (F4) och saknade resor (F3) i EN ruta */}
     {(()=>{
       const st=staleStatus(data,today());
-      if(!st.stale)return null;
-      return<div style={{background:'var(--card)',border:'1.5px solid var(--accent)',borderRadius:16,padding:16,marginBottom:20}}>
-        <div style={{fontSize:14,fontWeight:700,color:'var(--accent)',marginBottom:4}}>Inget registrerat på {st.days} dagar</div>
-        <div style={{fontSize:13,color:'var(--text-muted)'}}>Senaste posten är från {st.lastDate}. Gränsen är {st.limit} dagar och ändras i inställningarna.</div>
-      </div>;
-    })()}
-
-    {/* F3 – dagar med tid men utan resa, säkerhetsnät bakåt */}
-    {(()=>{
       const miss=missingTrips(data,today(),14);
-      if(!miss.length)return null;
-      const shown=miss.slice(0,6);
-      return<div style={{background:'var(--card)',border:'1.5px solid var(--accent)',borderRadius:16,padding:16,marginBottom:20}}>
-        <div style={{fontSize:14,fontWeight:700,color:'var(--text)',marginBottom:2}}>Saknade resor</div>
-        <div style={{fontSize:13,color:'var(--text-muted)',marginBottom:6}}>Tid är loggad men ingen resa registrerad.</div>
-        {shown.map(s=><div key={s.projectId+'|'+s.date} style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderTop:'1px solid var(--sage-ghost)'}}>
+      if(!st.stale&&!miss.length)return null;
+      const shown=miss.slice(0,4);
+      return<div style={S.alertBox}>
+        <span style={{...S.sectionSubtle,color:'var(--accent)',marginBottom:0}}>Att fixa</span>
+        {st.stale&&<div style={S.alertRow}>
           <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:14,fontWeight:600,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{s.projectName}</div>
-            <div style={{fontSize:12,color:'var(--text-muted)'}}>{s.date} · {s.km} km</div>
+            <div style={S.alertTitle}>Inget registrerat på {st.days} dagar</div>
+            <div style={S.alertSub}>Senaste posten är från {st.lastDate}</div>
           </div>
-          <button onClick={()=>addTrip(s)} style={S.addBtn}>+ Lägg till</button>
+        </div>}
+        {shown.map(s=><div key={s.projectId+'|'+s.date} style={S.alertRow}>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={S.alertTitle}>Resa saknas, {s.projectName}</div>
+            <div style={S.alertSub}>{s.date} · {s.km} km tur och retur</div>
+          </div>
+          <button onClick={()=>addTrip(s)} style={S.alertBtn}>+ {s.km} km</button>
         </div>)}
-        {miss.length>shown.length&&<div style={{...S.hint,paddingTop:8}}>+ {miss.length-shown.length} till längre bak</div>}
+        {miss.length>shown.length&&<div style={{...S.hint,padding:0}}>+ {miss.length-shown.length} till längre bak</div>}
       </div>;
     })()}
 
+    {/* Timern – överst och alltid synlig */}
+    <div style={S.timerCard}>
+      <select style={S.timerSelect} value={selProj||''} onChange={e=>setSelProj(e.target.value)}>
+        <option value="">Välj uppdrag...</option>
+        {data.projects.map(p=>{const cl=(data.clients||[]).find(c=>c.id===p.clientId);
+          return<option key={p.id} value={p.id}>{p.name}{cl?' · '+cl.name:''}</option>})}
+      </select>
+      <input style={S.timerInput} placeholder="Vad gör du?" value={moment} onChange={e=>setMom(e.target.value)}/>
+      <div style={S.timerBig}>{fmtDur(elapsed)}</div>
+      <div style={{display:'flex',gap:8,justifyContent:'center'}}>
+        {!running
+          ? <button onClick={startTimer} style={{...S.timerGo,opacity:selProj?1:.45}}>Starta</button>
+          : <><button onClick={stop} style={S.timerGo}>Spara</button><button onClick={cancelTimer} style={S.timerCancel}>Avbryt</button></>}
+      </div>
+    </div>
+
+    {/* Snabb tid – de uppdrag du oftast loggar, plus vägen in till ett nytt */}
     <div style={S.section}>
-      <div style={S.sectionHeader}><span style={S.sectionTitle}>Projekt</span><button onClick={()=>setShowNew(!showNew)} style={S.addBtn}>+ Nytt</button></div>
+      <div style={S.sectionHeader}><span style={S.sectionTitle}>Snabb tid</span></div>
+      <div style={S.quickCard}>
+        {(()=>{
+          const ids=recentProjectIds(data,3);
+          if(!ids.length)return<span style={S.hint}>Inga uppdrag ännu. Lägg till ett nedan.</span>;
+          return ids.map(pid=>{
+            const p=data.projects.find(x=>x.id===pid);if(!p)return null;
+            const cl=(data.clients||[]).find(c=>c.id===p.clientId);
+            const le=lastEntryFor(data,pid);
+            const secs=le?le.seconds:3600;
+            const mom=le?le.moment:'Allmänt';
+            const pi=data.projects.findIndex(x=>x.id===pid);
+            return<div key={pid} style={S.entryRow}>
+              <div style={{...S.entryDot,background:pc(pi)}}/>
+              <div style={S.entryInfo}>
+                <span style={S.entryProject}>{p.name}</span>
+                <span style={S.entryMoment}>{cl?cl.name+' · ':''}{mom} · senast {fmtH(secs)} h</span>
+              </div>
+              <button onClick={()=>quickAdd(pid,secs,mom)} style={S.addBtn}>+ {fmtH(secs)} h</button>
+            </div>;
+          });
+        })()}
+        <div style={{...S.entryRow,borderBottom:'none'}}>
+          <div style={{...S.entryDot,background:'var(--border)'}}/>
+          <div style={S.entryInfo}>
+            <span style={{...S.entryProject,color:'var(--text-muted)',fontWeight:500}}>Nytt uppdrag</span>
+            <span style={S.entryMoment}>Namn, kund och ett pris. Resten i grunddata.</span>
+          </div>
+          <button onClick={()=>setShowNew(!showNew)} style={S.addBtn}>+ Nytt</button>
+        </div>
+      </div>
       {showNew&&<div style={S.manualForm}>
         <input style={S.input} placeholder="Projektnamn..." value={newName} onChange={e=>setNewName(e.target.value)} autoFocus/>
         <div style={S.manualRow}>
@@ -808,22 +902,12 @@ function TimerView({data,setData,openSettings}){
         </div>
         <button onClick={addProj} style={S.confirmBtn}>Skapa projekt</button>
       </div>}
-      {data.projects.length>6&&<input style={{...S.input,marginBottom:8,fontSize:14,padding:'10px 14px'}} placeholder="Sök projekt eller kund..." value={projSearch} onChange={e=>setProjSearch(e.target.value)}/>}
-      <div style={S.pillRow}>{(()=>{
-        const q=projSearch.toLowerCase().trim();
-        const filtered=q?data.projects.map((p,i)=>({p,i})).filter(({p})=>{
-          const cl=(data.clients||[]).find(c=>c.id===p.clientId);
-          return p.name.toLowerCase().includes(q)||(cl?.name||'').toLowerCase().includes(q);
-        }):data.projects.map((p,i)=>({p,i}));
-        return filtered.map(({p,i})=>{const cl=(data.clients||[]).find(c=>c.id===p.clientId);
-          return<Pill key={p.id} label={p.name+(cl?' · '+cl.name:'')} color={pc(i)} selected={selProj===p.id} onClick={()=>setSelProj(p.id)}/>});
-      })()}{data.projects.length===0&&<span style={S.hint}>Skapa ditt första projekt ovan</span>}{data.projects.length>0&&projSearch&&data.projects.filter(p=>{const cl=(data.clients||[]).find(c=>c.id===p.clientId);return p.name.toLowerCase().includes(projSearch.toLowerCase().trim())||(cl?.name||'').toLowerCase().includes(projSearch.toLowerCase().trim())}).length===0&&<span style={S.hint}>Inga projekt matchar "{projSearch}"</span>}</div>
     </div>
 
-    {/* Manual entry - simplified */}
+    {/* Manuell tid – hopfälld, timern och snabbknapparna räcker för det mesta */}
     <div style={S.section}>
-      <span style={S.sectionTitle}>Logga tid</span>
-      <div style={S.manualForm}>
+      <button onClick={()=>setShowManual(!showManual)} style={S.manualToggle}>{showManual?'▾ Dölj manuell tid':'▸ Lägg till tid manuellt'}</button>
+      {showManual&&<div style={S.manualForm}>
         <div><label style={S.fieldLabel}>Projekt</label><select style={{...S.input,marginTop:4}} value={mProj||selProj||''} onChange={e=>setMProj(e.target.value)}><option value="">Välj projekt...</option>{data.projects.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
         <div><label style={S.fieldLabel}>Moment</label><input style={{...S.input,marginTop:4}} placeholder="Vad gjorde du?" value={mMom} onChange={e=>setMMom(e.target.value)}/></div>
         <div style={S.manualRow}>
@@ -840,7 +924,7 @@ function TimerView({data,setData,openSettings}){
           <div><label style={S.fieldLabel}>Anteckning</label><textarea style={{...S.textarea,marginTop:4}} placeholder="Valfri anteckning..." value={mNote} onChange={e=>setMNote(e.target.value)}/></div>
         </>}
         <button onClick={addManual} style={S.confirmBtn}>Lägg till tid</button>
-      </div>
+      </div>}
     </div>
 
     {/* Repeat yesterday - only if yesterday has entries */}
@@ -852,17 +936,6 @@ function TimerView({data,setData,openSettings}){
         <button onClick={repeatYesterday} style={{...S.manualToggle,color:'var(--sage-deep)',fontWeight:600}}>↻ Upprepa gårdagens poster ({yCount} st)</button>
       </div>;
     })()}
-
-    {/* Timer - compact, collapsible */}
-    <div style={S.section}>
-      <button onClick={()=>setShowManual(!showManual)} style={S.manualToggle}>{showManual?'▾ Dölj timer':'▸ Starta timer'}</button>
-      {showManual&&<div style={{background:'var(--card)',borderRadius:14,padding:12,marginTop:8,border:'1px solid var(--border)',boxShadow:'0 2px 10px rgba(0,0,0,.05)',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-        <input style={{...S.input,flex:'1 1 120px'}} placeholder="Moment..." value={moment} onChange={e=>setMom(e.target.value)}/>
-        <span style={{fontSize:24,fontWeight:700,fontVariantNumeric:'tabular-nums',color:'var(--sage-deep)',fontFamily:"'JetBrains Mono',monospace",minWidth:80,textAlign:'center'}}>{fmtDur(elapsed)}</span>
-        {!running?<button onClick={startTimer} style={{...S.timerBtn,...S.startBtn,padding:'8px 18px',fontSize:13,opacity:selProj?1:.4}}>Starta</button>:
-        <><button onClick={stop} style={{...S.timerBtn,...S.stopBtn,padding:'8px 18px',fontSize:13}}>Spara</button><button onClick={cancelTimer} style={{...S.timerBtn,...S.resetBtn,padding:'8px 14px',fontSize:13}}>Avbryt</button></>}
-      </div>}
-    </div>
 
     {/* Expense / Trip - collapsible */}
     <div style={S.section}>
@@ -902,8 +975,7 @@ function TimerView({data,setData,openSettings}){
 }
 
 // ── Dashboard View ──
-function DashboardView({data,weekOffset,setWeekOffset}){
-  const dashWeek=weekOffset;const setDashWeek=setWeekOffset;
+function TrendCharts({data}){
   const now=new Date();
   const thisMonth=now.getMonth(),thisYear=now.getFullYear();
   const lastMonth=thisMonth===0?11:thisMonth-1,lastYear=thisMonth===0?thisYear-1:thisYear;
@@ -957,72 +1029,7 @@ function DashboardView({data,weekOffset,setWeekOffset}){
   const card={background:'var(--card)',borderRadius:16,padding:16,border:'1px solid var(--border)',boxShadow:'0 4px 20px rgba(0,0,0,.06)',marginBottom:14};
   const compStyle=(val)=>({fontSize:12,fontWeight:600,color:val>0?'var(--sage)':val<0?'var(--accent)':'var(--text-muted)'});
 
-  return<div style={{paddingTop:8}}>
-    {/* Week navigation */}
-    <div style={S.weekNav}>
-      <button onClick={()=>setDashWeek(dashWeek-1)} style={S.weekNavBtn}>{'◀'}</button>
-      <div style={S.weekNavCenter}>
-        <span style={S.weekLabel}>{weekLabel(getWeekDates(dashWeek))}</span>
-        {dashWeek===0&&<span style={{fontSize:12,color:'var(--sage)',fontWeight:600}}>Denna vecka</span>}
-      </div>
-      <button onClick={()=>setDashWeek(dashWeek+1)} style={{...S.weekNavBtn,opacity:dashWeek>=0?.3:1}} disabled={dashWeek>=0}>{'▶'}</button>
-      {dashWeek!==0&&<button onClick={()=>setDashWeek(0)} style={S.weekTodayBtn}>Denna vecka</button>}
-    </div>
-
-    {/* Today indicator - only show for current week */}
-    {dashWeek===0&&(()=>{const todayDate=today();const tEntries=data.entries.filter(e=>e.date===todayDate);const tH=tEntries.reduce((s,e)=>s+e.seconds,0)/3600;
-      let tRev=calcRevenue(tEntries,data);
-      return<div style={{background:tH>0?'var(--sage-deep)':'var(--card)',borderRadius:16,padding:'16px',marginBottom:16,color:tH>0?'#fff':'var(--text)',border:tH>0?'none':'2px dashed var(--border)',boxShadow:tH>0?'0 4px 16px rgba(45,62,51,.25)':'none'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <div><div style={{fontSize:12,fontWeight:600,opacity:.7,textTransform:'uppercase',letterSpacing:'1px'}}>Idag</div>
-            <div style={{fontSize:28,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2}}>{tH.toFixed(1)} h</div></div>
-          {tH>0&&<div style={{textAlign:'right'}}><div style={{fontSize:12,fontWeight:600,opacity:.7,textTransform:'uppercase',letterSpacing:'1px'}}>Intäkt</div>
-            <div style={{fontSize:22,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2}}>{tRev.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</div></div>}
-          {tH===0&&<span style={{fontSize:14,color:'var(--text-muted)'}}>Ingen tid loggad ännu</span>}
-        </div>
-      </div>})()}
-
-    {/* Week summary card */}
-    {(()=>{
-      const wd=getWeekDates(dashWeek);
-      const ws=weekSummary(data,wd);
-      const wH=ws.hours,wRev=ws.arvode,wExtra=ws.extra,wTotal=ws.total;
-      const fmtKr=v=>v.toLocaleString('sv-SE',{maximumFractionDigits:0});
-      return<div style={{background:'var(--sage-ghost)',borderRadius:16,padding:'16px',marginBottom:16}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
-          <div><div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Veckan</div>
-            <div style={{fontSize:24,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)'}}>{wH.toFixed(1)} h</div></div>
-          <div style={{textAlign:'right'}}><div style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'1.5px'}}>Totalt</div>
-            <div style={{fontSize:28,fontWeight:700,fontFamily:"'JetBrains Mono',monospace",fontVariantNumeric:'tabular-nums',marginTop:2,color:'var(--sage-deep)',lineHeight:1.05}}>{fmtKr(wTotal)} kr</div></div>
-        </div>
-        <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid var(--border)',display:'flex',flexDirection:'column',gap:6}}>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'var(--text-muted)'}}><span>Arvode</span><span style={{fontVariantNumeric:'tabular-nums'}}>{fmtKr(wRev)} kr</span></div>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:13,color:'var(--text-muted)'}}><span>Utlägg &amp; resor</span><span style={{fontVariantNumeric:'tabular-nums'}}>{fmtKr(wExtra)} kr</span></div>
-        </div>
-      </div>})()}
-
-    {/* Month header */}
-    <div style={{marginBottom:16}}>
-      <span style={{fontSize:20,fontWeight:700,color:'var(--sage-deep)'}}>{monthNames[thisMonth]} {thisYear}</span>
-    </div>
-
-    {/* Summary cards */}
-    <div style={S.cardRow}>
-      <div style={S.summaryCard}>
-        <span style={S.cardLabel}>Tid</span>
-        <span style={S.cardValue}>{mH.toFixed(1)} h</span>
-        <span style={compStyle(diffH)}>{diffH>0?'+':''}{diffH.toFixed(1)} h vs {monthNames[lastMonth]}</span>
-      </div>
-      <div style={S.summaryCard}>
-        <span style={S.cardLabel}>Projekt</span>
-        <span style={S.cardValue}>{mProjects}</span>
-      </div>
-      <div style={{...S.summaryCard,...S.summaryCardAccent}}>
-        <span style={S.cardLabel}>Totalt</span>
-        <span style={S.cardValue}>{mTotal.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span>
-      </div>
-    </div>
-
+  return<div>
     {/* Project distribution - pie chart */}
     {topProjects.length>1&&<div style={card}>
       <span style={{...S.sectionTitle,marginBottom:12}}>Fördelning per projekt</span>
@@ -1107,9 +1114,24 @@ function DashboardView({data,weekOffset,setWeekOffset}){
   </div>
 }
 
-// ── Week View (with calendar) ──
-function WeekView({data,setData,msConnected,weekOffset,setWeekOffset}){
-  const wo=weekOffset;const setWo=setWeekOffset;
+// ── Vecka ──
+// Enda platsen där veckan rättas. Kalendern, posterna, redigering och borttagning.
+// Egen veckoräknare: ingen annan vy ska kunna ändra vad den här visar.
+function WeekView({data,setData,msConnected}){
+  const toast=useToast();
+  const[wo,setWo]=useState(0);
+  const[editEntry,setEditEntry]=useState(null);
+  const[splitEntry,setSplitEntry]=useState(null);
+  const nowIso=()=>new Date().toISOString();
+  const addTomb=(ids)=>{const t=nowIso();const map={...(data.deletedIds||{})};ids.forEach(id=>{map[id]=t});return map};
+  const delEntry=id=>{const entry=data.entries.find(e=>e.id===id);const u={...data,entries:data.entries.filter(e=>e.id!==id),deletedIds:addTomb([id])};setData(u);saveLocal(u);
+    const undo=()=>{const dd={...(u.deletedIds||{})};delete dd[id];const r={...u,entries:[...u.entries,entry],deletedIds:dd};setData(r);saveLocal(r)};undo.label='Ångra';toast('Tidspost borttagen',undo)};
+  const delExp=id=>{const exp=(data.expenses||[]).find(e=>e.id===id);const u={...data,expenses:(data.expenses||[]).filter(e=>e.id!==id),deletedIds:addTomb([id])};setData(u);saveLocal(u);
+    const undo=()=>{const dd={...(u.deletedIds||{})};delete dd[id];const r={...u,expenses:[...u.expenses,exp],deletedIds:dd};setData(r);saveLocal(r)};undo.label='Ångra';toast('Utlägg borttaget',undo)};
+  const delTrip=id=>{const trip=(data.trips||[]).find(e=>e.id===id);const u={...data,trips:(data.trips||[]).filter(e=>e.id!==id),deletedIds:addTomb([id])};setData(u);saveLocal(u);
+    const undo=()=>{const dd={...(u.deletedIds||{})};delete dd[id];const r={...u,trips:[...u.trips,trip],deletedIds:dd};setData(r);saveLocal(r)};undo.label='Ångra';toast('Resa borttagen',undo)};
+  const saveEntry=updated=>{const u={...data,entries:data.entries.map(e=>e.id===updated.id?{...updated,updatedAt:nowIso()}:e)};setData(u);saveLocal(u);toast('✓ Uppdaterad')};
+  const splitEntryFn=(e1,e2)=>{const t=nowIso();const u={...data,entries:data.entries.map(e=>e.id===e1.id?{...e1,updatedAt:t}:e).concat([{...e2,updatedAt:t}])};setData(u);saveLocal(u);toast('✓ Tidspost delad')};
   const[calEvents,setCalEvents]=useState([]);
   const[calLoading,setCalLoading]=useState(false);
   const[importProj,setImportProj]=useState('');
@@ -1166,7 +1188,9 @@ function WeekView({data,setData,msConnected,weekOffset,setWeekOffset}){
   const importableCount=visibleEvents.filter(ev=>!ev.isAllDay&&calEventDuration(ev)>0&&!data.entries.some(e=>e.calEventId===ev.id)).length;
 
   return<div style={{paddingTop:8}}>
-    <div style={S.weekNav}><button onClick={()=>setWo(wo-1)} style={S.weekNavBtn}>{'◀'}</button><div style={S.weekNavCenter}><span style={S.weekLabel}>{wl}</span><span style={S.weekTotal}>{fmtH(wt)} h totalt</span></div><button onClick={()=>setWo(wo+1)} style={S.weekNavBtn}>{'▶'}</button>{wo!==0&&<button onClick={()=>setWo(0)} style={S.weekTodayBtn}>Idag</button>}</div>
+    {editEntry&&<EditEntryModal entry={editEntry} data={data} onSave={saveEntry} onClose={()=>setEditEntry(null)}/>}
+    {splitEntry&&<SplitEntryModal entry={splitEntry} data={data} onSplit={splitEntryFn} onClose={()=>setSplitEntry(null)}/>}
+    <div style={S.weekNav}><button onClick={()=>setWo(wo-1)} style={S.weekNavBtn}>{'◀'}</button><div style={S.weekNavCenter}><span style={S.weekLabel}>{wl}</span><span style={S.weekTotal}>{fmtH(wt)} h totalt</span></div><button onClick={()=>setWo(wo+1)} style={{...S.weekNavBtn,opacity:wo>=0?.3:1}} disabled={wo>=0}>{'▶'}</button>{wo!==0&&<button onClick={()=>setWo(0)} style={S.weekTodayBtn}>Idag</button>}</div>
     <div style={S.weekChart}>{wd.map((date,i)=>{const dayE=data.entries.filter(e=>e.date===date),td=date===today();const byP={};dayE.forEach(e=>{if(!byP[e.projectId])byP[e.projectId]=0;byP[e.projectId]+=e.seconds});const segs=Object.entries(byP).map(([pid,sec])=>({color:pc(data.projects.findIndex(p=>p.id===pid)),pct:(sec/mx)*100}));
       return<div key={date} style={S.weekDayCol}><div style={S.weekBarContainer}>{segs.length>0?segs.map((sg,si)=><div key={si} style={{width:'100%',height:`${Math.max(sg.pct,1)}%`,background:sg.color,borderRadius:si===0?'6px 6px 0 0':si===segs.length-1?'0 0 6px 6px':0}}/>):<div style={{width:'100%',height:'2%',background:'#e5e2dc',borderRadius:6}}/>}</div><span style={{...S.weekDayLabel,fontWeight:td?700:500,color:td?'var(--sage-deep)':'var(--text-muted)'}}>{DN[i]}</span><span style={S.weekDayHours}>{dt[i]>0?fmtH(dt[i]):'–'}</span></div>})}</div>
 
@@ -1214,23 +1238,61 @@ function WeekView({data,setData,msConnected,weekOffset,setWeekOffset}){
       <span style={{fontSize:13,color:'var(--text-muted)'}}>Logga in med Microsoft i Synk-fliken för att se din kalender här.</span>
     </div>}
 
-    {/* Time entries */}
-    {wd.map((date,i)=>{const dayE=data.entries.filter(e=>e.date===date);if(!dayE.length)return null;const dayT=dayE.reduce((s,e)=>s+e.seconds,0),dO=new Date(date+'T12:00:00'),td=date===today();
-      return<div key={date} style={S.dateGroup}><div style={S.dateHeader}><span style={{...S.dateLabel,fontWeight:td?700:600}}>{DN[i]} {dO.getDate()}/{dO.getMonth()+1}{td&&<span style={{color:'var(--sage)',marginLeft:6,fontSize:11}}>idag</span>}</span><span style={S.dateTotalBadge}>{fmtH(dayT)} h</span></div>
-        {dayE.map(en=>{const pr=data.projects.find(p=>p.id===en.projectId);const pi=data.projects.findIndex(p=>p.id===en.projectId);return<div key={en.id} style={S.entryRow}><div style={{...S.entryDot,background:pc(pi)}}/><div style={S.entryInfo}><span style={S.entryProject}>{pr?.name||'?'}</span><span style={S.entryMoment}>{en.startTime&&en.endTime?en.startTime+'–'+en.endTime+' · ':''}{en.moment}{en.note&&<span style={S.noteTag}> — {en.note}</span>}</span></div><span style={S.entryTime}>{fmtH(en.seconds)} h</span></div>})}</div>})}
-    {we.length===0&&<span style={S.hint}>Inga registreringar den här veckan</span>}
+    {/* Dagens poster: tid, resor och utlägg i samma lista, med redigering på raden */}
+    {wd.map((date,i)=>{
+      const dayE=data.entries.filter(e=>e.date===date);
+      const dayT2=(data.trips||[]).filter(t=>t.date===date);
+      const dayX=(data.expenses||[]).filter(x=>x.date===date);
+      if(!dayE.length&&!dayT2.length&&!dayX.length)return null;
+      const dayT=dayE.reduce((s,e)=>s+e.seconds,0),dO=new Date(date+'T12:00:00'),td=date===today();
+      return<div key={date} style={S.dateGroup}>
+        <div style={S.dateHeader}>
+          <span style={{...S.dateLabel,fontWeight:td?700:600}}>{DN[i]} {dO.getDate()}/{dO.getMonth()+1}{td&&<span style={{color:'var(--sage)',marginLeft:6,fontSize:11}}>idag</span>}</span>
+          {dayT>0&&<span style={S.dateTotalBadge}>{fmtH(dayT)} h</span>}
+        </div>
+        {dayE.map(en=>{const pr=data.projects.find(p=>p.id===en.projectId);const pi=data.projects.findIndex(p=>p.id===en.projectId);
+          return<div key={en.id} style={S.entryRow}>
+            <div style={{...S.entryDot,background:pc(pi)}}/>
+            <div style={S.entryInfo}>
+              <span style={S.entryProject}>{pr?.name||'?'}</span>
+              <span style={S.entryMoment}>{en.startTime&&en.endTime?en.startTime+'–'+en.endTime+' · ':''}{en.moment}{en.note&&<span style={S.noteTag}> — {en.note}</span>}</span>
+            </div>
+            <span style={S.entryTime}>{fmtH(en.seconds)} h</span>
+            <button onClick={()=>setSplitEntry(en)} style={{...S.editBtn,fontSize:13}} title="Dela upp">{'÷'}</button>
+            <button onClick={()=>setEditEntry(en)} style={S.editBtn} title="Redigera">{'✎'}</button>
+            <button onClick={()=>delEntry(en.id)} style={S.deleteBtn} title="Ta bort">x</button>
+          </div>})}
+        {dayT2.map(tr=>{const pr=data.projects.find(p=>p.id===tr.projectId);
+          return<div key={tr.id} style={S.entryRow}>
+            <div style={{...S.entryDot,background:'var(--sage-light)'}}/>
+            <div style={S.entryInfo}>
+              <span style={S.entryProject}>{tr.description||'Resa'}</span>
+              <span style={S.entryMoment}>{pr?.name||'?'} · {tr.km} km</span>
+            </div>
+            <span style={S.entryTime}>{Math.round(tr.km*(data.kmRate||2.5))} kr</span>
+            <button onClick={()=>delTrip(tr.id)} style={S.deleteBtn} title="Ta bort">x</button>
+          </div>})}
+        {dayX.map(xp=>{const pr=data.projects.find(p=>p.id===xp.projectId);
+          return<div key={xp.id} style={S.entryRow}>
+            <div style={{...S.entryDot,background:'var(--accent)'}}/>
+            <div style={S.entryInfo}>
+              <span style={S.entryProject}>{xp.description||'Utlägg'}</span>
+              <span style={S.entryMoment}>{pr?.name||'?'} · Utlägg</span>
+            </div>
+            <span style={S.entryTime}>{xp.amount} kr</span>
+            <button onClick={()=>delExp(xp.id)} style={S.deleteBtn} title="Ta bort">x</button>
+          </div>})}
+      </div>})}
+    {we.length===0&&!(data.trips||[]).some(t=>wd.includes(t.date))&&!(data.expenses||[]).some(x=>wd.includes(x.date))&&<span style={S.hint}>Inga registreringar den här veckan</span>}
   </div>
 }
 
-// ── Entries View (with edit) ──
-function EntriesView({data,setData,weekOffset,setWeekOffset}){
+// ── Grunddata ──
+// Projekt och kunder. Ändras några gånger om året, så det bor bakom kugghjulet
+// i stället för att ta plats i en flik varje dag.
+function MasterDataView({data,setData}){
   const toast=useToast();
-  const[subTab,setSubTab]=useState('time');
-  const[filter,setFilter]=useState('all');
-  const[search,setSearch]=useState('');
-  const histWeek=weekOffset;const setHistWeek=setWeekOffset;
-  const[editEntry,setEditEntry]=useState(null);
-  const[splitEntry,setSplitEntry]=useState(null);
+  const[subTab,setSubTab]=useState('projects');
   const[editProj,setEditProj]=useState(null);
   const[editClient,setEditClient]=useState(null);
   const[showNewClient,setShowNewClient]=useState(false);
@@ -1238,78 +1300,20 @@ function EntriesView({data,setData,weekOffset,setWeekOffset}){
 
   const now=()=>new Date().toISOString();
   const addTomb=(ids)=>{const t=now();const map={...(data.deletedIds||{})};ids.forEach(id=>{map[id]=t});return map};
-  const del=id=>{const entry=data.entries.find(e=>e.id===id);const u={...data,entries:data.entries.filter(e=>e.id!==id),deletedIds:addTomb([id])};setData(u);saveLocal(u);
-    const undo=()=>{const dd={...(u.deletedIds||{})};delete dd[id];const r={...u,entries:[...u.entries,entry],deletedIds:dd};setData(r);saveLocal(r)};undo.label='Ångra';toast('Tidspost borttagen',undo)};
-  const delExp=id=>{const exp=(data.expenses||[]).find(e=>e.id===id);const u={...data,expenses:(data.expenses||[]).filter(e=>e.id!==id),deletedIds:addTomb([id])};setData(u);saveLocal(u);
-    const undo=()=>{const dd={...(u.deletedIds||{})};delete dd[id];const r={...u,expenses:[...u.expenses,exp],deletedIds:dd};setData(r);saveLocal(r)};undo.label='Ångra';toast('Utlägg borttaget',undo)};
-  const delTrip=id=>{const trip=(data.trips||[]).find(e=>e.id===id);const u={...data,trips:(data.trips||[]).filter(e=>e.id!==id),deletedIds:addTomb([id])};setData(u);saveLocal(u);
-    const undo=()=>{const dd={...(u.deletedIds||{})};delete dd[id];const r={...u,trips:[...u.trips,trip],deletedIds:dd};setData(r);saveLocal(r)};undo.label='Ångra';toast('Resa borttagen',undo)};
-  const saveEntry=updated=>{const u={...data,entries:data.entries.map(e=>e.id===updated.id?{...updated,updatedAt:now()}:e)};setData(u);saveLocal(u);toast('✓ Uppdaterad')};
-  const splitEntryFn=(e1,e2)=>{const t=now();const u={...data,entries:data.entries.map(e=>e.id===e1.id?{...e1,updatedAt:t}:e).concat([{...e2,updatedAt:t}])};setData(u);saveLocal(u);toast('✓ Tidspost delad')};
   const saveProj=updated=>{const u={...data,projects:data.projects.map(p=>p.id===updated.id?{...updated,updatedAt:now()}:p)};setData(u);saveLocal(u);toast('✓ Projekt uppdaterat')};
-  const delProj=pid=>{const projEntryIds=data.entries.filter(e=>e.projectId===pid).map(e=>e.id);const u={...data,projects:data.projects.filter(p=>p.id!==pid),entries:data.entries.filter(e=>e.projectId!==pid),deletedIds:addTomb([pid,...projEntryIds])};setData(u);saveLocal(u);if(filter===pid)setFilter('all')};
+  const delProj=pid=>{const projEntryIds=data.entries.filter(e=>e.projectId===pid).map(e=>e.id);const u={...data,projects:data.projects.filter(p=>p.id!==pid),entries:data.entries.filter(e=>e.projectId!==pid),deletedIds:addTomb([pid,...projEntryIds])};setData(u);saveLocal(u)};
   const saveClient=c=>{const exists=(data.clients||[]).find(x=>x.id===c.id);const withTs={...c,updatedAt:now()};const u={...data,clients:exists?(data.clients||[]).map(x=>x.id===c.id?withTs:x):[...(data.clients||[]),withTs]};setData(u);saveLocal(u);toast('✓ Kund sparad')};
   const delClient=cid=>{const u={...data,clients:(data.clients||[]).filter(c=>c.id!==cid),projects:data.projects.map(p=>p.clientId===cid?{...p,clientId:undefined,updatedAt:now()}:p),deletedIds:addTomb([cid])};setData(u);saveLocal(u)};
 
-  const histWd=getWeekDates(histWeek);
-  const searchLower=search.toLowerCase();
-  const filtered=(filter==='all'?data.entries:data.entries.filter(e=>e.projectId===filter)).filter(e=>{
-    if(!histWd.includes(e.date))return false;
-    if(!search)return true;const proj=data.projects.find(p=>p.id===e.projectId);
-    return e.moment.toLowerCase().includes(searchLower)||(e.note||'').toLowerCase().includes(searchLower)||(proj?.name||'').toLowerCase().includes(searchLower)||e.date.includes(search)});
-  const sorted=[...filtered].sort((a,b)=>b.date.localeCompare(a.date)||b.createdAt.localeCompare(a.createdAt));
-  const grouped={};sorted.forEach(e=>{if(!grouped[e.date])grouped[e.date]=[];grouped[e.date].push(e)});
-
-  return<div style={{paddingTop:8}}>
-    {editEntry&&<EditEntryModal entry={editEntry} data={data} onSave={saveEntry} onClose={()=>setEditEntry(null)}/>}
-    {splitEntry&&<SplitEntryModal entry={splitEntry} data={data} onSplit={splitEntryFn} onClose={()=>setSplitEntry(null)}/>}
+  return<div>
     {editProj&&<EditProjectModal project={editProj} data={data} onSave={saveProj} onClose={()=>setEditProj(null)}/>}
     {(editClient||showNewClient)&&<ClientModal client={editClient} onSave={c=>{saveClient(c);setShowNewClient(false)}} onClose={()=>{setEditClient(null);setShowNewClient(false)}}/>}
 
     {/* Sub-tabs */}
     <div style={{display:'flex',gap:0,background:'var(--card)',borderRadius:12,marginBottom:16,border:'1px solid var(--border)',overflow:'hidden'}}>
-      {[{id:'time',l:'Tid'},{id:'expenses',l:'Utlägg & Resor'},{id:'projects',l:'Projekt'},{id:'clients',l:'Kunder'}].map(t=>
+      {[{id:'projects',l:'Projekt'},{id:'clients',l:'Kunder'}].map(t=>
         <button key={t.id} onClick={()=>setSubTab(t.id)} style={{flex:1,padding:'10px 4px',border:'none',background:subTab===t.id?'var(--sage-ghost)':'transparent',color:subTab===t.id?'var(--sage-deep)':'var(--text-muted)',fontSize:13,fontWeight:subTab===t.id?600:400,fontFamily:'inherit',borderBottom:subTab===t.id?'2.5px solid var(--sage-deep)':'2.5px solid transparent',cursor:'pointer'}}>{t.l}</button>)}
     </div>
-
-    {/* TIME TAB */}
-    {subTab==='time'&&<div>
-      {/* Week navigation */}
-      <div style={S.weekNav}>
-        <button onClick={()=>setHistWeek(histWeek-1)} style={S.weekNavBtn}>{'◀'}</button>
-        <div style={S.weekNavCenter}>
-          <span style={S.weekLabel}>{weekLabel(histWd)}</span>
-          <span style={S.weekTotal}>{fmtH(filtered.reduce((s,e)=>s+e.seconds,0))} h · {filtered.length} poster</span>
-        </div>
-        <button onClick={()=>setHistWeek(histWeek+1)} style={{...S.weekNavBtn,opacity:histWeek>=0?.3:1}} disabled={histWeek>=0}>{'▶'}</button>
-        {histWeek!==0&&<button onClick={()=>setHistWeek(0)} style={S.weekTodayBtn}>Denna vecka</button>}
-      </div>
-      <input style={{...S.input,marginBottom:10}} placeholder="Sök moment, anteckning, projekt..." value={search} onChange={e=>setSearch(e.target.value)}/>
-      <div style={{...S.pillRow,marginBottom:12}}>
-        <Pill label="Alla" color="var(--sage-deep)" selected={filter==='all'} onClick={()=>setFilter('all')}/>
-        {data.projects.map((p,i)=><Pill key={p.id} label={p.name} color={pc(i)} selected={filter===p.id} onClick={()=>setFilter(p.id)}/>)}
-      </div>
-      {Object.keys(grouped).length===0&&<span style={S.hint}>Inga registreringar att visa</span>}
-      {Object.entries(grouped).map(([date,entries])=>{const total=entries.reduce((s,e)=>s+e.seconds,0);
-        return<div key={date} style={S.dateGroup}><div style={S.dateHeader}><span style={S.dateLabel}>{new Date(date+'T12:00:00').toLocaleDateString('sv-SE',{weekday:'short',day:'numeric',month:'short'})}</span><span style={S.dateTotalBadge}>{fmtH(total)} h</span></div>
-          {entries.map(en=>{const pr=data.projects.find(p=>p.id===en.projectId);const pi=data.projects.findIndex(p=>p.id===en.projectId);
-            return<div key={en.id} style={S.entryRow}><div style={{...S.entryDot,background:pc(pi)}}/><div style={S.entryInfo}><span style={S.entryProject}>{pr?.name||'?'}</span><span style={S.entryMoment}>{en.startTime&&en.endTime?en.startTime+'–'+en.endTime+' · ':''}{en.moment}{en.note&&<span style={S.noteTag}> — {en.note}</span>}</span></div><span style={S.entryTime}>{fmtH(en.seconds)} h</span><button onClick={()=>setSplitEntry(en)} style={{...S.editBtn,fontSize:13}} title="Dela upp">{'÷'}</button><button onClick={()=>setEditEntry(en)} style={S.editBtn} title="Redigera">{'✎'}</button><button onClick={()=>del(en.id)} style={S.deleteBtn} title="Ta bort">x</button></div>})}</div>})}
-    </div>}
-
-    {/* EXPENSES & TRIPS TAB */}
-    {subTab==='expenses'&&<div>
-      <span style={{...S.sectionTitle,marginBottom:12}}>Utlägg</span>
-      {(data.expenses||[]).length===0&&<span style={S.hint}>Inga utlägg</span>}
-      {[...(data.expenses||[])].sort((a,b)=>b.date.localeCompare(a.date)).map(exp=>{
-        const proj=data.projects.find(p=>p.id===exp.projectId);
-        return<div key={exp.id} style={S.entryRow}><div style={{...S.entryDot,background:'var(--accent)'}}/><div style={S.entryInfo}><span style={S.entryProject}>{exp.description}</span><span style={S.entryMoment}>{proj?.name||'?'} · {new Date(exp.date+'T12:00:00').toLocaleDateString('sv-SE',{day:'numeric',month:'short'})}</span></div><span style={S.entryTime}>{exp.amount} kr</span><button onClick={()=>delExp(exp.id)} style={S.deleteBtn}>x</button></div>})}
-
-      <span style={{...S.sectionTitle,marginTop:24,marginBottom:12}}>Resor</span>
-      {(data.trips||[]).length===0&&<span style={S.hint}>Inga resor</span>}
-      {[...(data.trips||[])].sort((a,b)=>b.date.localeCompare(a.date)).map(trip=>{
-        const proj=data.projects.find(p=>p.id===trip.projectId);
-        return<div key={trip.id} style={S.entryRow}><div style={{...S.entryDot,background:'var(--sage-light)'}}/><div style={S.entryInfo}><span style={S.entryProject}>{trip.description}</span><span style={S.entryMoment}>{proj?.name||'?'} · {trip.km} km · {new Date(trip.date+'T12:00:00').toLocaleDateString('sv-SE',{day:'numeric',month:'short'})}</span></div><span style={S.entryTime}>{trip.km*(data.kmRate||2.5)} kr</span><button onClick={()=>delTrip(trip.id)} style={S.deleteBtn}>x</button></div>})}
-    </div>}
 
     {/* PROJECTS TAB */}
     {subTab==='projects'&&<div>
@@ -1364,7 +1368,93 @@ function EntriesView({data,setData,weekOffset,setWeekOffset}){
 }
 
 
-// ── Report View ──
+// ── Fakturera ──
+// Underlaget grupperat per kund, eftersom en faktura hör till en kund och kan
+// innehålla rader från flera projekt. Fakturanummer, moms och öresavrundning
+// hör till nästa etapp, tills dess är detta underlag och inte fakturor.
+function InvoiceView({data,setData}){
+  const toast=useToast();
+  const[ym,setYm]=useState(()=>today().slice(0,7));
+  const groups=clientMonthSummaries(data,ym);
+  const kr=v=>v.toLocaleString('sv-SE',{maximumFractionDigits:0});
+  const invoicedIds=new Set((data.invoices||[]).filter(i=>i.month===ym).map(i=>i.projectId));
+  const clientDone=g=>g.projects.length>0&&g.projects.every(p=>invoicedIds.has(p.projectId));
+
+  const toggleClient=(g)=>{
+    const done=clientDone(g);
+    const ids=g.projects.map(p=>p.projectId);
+    const rest=(data.invoices||[]).filter(i=>!(i.month===ym&&ids.includes(i.projectId)));
+    const u=done
+      ? {...data,invoices:rest}
+      : {...data,invoices:[...rest,...ids.map(pid=>({projectId:pid,month:ym,invoicedAt:today()}))]};
+    setData(u);saveLocal(u);
+    toast(done?'Markering borttagen':'✓ '+g.name+' markerad som fakturerad');
+  };
+
+  const modelLine=(p)=>{
+    if(p.model==='session')return p.units+' tillfällen à '+kr(p.sessionPrice)+' kr';
+    if(p.model==='fixed')return 'Fastpris, månadens andel';
+    return p.hours.toFixed(1)+' h à '+kr(p.rate)+' kr';
+  };
+
+  const totalAll=groups.reduce((s,g)=>s+g.total,0);
+  const totalOpen=groups.filter(g=>!clientDone(g)).reduce((s,g)=>s+g.total,0);
+
+  return<div style={{paddingTop:8}}>
+    <div style={{...S.section,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+      <input type="month" style={{...S.input,width:'auto',padding:'8px 12px',fontSize:15}} value={ym} onChange={e=>setYm(e.target.value)}/>
+      <button onClick={()=>setYm(today().slice(0,7))} style={S.addBtn}>Denna månad</button>
+    </div>
+
+    <div style={S.cardRow}>
+      <div style={S.summaryCard}><span style={S.cardLabel}>Ofakturerat</span><span style={S.cardValue}>{kr(totalOpen)} kr</span></div>
+      <div style={{...S.summaryCard,...S.summaryCardAccent}}><span style={S.cardLabel}>Hela månaden</span><span style={S.cardValue}>{kr(totalAll)} kr</span></div>
+    </div>
+
+    <div style={{background:'var(--sage-ghost)',borderRadius:14,padding:'12px 14px',marginBottom:16,fontSize:13,color:'var(--text-muted)'}}>
+      Beloppen är underlag, inte fakturor. Fakturanummer, moms per artikel och öresavrundning
+      byggs i nästa etapp. Momsfria poster, som Saunas behandlingspass, kan appen ännu inte skilja ut.
+    </div>
+
+    {groups.length===0&&<span style={S.hint}>Ingen aktivitet den här månaden</span>}
+
+    {groups.map(g=>{
+      const done=clientDone(g);
+      return<div key={g.key} style={{background:'var(--card)',borderRadius:16,padding:16,marginBottom:14,border:'1px solid var(--border)',boxShadow:'0 2px 12px rgba(0,0,0,.04)'}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:10,marginBottom:10}}>
+          <div style={{minWidth:0}}>
+            <div style={{fontSize:16,fontWeight:700,color:'var(--sage-deep)'}}>{g.name}</div>
+            <div style={{fontSize:12,color:'var(--text-muted)'}}>{g.projects.length} {g.projects.length===1?'projekt':'projekt'} · {g.hours.toFixed(1)} h</div>
+          </div>
+          <div style={{textAlign:'right',flexShrink:0}}>
+            <div style={{fontSize:18,fontWeight:700,color:'var(--sage-deep)',fontVariantNumeric:'tabular-nums'}}>{kr(g.total)} kr</div>
+          </div>
+        </div>
+        {g.projects.map(p=><div key={p.projectId} style={{padding:'8px 0',borderTop:'1px solid var(--sage-ghost)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:14}}>
+            <span style={{fontWeight:600,minWidth:0,overflow:'hidden',textOverflow:'ellipsis'}}>{p.name}</span>
+            <span style={{fontVariantNumeric:'tabular-nums',flexShrink:0}}>{kr(p.arvode)} kr</span>
+          </div>
+          <div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:12,color:'var(--text-muted)'}}>
+            <span>{modelLine(p)}</span>
+          </div>
+          {p.tripAmount>0&&<div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:12,color:'var(--text-muted)'}}>
+            <span>{p.kmSum.toLocaleString('sv-SE')} km à {data.kmRate||2.5} kr</span><span style={{fontVariantNumeric:'tabular-nums'}}>{kr(p.tripAmount)} kr</span>
+          </div>}
+          {p.expenseAmount>0&&<div style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:12,color:'var(--accent)'}}>
+            <span>Utlägg</span><span style={{fontVariantNumeric:'tabular-nums'}}>{kr(p.expenseAmount)} kr</span>
+          </div>}
+        </div>)}
+        <button onClick={()=>toggleClient(g)} style={{...(done?{background:'var(--sage)',border:'none',color:'#fff'}:{background:'var(--sage-ghost)',border:'1.5px dashed var(--sage-light)',color:'var(--sage-dark)'}),borderRadius:12,padding:'11px 16px',fontSize:14,fontWeight:600,fontFamily:'inherit',width:'100%',marginTop:12,cursor:'pointer'}}>
+          {done?'✓ Fakturerad':'Markera hela kunden som fakturerad'}
+        </button>
+      </div>})}
+  </div>
+}
+
+// ── Uppföljning ──
+// Slår ihop det gamla Dashboard och den gamla Rapporten. Loggad tid och kronor
+// hålls isär, och veckoräknaren är lokal så ingen annan vy påverkas.
 function ReportView({data,setData}){
   const toast=useToast();
   const[period,setPeriod]=useState('month');const[groupBy,setGroupBy]=useState('project');const[showCompare,setShowCompare]=useState(false);const[exportClient,setExportClient]=useState('');const[exportProj,setExportProj]=useState('');
@@ -1585,15 +1675,14 @@ function ReportView({data,setData}){
         const fixedTotal=(proj?.pricingPeriods||[]).filter(p=>p.type==='fixed').reduce((s,p)=>s+p.amount,0);const projTotal=(fixed?fixedTotal:hourlyCost)+projExp+projTrips;
         const effectiveRate=fixed&&ph>0?Math.round(fixedTotal/ph):null;
         const byM={};entries.forEach(e=>{if(!byM[e.moment])byM[e.moment]=0;byM[e.moment]+=e.seconds});
-        const invKey=pid+'|'+selMonth;
+        // Fakturamarkeringen sätts i Fakturera-vyn, här visas den bara.
         const inv=(data.invoices||[]).find(i=>i.projectId===pid&&i.month===selMonth);
-        const toggleInv=()=>{if(inv){const u={...data,invoices:(data.invoices||[]).filter(i=>!(i.projectId===pid&&i.month===selMonth))};setData(u);saveLocal(u)}else{const u={...data,invoices:[...(data.invoices||[]),{projectId:pid,month:selMonth,invoicedAt:today()}]};setData(u);saveLocal(u)}};
         return<div key={pid} style={S.projectBreakdown}>
           <div style={S.projectBarHeader}>
             <div style={{...S.entryDot,background:pc(pi)}}/>
             <span style={{...S.entryProject,flex:1}}>{proj?.name||'?'}{cl&&<span style={{...S.clientBadge,marginLeft:6}}>{cl.name}</span>}</span>
             <span style={S.projectBarHours}>{projTotal.toLocaleString('sv-SE',{maximumFractionDigits:0})} kr</span>
-            {period==='month'&&<button onClick={toggleInv} title={inv?'Fakturerad '+inv.invoicedAt:'Markera som fakturerad'} style={{marginLeft:8,background:inv?'var(--sage)':'var(--sage-ghost)',border:inv?'none':'1.5px dashed var(--border)',borderRadius:8,padding:'4px 10px',fontSize:12,fontWeight:600,color:inv?'#fff':'var(--text-muted)',cursor:'pointer',whiteSpace:'nowrap'}}>{inv?'✓ Fakturerad':'Fakturera'}</button>}
+            {period==='month'&&inv&&<span title={'Fakturerad '+inv.invoicedAt} style={{marginLeft:8,background:'var(--sage)',borderRadius:8,padding:'4px 10px',fontSize:12,fontWeight:600,color:'#fff',whiteSpace:'nowrap'}}>✓ Fakturerad</span>}
           </div>
           {inv&&<div style={{fontSize:11,color:'var(--sage)',marginBottom:4,marginLeft:20}}>Fakturerad {inv.invoicedAt}</div>}
           <div style={S.barTrack}><div style={{...S.barFill,width:`${pct}%`,background:pc(pi)}}/></div>
@@ -1726,6 +1815,12 @@ function ReportView({data,setData}){
         </div>
       </div>}
     </div>
+
+    {/* Trender: fördelning, veckor och aktivitet. Bara timmar, aldrig kronor. */}
+    <div style={S.section}>
+      <span style={S.sectionTitle}>Trender</span>
+      <TrendCharts data={data}/>
+    </div>
   </div>
 }
 
@@ -1785,9 +1880,10 @@ function SyncView({data,setData,syncStatus,onSync,msConnected,onLogin,onLogout})
 
 // ── Main App ──
 function App(){
-  const[data,setData]=useState(loadLocal());const[tab,setTab]=useState('timer');const[syncStatus,setSS]=useState(null);const[msC,setMsC]=useState(false);const stRef=useRef(null);const lsRef=useRef(JSON.stringify(data));
+  const[data,setData]=useState(loadLocal());const[tab,setTab]=useState('idag');const[syncStatus,setSS]=useState(null);const[msC,setMsC]=useState(false);const stRef=useRef(null);const lsRef=useRef(JSON.stringify(data));
   const[showSettings,setShowSettings]=useState(false);
-  const[weekOffset,setWeekOffset]=useState(0);
+  // Ingen delad veckoräknare längre. Varje vy äger sin egen period, annars
+  // ändrar en vy tyst vad en annan visar.
   const toast=useToast();
   // Gemensam felvisning: behåller '⚠ … – klicka …'-prefixet så befintlig
   // klicka-för-att-försöka-igen-logik fortsätter funka, plus en tydlig toast.
@@ -1809,13 +1905,13 @@ function App(){
   }catch(e){syncFail(e,'synk')}};
   const doLogin=()=>{window.location.href=msLoginUrl()};const doLogout=()=>{clearMsToken();setMsC(false);setSS(null)};
 
-  const tabs=[{id:'timer',l:'Logga'},{id:'dash',l:'Dashboard'},{id:'week',l:'Vecka'},{id:'entries',l:'Historik'},{id:'report',l:'Rapport'}];
+  const tabs=[{id:'idag',l:'Idag'},{id:'vecka',l:'Vecka'},{id:'faktura',l:'Fakturera'},{id:'uppfoljning',l:'Uppföljning'}];
 
   return<div id="root-inner">
     <InstallBanner/>
     {showSettings&&<div className="modal-overlay" onClick={()=>setShowSettings(false)}><div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:500}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-        <span style={S.modalTitle}>Synk & data</span>
+        <span style={S.modalTitle}>Grunddata</span>
         <button onClick={()=>setShowSettings(false)} style={{...S.deleteBtn,fontSize:24}}>x</button>
       </div>
       <div style={{marginBottom:18}}>
@@ -1826,6 +1922,10 @@ function App(){
           <div style={{flex:1,minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Veckomål (kr)</label><input type="number" step="1000" style={{padding:'10px 12px',borderRadius:14,border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',width:'100%',marginTop:4}} placeholder="0" value={data.weeklyGoal||''} onChange={e=>{const n=parseInt(e.target.value)||0;const u={...data,weeklyGoal:n};setData(u);saveLocal(u)}}/></div>
           <div style={{flex:1,minWidth:80}}><label style={{fontSize:12,fontWeight:600,color:'var(--text-muted)',textTransform:'uppercase',letterSpacing:'0.8px'}}>Varna efter (dagar)</label><input type="number" min="1" style={{padding:'10px 12px',borderRadius:14,border:'1.5px solid var(--border)',background:'var(--card)',fontSize:16,color:'var(--text)',fontFamily:'inherit',width:'100%',marginTop:4}} value={data.settings?.staleWarningDays??7} onChange={e=>{const n=parseInt(e.target.value)||0;const u={...data,settings:{...(data.settings||{}),staleWarningDays:n>0?n:7}};setData(u);saveLocal(u)}}/></div>
         </div>
+      </div>
+      <div style={{marginBottom:18}}>
+        <span style={{fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:'1.5px',color:'var(--text-muted)',display:'block',marginBottom:10}}>Projekt och kunder</span>
+        <MasterDataView data={data} setData={setData}/>
       </div>
       <SyncView data={data} setData={setData} syncStatus={syncStatus} onSync={doSync} msConnected={msC} onLogin={doLogin} onLogout={doLogout}/>
     </div></div>}
@@ -1860,11 +1960,10 @@ function App(){
       <div className="mobile-nav"><TabBar active={tab} onChange={setTab}/></div>
 
     <div style={S.content}>
-      {tab==='timer'&&<TimerView data={data} setData={setData} openSettings={()=>setShowSettings(true)}/>}
-      {tab==='dash'&&<DashboardView data={data} weekOffset={weekOffset} setWeekOffset={setWeekOffset}/>}
-      {tab==='week'&&<WeekView data={data} setData={setData} msConnected={msC} weekOffset={weekOffset} setWeekOffset={setWeekOffset}/>}
-      {tab==='entries'&&<EntriesView data={data} setData={setData} weekOffset={weekOffset} setWeekOffset={setWeekOffset}/>}
-      {tab==='report'&&<ReportView data={data} setData={setData}/>}
+      {tab==='idag'&&<TodayView data={data} setData={setData} openSettings={()=>setShowSettings(true)}/>}
+      {tab==='vecka'&&<WeekView data={data} setData={setData} msConnected={msC}/>}
+      {tab==='faktura'&&<InvoiceView data={data} setData={setData}/>}
+      {tab==='uppfoljning'&&<ReportView data={data} setData={setData}/>}
     </div>
     </div>
   </div>

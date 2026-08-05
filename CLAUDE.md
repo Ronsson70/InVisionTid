@@ -27,6 +27,20 @@ Det här repo:t är en personlig single-file PWA för tidsregistrering.
 - Data lagras primärt i `localStorage`
 - Synkning mot OneDrive görs via Microsoft Graph
 
+## Vyer
+Fyra flikar som följer arbetet, inte hur data visas:
+- **Idag** (`TodayView`) — registrering. Timern överst, Snabb tid, Att fixa, dagens poster.
+- **Vecka** (`WeekView`) — rättning. Kalenderimport, veckans poster, redigera, dela, ta bort.
+- **Fakturera** (`InvoiceView`) — underlag per kund och månad, fakturamarkering.
+- **Uppföljning** (`ReportView` + `TrendCharts`) — period, sammanställning, export, trender.
+
+Grunddata (`MasterDataView`: projekt och kunder) och inställningar ligger bakom kugghjulet,
+inte i en flik.
+
+Två regler:
+- **Varje vy äger sin egen period.** Ingen delad veckoräknare mellan vyer.
+- **Timmar och kronor blandas aldrig i samma siffra.** Loggat är timmar, att fakturera är kronor.
+
 ## Datamodell
 - `clients`
 - `projects`

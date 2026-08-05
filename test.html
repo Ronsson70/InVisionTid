@@ -30,7 +30,7 @@
     const src=await (await fetch('index.html')).text();
     const m=src.match(/\/\* PURE-START \*\/([\s\S]*?)\/\* PURE-END \*\//);
     if(!m) throw new Error('Hittade inte PURE-START/PURE-END i index.html');
-    const exports='gid,fmtH,today,localDateStr,getWeekDates,weekLabel,getRate,hasSessionPrice,isFixedPrice,getActivePeriod,getSessionCount,getSessionRevenue,calcRevenue,calcFixedMonthly,getFixedWeeklyAmount,calcWeekRevenue,weekSummary,getDefaultTripKm,hasTripOn,suggestTrip,addDays,missingTrips,lastActivityDate,daysBetween,staleStatus,lastActivityLabel';
+    const exports='gid,fmtH,today,localDateStr,getWeekDates,weekLabel,getRate,hasSessionPrice,isFixedPrice,getActivePeriod,getSessionCount,getSessionRevenue,calcRevenue,calcFixedMonthly,getFixedWeeklyAmount,calcWeekRevenue,weekSummary,getDefaultTripKm,hasTripOn,suggestTrip,addDays,missingTrips,lastActivityDate,daysBetween,staleStatus,lastActivityLabel,recentProjectIds,lastEntryFor,projectMonthSummary,clientMonthSummaries';
     M=new Function(m[1]+`;return{${exports}};`)();
   }catch(e){
     out.innerHTML=`<div class="fail">✗ Kunde inte ladda funktioner: ${e.message}<br>Kör via en lokal server (fetch fungerar inte på file://).</div>`;
@@ -164,6 +164,56 @@
   eq('lastActivityLabel: idag, igår, längre bak, inget',
      [M.lastActivityLabel(0),M.lastActivityLabel(1),M.lastActivityLabel(6),M.lastActivityLabel(null)],
      ['idag','igår','för 6 dagar sedan',null]);
+
+  // ── Snabb tid och faktureringsunderlag ──
+  // Tre prismodeller hos tre olika kunder, plus ett projekt utan kund.
+  const dInv={
+    kmRate:5.5,
+    clients:[{id:'c1',name:'Sauna HVB'},{id:'c2',name:'Train2Lead AB'}],
+    projects:[
+      {id:'sauna',name:'Sauna HVB',clientId:'c1',sessionPrice:2400,defaultTripKm:23},
+      {id:'ff',name:'Framgångsfabriken',clientId:'c2',pricingPeriods:[{id:'pp',type:'fixed',startDate:'2026-03-01',endDate:'2026-06-30',amount:100000}]},
+      {id:'nord',name:'Nordsjögården',hourlyRate:850},
+    ],
+    entries:[
+      {id:'a',projectId:'sauna',date:'2026-06-02',seconds:7200,moment:'Behandlingspass',createdAt:'2026-06-02T10:00:00Z'},
+      {id:'b',projectId:'sauna',date:'2026-06-02',seconds:3600,moment:'Samtal',createdAt:'2026-06-02T12:00:00Z'},
+      {id:'c',projectId:'sauna',date:'2026-06-09',seconds:7200,moment:'Behandlingspass',createdAt:'2026-06-09T10:00:00Z'},
+      {id:'d',projectId:'ff',date:'2026-06-10',seconds:7200,moment:'Verkstad',createdAt:'2026-06-10T10:00:00Z'},
+      {id:'e',projectId:'nord',date:'2026-06-11',seconds:7200,moment:'Lektion',createdAt:'2026-06-11T10:00:00Z'},
+      {id:'f',projectId:'nord',date:'2026-05-11',seconds:3600,moment:'Lektion',createdAt:'2026-05-11T10:00:00Z'},
+    ],
+    trips:[{id:'t1',projectId:'sauna',date:'2026-06-02',km:23}],
+    expenses:[{id:'x1',projectId:'nord',date:'2026-06-11',amount:164}],
+  };
+
+  eq('recentProjectIds: nyast loggade först', M.recentProjectIds(dInv,3), ['nord','ff','sauna']);
+  eq('recentProjectIds: respekterar gränsen', M.recentProjectIds(dInv,1), ['nord']);
+  eq('recentProjectIds: tom app ger tom lista', M.recentProjectIds({entries:[]},3), []);
+  eq('lastEntryFor: senaste posten på projektet', M.lastEntryFor(dInv,'sauna').id, 'c');
+  eq('lastEntryFor: samma dag → senast skapade', M.lastEntryFor({entries:dInv.entries.filter(e=>e.date==='2026-06-02')},'sauna').id, 'b');
+  eq('lastEntryFor: okänt projekt ger null', M.lastEntryFor(dInv,'finns-ej'), null);
+
+  const sSauna=M.projectMonthSummary(dInv,'sauna','2026-06');
+  eq('projectMonthSummary: pris per tillfälle räknar unika dagar', [sSauna.model,sSauna.units,sSauna.arvode], ['session',2,4800]);
+  eq('projectMonthSummary: timmar räknas även vid tillfällespris', sSauna.hours, 5);
+  eq('projectMonthSummary: resa 23 km à 5,50', sSauna.tripAmount, 126.5);
+  eq('projectMonthSummary: total = arvode + resa + utlägg', sSauna.total, 4926.5);
+
+  const sFF=M.projectMonthSummary(dInv,'ff','2026-06');
+  eq('projectMonthSummary: fastpris 100000 över 4 mån → 25000', [sFF.model,sFF.arvode], ['fixed',25000]);
+  eq('projectMonthSummary: fastpris räknas inte per timme', sFF.total, 25000);
+
+  const sNord=M.projectMonthSummary(dInv,'nord','2026-06');
+  eq('projectMonthSummary: timpris 2h à 850 + utlägg 164', [sNord.model,sNord.arvode,sNord.total], ['hourly',1700,1864]);
+  eq('projectMonthSummary: annan månad räknas inte med', M.projectMonthSummary(dInv,'nord','2026-05').arvode, 850);
+  eq('projectMonthSummary: månad utan poster ger noll', M.projectMonthSummary(dInv,'nord','2026-01').count, 0);
+
+  const groups=M.clientMonthSummaries(dInv,'2026-06');
+  eq('clientMonthSummaries: en post per kund, störst först', groups.map(g=>g.name), ['Train2Lead AB','Sauna HVB','Utan kund']);
+  eq('clientMonthSummaries: kundens total är summan av projekten', groups[1].total, 4926.5);
+  eq('clientMonthSummaries: projekt utan kund hamnar för sig', groups[2].projects.map(p=>p.projectId), ['nord']);
+  eq('clientMonthSummaries: månad utan aktivitet ger tom lista', M.clientMonthSummaries(dInv,'2026-01'), []);
 
   out.innerHTML=lines.join('')+
     `<div class="sum"><strong class="${failed?'fail':'pass'}">${passed} godkända, ${failed} misslyckade</strong></div>`;
