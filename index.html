@@ -246,7 +246,19 @@ function pc(i){return PC[i%PC.length]}
 
 function getRate(project,data){return project?.hourlyRate??data.hourlyRate??850}
 function hasSessionPrice(project){return project?.sessionPrice>0}
-function isFixedPrice(project){return(project?.pricingPeriods||[]).some(p=>p.type==='fixed')}
+function hasFixedPeriod(project){return(project?.pricingPeriods||[]).some(p=>p.type==='fixed')}
+
+// Prioriteringen mellan prismodellerna finns på ETT ställe. Pris per tillfälle slår
+// fastpris, fastpris slår timpris. Låg den på flera ställen kunde ett projekt med både
+// tillfällespris och fastprisperiod räknas två gånger: en gång som tillfällen i
+// calcRevenue och en gång som månadsandel i calcFixedMonthly.
+function pricingModel(project){
+  if(hasSessionPrice(project))return'session';
+  if(hasFixedPeriod(project))return'fixed';
+  return'hourly';
+}
+// Sant bara när fastpris är projektets FAKTISKA modell, inte bara när en period finns.
+function isFixedPrice(project){return pricingModel(project)==='fixed'}
 function getActivePeriod(project,date){if(!project?.pricingPeriods?.length)return null;return project.pricingPeriods.find(p=>date>=p.startDate&&(!p.endDate||date<=p.endDate))||null}
 
 // Count unique days logged for a project within given entries
@@ -281,7 +293,9 @@ function calcFixedMonthly(data,year,month){
   const mStart=year+'-'+String(month+1).padStart(2,'0')+'-01';
   const mEndDay=new Date(year,month+1,0).getDate();
   const mEnd=year+'-'+String(month+1).padStart(2,'0')+'-'+String(mEndDay).padStart(2,'0');
-  data.projects.forEach(p=>{(p.pricingPeriods||[]).forEach(pp=>{
+  data.projects.forEach(p=>{
+    if(pricingModel(p)!=='fixed')return; // tillfällespris vinner, ingen dubbelräkning
+    (p.pricingPeriods||[]).forEach(pp=>{
     if(pp.type!=='fixed'||!pp.amount)return;
     const start=pp.startDate;const end=pp.endDate;
     if(!end){if(start>=mStart&&start<=mEnd)total+=pp.amount;return}
@@ -291,14 +305,17 @@ function calcFixedMonthly(data,year,month){
     const eY=parseInt(end.slice(0,4)),eM=parseInt(end.slice(5,7))-1;
     const totalMonths=Math.max(1,(eY-sY)*12+(eM-sM)+1);
     total+=Math.round(pp.amount/totalMonths);
-  })});
+    });
+  });
   return total;
 }
 
 // Calculate fixed period amounts for a specific week
 // Uses monthly amount / ~4.33 weeks for consistency with calcFixedMonthly
 function getFixedWeeklyAmount(project,weekDates){
-  if(!project?.pricingPeriods)return 0;let total=0;
+  if(!project?.pricingPeriods)return 0;
+  if(pricingModel(project)!=='fixed')return 0; // samma regel som i calcFixedMonthly
+  let total=0;
   project.pricingPeriods.forEach(p=>{
     if(p.type!=='fixed'||!p.amount)return;
     const start=p.startDate;const end=p.endDate;
@@ -691,7 +708,8 @@ function EditProjectModal({project,data,onSave,onClose}){
       <div style={{...S.modalField,flex:1}}><label style={{...S.fieldLabel,opacity:hasPeriods?.4:1}}>Pris per tillfälle (kr)</label><input type="number" style={{...S.input,marginTop:4,opacity:hasPeriods?.4:1}} placeholder="Valfritt" value={sessionPrice} onChange={e=>setSessionPrice(e.target.value)} disabled={hasPeriods}/></div>
     </div>
     {hasSession&&!hasPeriods&&<div style={{fontSize:12,color:'var(--sage)',marginTop:-8,marginBottom:8}}>Pris per tillfälle aktivt – varje loggad dag räknas som ett tillfälle</div>}
-    {hasPeriods&&<div style={{fontSize:12,color:'var(--sage)',marginTop:-8,marginBottom:8}}>Prisperioder aktivt – timpris och tillfällepris ignoreras</div>}
+    {hasPeriods&&!hasSession&&<div style={{fontSize:12,color:'var(--sage)',marginTop:-8,marginBottom:8}}>Prisperioder aktivt – timpriset ignoreras</div>}
+    {hasSession&&hasPeriods&&<div style={{fontSize:12,color:'var(--accent)',fontWeight:600,marginTop:-8,marginBottom:8}}>Både pris per tillfälle och prisperiod är satta. Tillfällespriset gäller, perioderna räknas inte. Ta bort perioderna om de inte ska vara kvar.</div>}
     <div style={S.modalField}><label style={S.fieldLabel}>Standardresa tur och retur (km)</label>
       <input type="number" step="1" min="0" style={{...S.input,marginTop:4}} placeholder="Valfritt – t.ex. 23" value={tripKm} onChange={e=>setTripKm(e.target.value)}/>
       <div style={{...S.hint,paddingTop:6}}>Appen föreslår resan när du loggar tid på projektet en dag som saknar registrerad resa.</div>
@@ -1327,6 +1345,7 @@ function MasterDataView({data,setData}){
             <span style={S.entryMoment}>{pe.length} poster · {fmtH(pe.reduce((s,e)=>s+e.seconds,0))} h · {r} kr/h{hasSessionPrice(p)&&' · '+p.sessionPrice.toLocaleString('sv-SE')+' kr/tillfälle'}{isFixedPrice(p)&&' · Fastpris: '+(p.pricingPeriods||[]).filter(pp=>pp.type==='fixed').reduce((s,pp)=>s+pp.amount,0).toLocaleString('sv-SE')+' kr'}</span>
             {cl&&<span style={S.clientBadge}>{cl.name}</span>}
             {hasPeriods&&<div style={{marginTop:4}}>{(p.pricingPeriods||[]).map(pp=><span key={pp.id} style={{fontSize:11,color:'var(--text-muted)',display:'block'}}>{pp.startDate}{pp.endDate?' – '+pp.endDate:' →'}: {pp.type==='fixed'?pp.amount.toLocaleString('sv-SE')+' kr fast':pp.amount+' kr/h'}</span>)}</div>}
+            {hasSessionPrice(p)&&hasFixedPeriod(p)&&<span style={{fontSize:11,color:'var(--accent)',fontWeight:600,display:'block',marginTop:4}}>Pris per tillfälle gäller. Fastprisperioden nedan räknas inte, ta bort den om den inte ska vara kvar.</span>}
           </div>
           <button onClick={()=>setEditProj(p)} style={S.editBtn}>{'✎'}</button>
           <button onClick={()=>{if(confirm('Ta bort "'+p.name+'" och alla tidsposter?'))delProj(p.id)}} style={S.deleteBtn}>x</button>
@@ -1579,7 +1598,7 @@ function ReportView({data,setData}){
   // Add fixed price portions for filtered period
   if(period==='month'){totTimeCost+=calcFixedMonthly(data,selYear,selMonthIdx)}
   else if(period==='week'){totTimeCost=weekSummary(data,curWeek).arvode} // samma källa som dashboarden
-  else if(period==='all'){const countedFixedPeriods=new Set();data.projects.forEach(p=>{(p?.pricingPeriods||[]).forEach(pp=>{if(pp.type!=='fixed'||countedFixedPeriods.has(pp.id))return;countedFixedPeriods.add(pp.id);totTimeCost+=pp.amount})})}
+  else if(period==='all'){const countedFixedPeriods=new Set();data.projects.forEach(p=>{if(!isFixedPrice(p))return;(p?.pricingPeriods||[]).forEach(pp=>{if(pp.type!=='fixed'||countedFixedPeriods.has(pp.id))return;countedFixedPeriods.add(pp.id);totTimeCost+=pp.amount})})}
   const totExpenses=filteredExp.reduce((s,e)=>s+e.amount,0);
 
   // Compare month data
@@ -1668,7 +1687,7 @@ function ReportView({data,setData}){
         const projTripsList=filteredTrips.filter(e=>e.projectId===pid);
         const projTripKm=projTripsList.reduce((s,e)=>s+e.km,0);
         const projTrips=projTripKm*(data.kmRate||2.5);
-        const fixed=(proj?.pricingPeriods||[]).some(p=>p.type==='fixed');
+        const fixed=isFixedPrice(proj); // inte bara "har en fastprisperiod", se pricingModel
         const sessRev=hasSessionPrice(proj)?getSessionRevenue(proj,entries):0;
         const hourlyCost=hasSessionPrice(proj)?sessRev:(ph*projRate);
         const sessCount=hasSessionPrice(proj)?getSessionCount(proj,entries):0;
@@ -1756,7 +1775,7 @@ function ReportView({data,setData}){
             const projRate=getRate(proj,data);const ph=entries.reduce((s,e)=>s+e.seconds,0)/3600;
             const pExp=cData.expenses.filter(e=>e.projectId===pid).reduce((s,e)=>s+e.amount,0);
             const pTrip=cData.trips.filter(e=>e.projectId===pid).reduce((s,e)=>s+e.km*(data.kmRate||2.5),0);
-            const fixed=(proj?.pricingPeriods||[]).some(p=>p.type==='fixed');const pFixedTotal=(proj?.pricingPeriods||[]).filter(p=>p.type==='fixed').reduce((s,p)=>s+p.amount,0);const pSessRev=hasSessionPrice(proj)?getSessionRevenue(proj,entries):0;const pTimeCost=hasSessionPrice(proj)?pSessRev:(fixed?pFixedTotal:(ph*projRate));const pSessCount=hasSessionPrice(proj)?getSessionCount(proj,entries):0;
+            const fixed=isFixedPrice(proj);const pFixedTotal=(proj?.pricingPeriods||[]).filter(p=>p.type==='fixed').reduce((s,p)=>s+p.amount,0);const pSessRev=hasSessionPrice(proj)?getSessionRevenue(proj,entries):0;const pTimeCost=hasSessionPrice(proj)?pSessRev:(fixed?pFixedTotal:(ph*projRate));const pSessCount=hasSessionPrice(proj)?getSessionCount(proj,entries):0;
             return<div key={pid} style={{padding:'6px 0',borderTop:'1px solid var(--sage-ghost)'}}>
               <div style={{display:'flex',alignItems:'center',gap:6}}>
                 <div style={{...S.entryDot,background:pc(pi)}}/>

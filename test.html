@@ -30,7 +30,7 @@
     const src=await (await fetch('index.html')).text();
     const m=src.match(/\/\* PURE-START \*\/([\s\S]*?)\/\* PURE-END \*\//);
     if(!m) throw new Error('Hittade inte PURE-START/PURE-END i index.html');
-    const exports='gid,fmtH,today,localDateStr,getWeekDates,weekLabel,getRate,hasSessionPrice,isFixedPrice,getActivePeriod,getSessionCount,getSessionRevenue,calcRevenue,calcFixedMonthly,getFixedWeeklyAmount,calcWeekRevenue,weekSummary,getDefaultTripKm,hasTripOn,suggestTrip,addDays,missingTrips,lastActivityDate,daysBetween,staleStatus,lastActivityLabel,recentProjectIds,lastEntryFor,projectMonthSummary,clientMonthSummaries';
+    const exports='gid,fmtH,today,localDateStr,getWeekDates,weekLabel,getRate,hasSessionPrice,isFixedPrice,getActivePeriod,getSessionCount,getSessionRevenue,calcRevenue,calcFixedMonthly,getFixedWeeklyAmount,calcWeekRevenue,weekSummary,getDefaultTripKm,hasTripOn,suggestTrip,addDays,missingTrips,lastActivityDate,daysBetween,staleStatus,lastActivityLabel,recentProjectIds,lastEntryFor,projectMonthSummary,clientMonthSummaries,pricingModel,hasFixedPeriod';
     M=new Function(m[1]+`;return{${exports}};`)();
   }catch(e){
     out.innerHTML=`<div class="fail">✗ Kunde inte ladda funktioner: ${e.message}<br>Kör via en lokal server (fetch fungerar inte på file://).</div>`;
@@ -164,6 +164,38 @@
   eq('lastActivityLabel: idag, igår, längre bak, inget',
      [M.lastActivityLabel(0),M.lastActivityLabel(1),M.lastActivityLabel(6),M.lastActivityLabel(null)],
      ['idag','igår','för 6 dagar sedan',null]);
+
+  // ── Prismodellens prioritet ──
+  // Sauna HVB hade i skarp data BÅDE 2 400 kr per tillfälle och en fastprisperiod
+  // på 2 400 kr över 11 juni–30 nov. Det gav dubbelräkning: tillfällena via
+  // calcRevenue och dessutom 400 kr per månad via calcFixedMonthly.
+  const pSess={id:'s',sessionPrice:2400};
+  const pFix={id:'f',pricingPeriods:[{id:'p1',type:'fixed',startDate:'2026-01-01',endDate:'2026-12-31',amount:120000}]};
+  const pHour={id:'h',hourlyRate:900};
+  const pBoth={id:'b',name:'Sauna HVB',sessionPrice:2400,pricingPeriods:[{id:'p2',type:'fixed',startDate:'2026-06-11',endDate:'2026-11-30',amount:2400}]};
+
+  eq('pricingModel: tillfällespris', M.pricingModel(pSess), 'session');
+  eq('pricingModel: fastpris', M.pricingModel(pFix), 'fixed');
+  eq('pricingModel: timpris', M.pricingModel(pHour), 'hourly');
+  eq('pricingModel: både tillfälle och fastpris → tillfälle vinner', M.pricingModel(pBoth), 'session');
+  eq('hasFixedPeriod ser perioden även när den inte gäller', M.hasFixedPeriod(pBoth), true);
+  eq('isFixedPrice är falskt när tillfällespriset vinner', M.isFixedPrice(pBoth), false);
+
+  const dBoth={kmRate:5.5,projects:[pBoth],entries:[
+    {id:'e1',projectId:'b',date:'2026-07-28',seconds:7200},
+    {id:'e2',projectId:'b',date:'2026-07-30',seconds:10800},
+  ],trips:[],expenses:[]};
+  eq('calcRevenue: två pass à 2 400', M.calcRevenue(dBoth.entries,dBoth), 4800);
+  eq('calcFixedMonthly lägger INTE på fastprisandel ovanpå tillfällespriset', M.calcFixedMonthly(dBoth,2026,6), 0);
+  eq('getFixedWeeklyAmount ger 0 för projekt med tillfällespris',
+     M.getFixedWeeklyAmount(pBoth,['2026-07-27','2026-07-28','2026-07-29','2026-07-30','2026-07-31','2026-08-01','2026-08-02']), 0);
+  eq('calcWeekRevenue: bara passen, ingen dubbelräkning',
+     M.calcWeekRevenue(dBoth,['2026-07-27','2026-07-28','2026-07-29','2026-07-30','2026-07-31','2026-08-01','2026-08-02']), 4800);
+  eq('projectMonthSummary: modellen är session, beloppet 4 800',
+     (()=>{const s=M.projectMonthSummary(dBoth,'b','2026-07');return[s.model,s.arvode]})(), ['session',4800]);
+
+  // Rena fastprisprojekt ska fungera precis som förut
+  eq('fastpris utan tillfällespris räknas fortfarande per månad', M.calcFixedMonthly({projects:[pFix]},2026,6), 10000);
 
   // ── Snabb tid och faktureringsunderlag ──
   // Tre prismodeller hos tre olika kunder, plus ett projekt utan kund.
