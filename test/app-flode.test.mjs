@@ -90,7 +90,7 @@ test('klickflöde: veckomål sparas och kontoåtgärder fungerar', async () => {
   assert.equal(utloggningar, 1);
 });
 
-test('klickflöde: hela historiken läggs in och kan beslutas post för post', async () => {
+test('klickflöde: hela historiken läggs in som redan klar och förblir redigerbar', async () => {
   const sparade = [];
   const tillstand = skapaTestdata();
   const plan = planeraHistorikimport({
@@ -116,17 +116,42 @@ test('klickflöde: hela historiken läggs in och kan beslutas post för post', a
   klicka({ importerahistorik: '1' });
   await tom();
 
-  assert.match(html, /juli 2026/);
-  assert.match(html, /Arkivuppdrag · Arbetad tid/);
-  assert.match(html, /Arkivkund · 1 tim/);
-  assert.match(html, /Behöver granskas/);
+  assert.match(html, /markerad som redan klar i Lundify/);
   assert.equal(sparade.at(-1).poster.filter(p => p.legacySource === 'v1-full-history').length, 3);
+  assert.ok(sparade.at(-1).poster.every(p => p.legacySource !== 'v1-full-history' || p.status === 'handled'));
 
+  // Posten finns på sitt ursprungliga datum och kan fortfarande rättas.
   klicka({ post: 'e1' });
-  assert.match(html, /Ska faktureras/);
   assert.match(html, /Redan klart i Lundify/);
-  assert.match(html, /Behåll endast som historik/);
-  klicka({ historikbeslut: 'e1|billable' });
+  assert.match(html, /Spara ändring/);
+  assert.doesNotMatch(html, /Ska faktureras|Behåll endast som historik/);
+});
+
+test('klickflöde: månadsmål och kunduppgifter sparas', async () => {
+  const sparade = [];
+  startaApp({
+    lagring: { async spara(s) { sparade.push(structuredClone(s)); } },
+    tillstand: { ...skapaTestdata(), installningar: { veckomalOre: 2500000, manadsmalOre: null } },
+  });
+
+  klicka({ vy: 'uppfoljning' });
+  assert.match(html, /Sätt månadsmål/);
+  klicka({ oppna: 'manadsmal' });
+  fyll('manadsmal', '100 000');
+  klicka({ sparamanadsmal: '1' });
   await tom();
-  assert.equal(sparade.at(-1).poster.find(p => p.id === 'e1').legacyReviewStatus, 'billable');
+  assert.equal(sparade.at(-1).installningar.manadsmalOre, 10000000);
+
+  klicka({ oppna: 'mer' });
+  klicka({ oppna: 'kunder' });
+  klicka({ redigerakund: 'k-a' });
+  fyll('name', 'Kund A uppdaterad');
+  fyll('contact', 'Kontaktperson');
+  klicka({ valjkundstatus: 'paused' });
+  klicka({ sparakund: 'k-a' });
+  await tom();
+  const kund = sparade.at(-1).clients.find(c => c.id === 'k-a');
+  assert.equal(kund.name, 'Kund A uppdaterad');
+  assert.equal(kund.contact, 'Kontaktperson');
+  assert.equal(kund.status, 'paused');
 });

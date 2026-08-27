@@ -150,7 +150,8 @@ test('hela gamla historiken kan planeras för v2 utan en enda skrivning', async 
   assert.equal(plan.antal.poster, v1.entries.length);
   assert.equal(plan.antal.resor, v1.trips.length);
   assert.equal(plan.antal.utlagg, v1.expenses.length);
-  assert.equal(plan.antal.totalt, v1.entries.length + v1.trips.length + v1.expenses.length);
+  assert.equal(plan.antal.totalt,
+    v1.entries.length + v1.trips.length + v1.expenses.length + plan.antal.fastprisperioder);
   assert.ok(plan.tillstand.poster.some(r => r.legacyInvoiceMarked), 'markerad historik ska följa med, inte filtreras bort');
   assert.ok(fetch.anrop.every(a => a.metod === 'GET'), 'bara läsning');
   assert.equal(fetch.lager[V1_SOKVAG], v1text, 'v1 är byte-identisk');

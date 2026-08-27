@@ -13,6 +13,12 @@ export const DEBITERINGSTYPER = Object.freeze([
   { id: 'internal', etikett: 'Endast tidsuppföljning' },
 ]);
 
+export const KUNDSTATUSAR = Object.freeze([
+  { id: 'active', etikett: 'Aktiv' },
+  { id: 'paused', etikett: 'Vilande' },
+  { id: 'closed', etikett: 'Avslutad' },
+]);
+
 const text = v => String(v ?? '').trim();
 
 function pengarOre(varde, falt) {
@@ -38,6 +44,35 @@ const uniktId = (prefix, lista) => {
   while (lista.some(x => x.id === id));
   return id;
 };
+
+/**
+ * Redigerar samma kunduppgifter som fanns i den tidigare appen. Okända fält
+ * bevaras och kunden kan inte raderas när historik pekar på den.
+ */
+export function uppdateraKund(tillstand, clientId, indata) {
+  const befintlig = (tillstand.clients || []).find(c => c.id === clientId);
+  if (!befintlig) throw new Error('Kunden finns inte längre.');
+
+  const name = text(indata?.name);
+  if (!name) throw new Error('Kundens namn får inte vara tomt.');
+  const status = text(indata?.status) || 'active';
+  if (!KUNDSTATUSAR.some(s => s.id === status)) throw new Error('Välj en giltig kundstatus.');
+
+  const uppdaterad = {
+    ...befintlig,
+    name,
+    orgNr: text(indata?.orgNr),
+    contact: text(indata?.contact),
+    phone: text(indata?.phone),
+    email: text(indata?.email),
+    address: text(indata?.address),
+    status,
+  };
+  return {
+    ...tillstand,
+    clients: tillstand.clients.map(c => c.id === clientId ? uppdaterad : c),
+  };
+}
 
 /**
  * Tar fram uppdrag som finns i v1 men inte i det aktuella v2-tillståndet.

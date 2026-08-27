@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import * as L from '../src/app/logik.mjs';
 import { franAppTillstand } from '../src/app/tillstand.mjs';
-import { tidigareUppdragFranV1, aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag }
+import { tidigareUppdragFranV1, aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag, uppdateraKund }
   from '../src/app/uppdrag.mjs';
 
 const artikel = (id, projectId, type, unit) => ({
@@ -156,4 +156,29 @@ test('ekonomiska uppgifter gissas aldrig för ett nytt uppdrag', () => {
     clientId: 'k1', namn: 'Halv resa', debitering: 'hourly', pris: '850', vatRate: 2500,
     standardresaKm: '20', resepris: '',
   }), /både standardresa och pris/);
+});
+
+test('kunduppgifter kan redigeras med samma fält som i den gamla appen', () => {
+  const fore = grund();
+  fore.clients[0] = { ...fore.clients[0], egetFalt: 'bevaras' };
+  const ut = uppdateraKund(fore, 'k1', {
+    name: 'Kund A AB', orgNr: '556677-8899', contact: 'Anna', phone: '070-123 45 67',
+    email: 'anna@example.se', address: 'Vägen 1, 820 40 Järvsö', status: 'paused',
+  });
+  const kund = ut.clients[0];
+  assert.equal(kund.name, 'Kund A AB');
+  assert.equal(kund.orgNr, '556677-8899');
+  assert.equal(kund.contact, 'Anna');
+  assert.equal(kund.phone, '070-123 45 67');
+  assert.equal(kund.email, 'anna@example.se');
+  assert.equal(kund.address, 'Vägen 1, 820 40 Järvsö');
+  assert.equal(kund.status, 'paused');
+  assert.equal(kund.egetFalt, 'bevaras');
+  assert.equal(ut.projects[0].clientId, 'k1', 'uppdragets koppling bevaras');
+});
+
+test('kundredigering avvisar tomt namn och okänd status', () => {
+  assert.throws(() => uppdateraKund(grund(), 'k1', { name: '', status: 'active' }), /namn/);
+  assert.throws(() => uppdateraKund(grund(), 'k1', { name: 'Kund', status: 'fel' }), /kundstatus/);
+  assert.throws(() => uppdateraKund(grund(), 'saknas', { name: 'Kund', status: 'active' }), /finns inte/);
 });

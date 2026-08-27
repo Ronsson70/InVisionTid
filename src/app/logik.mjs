@@ -18,8 +18,9 @@ import {
 } from './historikimport.mjs';
 
 export {
-  DEBITERINGSTYPER, tidigareUppdragFranV1,
+  DEBITERINGSTYPER, KUNDSTATUSAR, tidigareUppdragFranV1,
   aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag,
+  uppdateraKund,
 } from './uppdrag.mjs';
 
 export { harAvtalsperiod, periodKontroll, periodandelOre, arGenomford };
@@ -37,25 +38,35 @@ export const belopp = oreTillKortText;
  * Sparar ett frivilligt veckomål. Beloppet anges i kronor av användaren men
  * lagras, precis som alla andra pengar i appen, som heltalsöre.
  */
-export function sattVeckomal(s, kronor) {
+function sattMal(s, kronor, falt, etikett) {
   const normaliserat = String(kronor ?? '').trim()
     .replace(/[\s\u00a0\u202f]/g, '')
     .replace(',', '.');
   const beloppKronor = Number(normaliserat);
   if (!normaliserat || !Number.isFinite(beloppKronor) || beloppKronor <= 0) {
-    throw new Error('Veckomålet måste vara ett belopp större än noll.');
+    throw new Error(`${etikett} måste vara ett belopp större än noll.`);
   }
   return {
     ...s,
-    installningar: { ...(s.installningar || {}), veckomalOre: kronorTillOre(beloppKronor) },
+    installningar: { ...(s.installningar || {}), [falt]: kronorTillOre(beloppKronor) },
   };
 }
+
+export const sattVeckomal = (s, kronor) => sattMal(s, kronor, 'veckomalOre', 'Veckomålet');
+export const sattManadsmal = (s, kronor) => sattMal(s, kronor, 'manadsmalOre', 'Månadsmålet');
 
 /** Tar bort målet utan att påverka registreringar eller ekonomiska regler. */
 export function taBortVeckomal(s) {
   return {
     ...s,
     installningar: { ...(s.installningar || {}), veckomalOre: null },
+  };
+}
+
+export function taBortManadsmal(s) {
+  return {
+    ...s,
+    installningar: { ...(s.installningar || {}), manadsmalOre: null },
   };
 }
 
@@ -216,12 +227,13 @@ export function fakturerbartOre(s, poster) {
  */
 export function fakturaunderlagForDag(s, datum) {
   const poster = posterForDag(s, datum);
+  const redo = poster.filter(p => p.status === 'open' && !p.invoiceRecordId);
   const leveranser = genomfordaLeveranserForDag(s, datum);
   // Leveranser räknas inte in i dagens underlag. De upparbetas över sin period
   // och faktureras när de väljs till ett underlag i Fakturera.
   return {
-    beloppOre: fakturerbartOre(s, poster),
-    harFakturerbart: poster.some(p => kanIngaIFakturaunderlag(s, p)),
+    beloppOre: fakturerbartOre(s, redo),
+    harFakturerbart: redo.some(p => kanIngaIFakturaunderlag(s, p)),
     poster, leveranser,
   };
 }
@@ -776,11 +788,14 @@ export function jobbatIn(s, datumLista) {
   const ingar = d => datumLista.includes(d);
   const poster = s.poster.filter(p => ingar(p.date));
 
-  let timarbeteOre = 0, tillfallenOre = 0, styckOre = 0, resorOre = 0, utlaggOre = 0;
+  let timarbeteOre = 0, tillfallenOre = 0, styckOre = 0;
+  let resorOre = 0, utlaggOre = 0, totaltUnderlagOre = 0;
   for (const p of poster) {
     if (!kanIngaIFakturaunderlag(s, p)) continue;
     const a = artikelFor(s, p.articleId);
     const belopp = radbeloppOre(a.unitPriceOre, p.qtyMilli);
+    const redoForLundify = p.status === 'open' && !p.invoiceRecordId;
+    if (redoForLundify) totaltUnderlagOre += belopp;
 
     // Samma regel som raknasSomJobbatIn, och bara på ett ställe. Fanns den på
     // två kunde de glida isär, och då hade summan blivit fel medan
@@ -789,8 +804,8 @@ export function jobbatIn(s, datumLista) {
       if (a.type === 'hourly') timarbeteOre += belopp;
       else if (a.type === 'session') tillfallenOre += belopp;
       else styckOre += belopp;
-    } else if (a.type === 'travel') resorOre += belopp;
-    else if (a.unit === 'kr') utlaggOre += belopp;
+    } else if (redoForLundify && a.type === 'travel') resorOre += belopp;
+    else if (redoForLundify && a.unit === 'kr') utlaggOre += belopp;
   }
 
   // Fasta ersättningar upparbetas ALLTID över sin period.
@@ -821,7 +836,7 @@ export function jobbatIn(s, datumLista) {
     // Fakturaunderlaget innehåller det som faktiskt blir fakturarader.
     // Den veckofördelade fastprisandelen ingår ALDRIG — den faktureras enligt
     // avtalet, inte per vecka.
-    totaltUnderlagOre: timarbeteOre + tillfallenOre + styckOre + resorOre + utlaggOre,
+    totaltUnderlagOre,
     ofullstandigaPerioder,
     arbetadTidSekunder: arbetadTidSekunder(poster),
   };
@@ -850,10 +865,8 @@ export function sammanstallning(s, datumLista, { malOre = null } = {}) {
   const ingar = d => datumLista.includes(d);
   const summa = jobbatIn(s, datumLista);
 
-  // Redo för Lundify: öppna, olåsta poster i perioden.
-  const redoPoster = s.poster.filter(p =>
-    ingar(p.date) && p.status === 'open' && !p.invoiceRecordId && kanIngaIFakturaunderlag(s, p));
-  const fakturaunderlagOre = fakturerbartOre(s, redoPoster);
+  // Redo för Lundify beräknas i samma genomgång som periodens övriga tal.
+  const fakturaunderlagOre = summa.totaltUnderlagOre;
 
   // Klart i Lundify: underlag som markerats klara under perioden.
   const klartILundifyOre = (s.invoiceRecords || [])
@@ -896,28 +909,27 @@ export function veckoSammanstallning(s, offset = 0, idagDatum = new Date()) {
 }
 
 /**
- * Alla datum i en månad som har något registrerat. Används både av
- * sammanställningen och av fördelningen per kund, så de aldrig kan titta på
- * olika perioder.
+ * Alla kalenderdatum i en månad. En komplett kalenderperiod krävs för att
+ * fastpris ska fördelas rätt även när det saknas tidsposter vissa dagar.
  */
-export function manadensDatum(s, manad) {
-  const iManad = d => typeof d === 'string' && d.slice(0, 7) === manad;
-  return [...new Set([
-    ...s.poster.map(p => p.date).filter(iManad),
-    ...(s.deliverables || []).map(l => l.completedAt).filter(iManad),
-    ...(s.invoiceRecords || []).map(r => r.klarmarkeradAt).filter(iManad),
-  ])];
+export function manadensDatum(_s, manad) {
+  if (!/^\d{4}-\d{2}$/.test(String(manad))) return [];
+  const [ar, m] = manad.split('-').map(Number);
+  if (m < 1 || m > 12) return [];
+  const antalDagar = new Date(ar, m, 0).getDate();
+  return Array.from({ length: antalDagar }, (_, i) =>
+    `${ar}-${String(m).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`);
 }
 
-/** Månadens sammanställning. Samma regler, inget mål och ingen budget. */
+/** Månadens sammanställning. Samma regler och samma enkla målmodell som veckan. */
 export function manadsSammanstallning(s, manad) {
-  return sammanstallning(s, manadensDatum(s, manad));
+  return sammanstallning(s, manadensDatum(s, manad), { malOre: s.installningar?.manadsmalOre });
 }
 
 /** Måltexten på vanlig svenska. Kort, utan prestationstryck. */
-export function maltext(v) {
+export function maltext(v, period = 'veckans') {
   if (!v.harMal) return null;
-  const inledning = `${belopp(v.jobbatInOre)} av veckans mål ${belopp(v.malOre)}`;
+  const inledning = `${belopp(v.jobbatInOre)} av ${period} mål ${belopp(v.malOre)}`;
   if (v.naddMal) return `${inledning}. Målet är nått, ${belopp(v.overskjutandeOre)} över.`;
   return `${inledning}. ${belopp(v.kvarOre)} kvar.`;
 }

@@ -187,3 +187,38 @@ test('veckomålet accepterar svenska decimaler men aldrig tomt eller negativt be
     assert.throws(() => L.sattVeckomal(s, ogiltigt), /större än noll/);
   }
 });
+
+// ── 3. Månadsmål och kalenderperiod ────────────────────────────────────────
+
+test('månadsmålet använder samma enkla regler som veckomålet', () => {
+  const fore = { ...nyState(), installningar: { veckomalOre: 2500000, manadsmalOre: null } };
+  const medMal = L.sattManadsmal(fore, '100 000');
+  const manad = L.manadsSammanstallning(medMal, '2026-08');
+
+  assert.equal(medMal.installningar.manadsmalOre, 10000000);
+  assert.equal(manad.malOre, 10000000);
+  assert.equal(manad.harMal, true);
+  assert.match(L.maltext(manad, 'månadens'), /av månadens mål/);
+  assert.equal(L.taBortManadsmal(medMal).installningar.manadsmalOre, null);
+  assert.deepEqual(medMal.poster, fore.poster, 'registreringarna påverkas inte');
+});
+
+test('månadens datum innehåller varje kalenderdag även utan registreringar', () => {
+  assert.equal(L.manadensDatum(nyState(), '2026-02').length, 28);
+  assert.equal(L.manadensDatum(nyState(), '2028-02').length, 29);
+  assert.deepEqual(L.manadensDatum(nyState(), '2026-04').slice(0, 2), ['2026-04-01', '2026-04-02']);
+  assert.equal(L.manadensDatum(nyState(), 'fel').length, 0);
+});
+
+test('en fastprisperiod räknas för hela månaden även när månaden saknar tidsposter', () => {
+  const s = {
+    ...nyState(), poster: [], invoiceRecords: [],
+    deliverables: [{
+      id: 'fast', projectId: 'u-verkstad', name: 'Fast april', amountOre: 3000000,
+      startDate: '2026-04-01', endDate: '2026-04-30', status: 'invoiced', completedAt: '2026-04-30',
+    }],
+  };
+  const m = L.manadsSammanstallning(s, '2026-04');
+  assert.equal(m.delar.fastPrisAndelOre, 3000000);
+  assert.equal(m.jobbatInOre, 3000000);
+});

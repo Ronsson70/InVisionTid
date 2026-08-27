@@ -57,10 +57,11 @@ export function skapaTestdata(idag = new Date()) {
   const verkstad2Slut = plusDagar(verkstad2Start, 27);
 
   return {
-    // Ett frivilligt veckomål i kronor. Inget annat.
+    // Frivilliga vecko- och månadsmål i kronor. Inget annat.
     // Appen räknar inte lön, skatt, avgifter eller budget.
     installningar: {
       veckomalOre: 2500000,      // 25 000 kr, påhittat testvärde. null = inget mål.
+      manadsmalOre: 10000000,    // 100 000 kr, påhittat testvärde.
     },
 
     clients: [

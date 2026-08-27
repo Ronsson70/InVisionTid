@@ -153,7 +153,11 @@ export function tillAppTillstand(fil) {
   // gett två sanningar om samma rad.
   for (const samling of Object.keys(KALLTYP)) delete tillstand[samling];
 
-  tillstand.installningar = data.installningar ?? { veckomalOre: null };
+  tillstand.installningar = {
+    veckomalOre: null,
+    manadsmalOre: null,
+    ...(data.installningar || {}),
+  };
   return { tillstand, saknadeValfria };
 }
 

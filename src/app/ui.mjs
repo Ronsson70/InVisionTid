@@ -16,7 +16,7 @@ const FARGER = ['#7C9082', '#D4856A', '#8B7EA8', '#C4A55A', '#5B8A72', '#B07156'
 
 // ── Tillstånd ───────────────────────────────────────────────────────────────
 
-let s, vy = 'idag', veckoOffset = 0, ark = null, flash = null, kopierat = false;
+let s, vy = 'idag', veckoOffset = 0, manadsOffset = 0, ark = null, flash = null, kopierat = false;
 let tidigareUppdrag = [];
 let historikForslag = null;
 
@@ -91,6 +91,12 @@ const langtDatum = d => {
 const kortDatum = d => {
   const o = new Date(d + 'T12:00:00');
   return `${DAGAR[o.getDay()].slice(0, 3)} ${o.getDate()}/${o.getMonth() + 1}`;
+};
+const manadMedOffset = (offset = 0) => {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 };
 const farg = pid => FARGER[Math.max(0, s.projects.findIndex(p => p.id === pid)) % FARGER.length];
 
@@ -341,17 +347,34 @@ function vyFakturera() {
 // ── Vy: Uppföljning ─────────────────────────────────────────────────────────
 
 function vyUppfoljning() {
-  const manad = idag().slice(0, 7);
-  const namn = MANADER[parseInt(manad.slice(5, 7), 10) - 1];
+  const manad = manadMedOffset(manadsOffset);
+  const namn = MANADSNAMN(manad);
 
   // EN sammanställning. Vyn kombinerar inte siffror från två beräkningsvägar.
   const m = L.manadsSammanstallning(s, manad);
   const kunder = L.perKund(s, L.manadensDatum(s, manad));
+  const bredd = m.harMal ? Math.min(100, Math.round(m.jobbatInOre / m.malOre * 100)) : 0;
 
   return `
-  <header><h1>Uppföljning</h1><div class="datum">${esc(namn)} · enkel prototyp</div></header>
+  <header><h1>Uppföljning</h1><div class="datum">Jobbat in per månad.</div></header>
+  <div class="veckonav">
+    <button data-manad="-1" aria-label="Föregående månad">◀</button>
+    <span class="mitt"><span class="p">${esc(namn)}</span></span>
+    <button data-manad="1" aria-label="Nästa månad">▶</button>
+  </div>
   <div class="kort">
-    <div class="uppfrad"><span>Jobbat in<div class="markning">exklusive moms</div></span><span class="v">${esc(kr(m.jobbatInOre))}</span></div>
+    <div class="rubrik">Jobbat in denna månad</div>
+    <div class="malbelopp">${esc(kr(m.jobbatInOre))}<small>exklusive moms</small></div>
+    <button class="lankknapp mitten" data-oppna="manadsmal">${m.harMal ? 'Ändra månadsmål' : 'Sätt månadsmål'}</button>
+    ${m.harMal ? `
+      <div class="matare"><div class="matarfyll" style="width:${bredd}%"></div></div>
+      <div class="maltext">${esc(L.maltext(m, 'månadens'))}</div>
+      <div class="malrader malruta">
+        <div class="brad"><span>Upparbetat</span><span>${esc(kr(m.jobbatInOre))}</span></div>
+        <div class="brad"><span>Månadens mål</span><span>${esc(kr(m.malOre))}</span></div>
+        <div class="brad stark"><span>${m.naddMal ? 'Över målet' : 'Kvar till målet'}</span><span>${esc(kr(m.naddMal ? m.overskjutandeOre : m.kvarOre))}</span></div>
+      </div>` : ''}
+    ${m.delar.fastPrisAndelOre ? `<div class="uppfrad"><span>Fast pris, månadens andel</span><span class="v">${esc(kr(m.delar.fastPrisAndelOre))}</span></div>` : ''}
     <div class="uppfrad"><span>Redo för Lundify<div class="markning">exklusive moms</div></span><span class="v">${esc(kr(m.redoForLundifyOre))}</span></div>
     <div class="uppfrad"><span>Klart i Lundify<div class="markning">exklusive moms</div></span><span class="v">${esc(kr(m.klartILundifyOre))}</span></div>
     <div class="uppfrad"><span>Arbetad tid</span><span class="v">${esc(timmar(m.arbetadTidSekunder))} h</span></div>
@@ -378,7 +401,9 @@ function vyUppfoljning() {
 const RUBRIKER = {
   tillfalle: 'Behandlingstillfälle', tid: 'Arbetstid', resa: 'Resa',
   leverans: 'Leverans klar', mer: 'Mer', uppdrag: 'Mina uppdrag',
-  nyttuppdrag: 'Nytt uppdrag', veckomal: 'Veckomål', konto: 'Konto och synk', historik: 'Hela historiken',
+  nyttuppdrag: 'Nytt uppdrag', veckomal: 'Veckomål', manadsmal: 'Månadsmål',
+  kunder: 'Mina kunder', redigerakund: 'Redigera kund',
+  konto: 'Konto och synk', historik: 'Hela historiken',
 };
 const TYPKARTA = { tillfalle: ['session'], tid: ['hourly', 'trackingOnly'], resa: ['travel'] };
 
@@ -388,7 +413,8 @@ function arkMer() {
   return `<div class="val">
     <button data-oppna="leverans">Leverans klar<span class="kund">Markera en avtalad leverans som genomförd</span></button>
     <button data-oppna="uppdrag">Mina uppdrag<span class="kund">Visa, återaktivera eller lägg till uppdrag</span></button>
-    <button data-oppna="historik">Hela historiken<span class="kund">Lägg in, granska och bestäm vad gamla poster ska göra</span></button>
+    <button data-oppna="kunder">Mina kunder<span class="kund">Visa och redigera kunduppgifter</span></button>
+    <button data-oppna="historik">Hela historiken<span class="kund">Lägg in det gamla som redan klart i Lundify</span></button>
     <button data-oppna="konto">Konto och synk<span class="kund">OneDrive, synkstatus och utloggning</span></button>
   </div>`;
 }
@@ -409,21 +435,23 @@ function arkHistorik() {
 
   const forslag = historikForslag?.antal;
   if (forslag?.totalt) return `
-    <div class="notis"><strong>Allt läggs in i den vanliga appen.</strong> Befintliga poster ändras inte och dubbletter skapas inte.</div>
+    <div class="notis"><strong>Allt gammalt läggs in som redan klart i Lundify.</strong> Det syns på sina ursprungliga datum och räknas i Jobbat in, men kan aldrig faktureras igen. Dubbletter skapas inte.</div>
     <div class="uppfrad"><span>Tidsposter</span><span class="v">${forslag.poster}</span></div>
     <div class="uppfrad"><span>Resor</span><span class="v">${forslag.resor}</span></div>
     <div class="uppfrad"><span>Utlägg</span><span class="v">${forslag.utlagg}</span></div>
+    ${forslag.uppdaterade ? `<div class="uppfrad"><span>Befintliga gamla poster som färdigmarkeras</span><span class="v">${forslag.uppdaterade}</span></div>` : ''}
+    ${forslag.fastprisperioder ? `<div class="uppfrad"><span>Fastprisperioder</span><span class="v">${forslag.fastprisperioder}</span></div>` : ''}
     <div class="uppfrad"><span>Tidigare uppdrag</span><span class="v">${forslag.uppdrag}</span></div>
-    <p class="notis">De nya posterna börjar som <strong>Behöver granskas</strong>. De påverkar inte Jobbat in eller Lundify-underlag förrän du väljer vad de ska göra.</p>
-    <button class="primar" data-importerahistorik="1">Lägg in hela historiken</button>
+    <p class="notis">Gamla behandlingstillfällen räknas som ett pass per registrering och kan rättas i efterhand. Tid på fastprisuppdrag visas som historik; själva fastpriset fördelas över avtalets start- och slutdatum.</p>
+    <button class="primar" data-importerahistorik="1">Lägg in hela historiken som klar</button>
     <button class="avbryt" data-stang="knapp">Avbryt</button>`;
 
   const ogranskade = L.historikposterAttGranska(s);
   if (!ogranskade.length) return `
     <p class="notis">${s.historikimport
-      ? 'Hela den äldre historiken finns i appen. Det finns inga importerade poster kvar att granska.'
+      ? 'Hela den äldre historiken finns i appen och är markerad som redan klar i Lundify.'
       : 'Ingen äldre historik finns att lägga in i den här versionen.'}</p>
-    ${s.historikimport ? '<p class="notis">Du hittar posterna på sina ursprungliga datum i Vecka. Tryck på en rad om du vill ändra eller ångra ett beslut.</p>' : ''}
+    ${s.historikimport ? '<p class="notis">Du hittar posterna på sina ursprungliga datum i Vecka. Tryck på en rad om du vill rätta datum eller antal.</p>' : ''}
     <button class="avbryt" data-stang="knapp">Stäng</button>`;
 
   const manader = [...new Set(ogranskade.map(historikmanad))]
@@ -454,6 +482,18 @@ function arkVeckomal() {
     <button class="avbryt" data-stang="knapp">Avbryt</button>`;
 }
 
+function arkManadsmal() {
+  const befintligt = s.installningar?.manadsmalOre;
+  const forvalt = befintligt ? String(befintligt / 100).replace('.', ',') : '';
+  return `
+    <p class="notis">Målet gäller varje månad och jämförs bara med Jobbat in. Resor, utlägg och moms räknas inte in.</p>
+    <div class="faltrubrik">Mål per månad, exklusive moms</div>
+    <input type="text" inputmode="decimal" data-falt="manadsmal" value="${esc(ark.manadsmal ?? forvalt)}" placeholder="till exempel 100 000">
+    <button class="spara" data-sparamanadsmal="1">Spara månadsmålet</button>
+    ${befintligt ? '<button class="sekundar" data-tabortmanadsmal="1">Ta bort månadsmålet</button>' : ''}
+    <button class="avbryt" data-stang="knapp">Avbryt</button>`;
+}
+
 function arkKonto() {
   const ansluten = !!installningar.kontoNamn;
   return `
@@ -466,6 +506,45 @@ function arkKonto() {
       <button class="sekundar" data-synkaom="1">Läs om från OneDrive</button>
       <button class="avbryt" data-loggautapp="1">Logga ut eller byt konto</button>` : ''}
     <button class="avbryt" data-stang="knapp">Stäng</button>`;
+}
+
+function arkKunder() {
+  const ordning = { active: 0, paused: 1, closed: 2 };
+  const kunder = [...(s.clients || [])].sort((a, b) =>
+    (ordning[a.status ?? 'active'] ?? 1) - (ordning[b.status ?? 'active'] ?? 1)
+    || a.name.localeCompare(b.name, 'sv'));
+  const statusText = id => L.KUNDSTATUSAR.find(x => x.id === (id || 'active'))?.etikett ?? 'Aktiv';
+  return `
+    <p class="notis">Kunduppgifterna används i uppdrag och underlag till Lundify. Historiken påverkas inte när du rättar ett namn eller en kontaktuppgift.</p>
+    <div class="val">${kunder.map(c => `
+      <button data-redigerakund="${esc(c.id)}">
+        ${esc(c.name)}
+        <span class="kund">${esc(statusText(c.status))}${c.contact ? ' · ' + esc(c.contact) : ''}${c.orgNr ? ' · ' + esc(c.orgNr) : ''}</span>
+      </button>`).join('') || '<div class="tom">Inga kunder finns ännu.</div>'}</div>
+    <button class="avbryt" data-stang="knapp">Stäng</button>`;
+}
+
+function arkRedigeraKund() {
+  const c = L.kundFor(s, ark.clientId);
+  if (!c) return '<div class="tom">Kunden finns inte längre.</div>';
+  return `
+    <div class="faltrubrik">Kundnamn</div>
+    <input type="text" data-falt="name" value="${esc(ark.name ?? c.name)}" autocomplete="organization">
+    <div class="faltrubrik">Organisationsnummer</div>
+    <input type="text" data-falt="orgNr" value="${esc(ark.orgNr ?? c.orgNr ?? '')}" placeholder="XXXXXX-XXXX">
+    <div class="faltrubrik">Kontaktperson</div>
+    <input type="text" data-falt="contact" value="${esc(ark.contact ?? c.contact ?? '')}" autocomplete="name">
+    <div class="faltrubrik">Telefon</div>
+    <input type="tel" data-falt="phone" value="${esc(ark.phone ?? c.phone ?? '')}" autocomplete="tel">
+    <div class="faltrubrik">E-post</div>
+    <input type="email" data-falt="email" value="${esc(ark.email ?? c.email ?? '')}" autocomplete="email">
+    <div class="faltrubrik">Adress</div>
+    <textarea data-falt="address" rows="3" placeholder="Gatuadress, postnummer, ort">${esc(ark.address ?? c.address ?? '')}</textarea>
+    <div class="faltrubrik">Status</div>
+    <div class="val">${L.KUNDSTATUSAR.map(x => `
+      <button class="${(ark.status ?? c.status ?? 'active') === x.id ? 'vald' : ''}" data-valjkundstatus="${esc(x.id)}">${esc(x.etikett)}</button>`).join('')}</div>
+    <button class="spara" data-sparakund="${esc(c.id)}">Spara kunden</button>
+    <button class="avbryt" data-oppna="kunder">Tillbaka</button>`;
 }
 
 function arkUppdrag() {
@@ -516,7 +595,7 @@ function arkNyttUppdrag() {
 
   return `
     <div class="faltrubrik">Kund</div>
-    <div class="val">${(s.clients || []).map(c => `
+    <div class="val">${(s.clients || []).filter(c => c.status !== 'closed').map(c => `
       <button class="${ark.clientId === c.id ? 'vald' : ''}" data-valjkund="${esc(c.id)}">${esc(c.name)}</button>`).join('')}
       <button class="${ark.clientId === 'ny' ? 'vald' : ''}" data-valjkund="ny">+ Ny kund</button>
     </div>
@@ -719,7 +798,6 @@ function arkAndra() {
           <button class="primar" data-historikbeslut="${esc(p.id)}|billable">Ska faktureras</button>
           <button class="sekundar" data-historikbeslut="${esc(p.id)}|lundifyDone">Redan klart i Lundify</button>` : ''}
         <button class="sekundar" data-historikbeslut="${esc(p.id)}|historyOnly">Behåll endast som historik</button>` : ''}
-      ${arHistorik && !behoverBeslut ? '<button class="sekundar" data-angrahistorikbeslut="' + esc(p.id) + '">Ändra mitt beslut</button>' : ''}
       <button class="tabort" data-tabort="${esc(p.id)}">Ta bort registreringen</button>
       <button class="avbryt" data-stang="knapp">Avbryt</button>`}`;
 }
@@ -774,6 +852,9 @@ function ritaArk() {
   else if (ark.typ === 'uppdrag') innehall = arkUppdrag();
   else if (ark.typ === 'nyttuppdrag') innehall = arkNyttUppdrag();
   else if (ark.typ === 'veckomal') innehall = arkVeckomal();
+  else if (ark.typ === 'manadsmal') innehall = arkManadsmal();
+  else if (ark.typ === 'kunder') innehall = arkKunder();
+  else if (ark.typ === 'redigerakund') innehall = arkRedigeraKund();
   else if (ark.typ === 'konto') innehall = arkKonto();
   else if (ark.typ === 'historik') innehall = arkHistorik();
   else if (ark.typ === 'andra') innehall = arkAndra();
@@ -829,7 +910,9 @@ const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara',
   'sparaleveransdatum', 'angragenomford', 'aktiverauppdrag', 'valjkund',
   'aktiverabefintligt',
   'valjdebitering', 'valjnyvat', 'sparanyttuppdrag', 'sparaveckomal',
-  'tabortveckomal', 'synkaom', 'loggautapp', 'arkivmanad', 'importerahistorik',
+  'tabortveckomal', 'sparamanadsmal', 'tabortmanadsmal', 'manad',
+  'redigerakund', 'valjkundstatus', 'sparakund',
+  'synkaom', 'loggautapp', 'arkivmanad', 'importerahistorik',
   'historikbeslut', 'angrahistorikbeslut'].map(n => `[data-${n}]`).join(',');
 
 document.addEventListener('click', e => {
@@ -852,12 +935,14 @@ document.addEventListener('click', e => {
   }
   if (d.vy) { vy = d.vy; ark = null; return rita(); }
   if (d.vecka) { veckoOffset += Number(d.vecka); return rita(); }
+  if (d.manad) { manadsOffset += Number(d.manad); return rita(); }
   if (d.stang) { if (d.stang === 'knapp' || e.target.classList.contains('ark')) { ark = null; kopierat = false; rita(); } return; }
 
   if (d.oppna) {
     if (d.oppna === 'mer') ark = { typ: 'mer' };
     else if (d.oppna === 'historik') ark = { typ: 'historik', manadsindex: 0 };
     else if (d.oppna === 'uppdrag') ark = { typ: 'uppdrag' };
+    else if (d.oppna === 'kunder') ark = { typ: 'kunder' };
     else if (d.oppna === 'nyttuppdrag') ark = {
       typ: 'nyttuppdrag', clientId: null, kundnamn: '', namn: '', debitering: null,
       pris: '', vatRate: null, startDate: '', endDate: '', standardresaKm: '', resepris: '',
@@ -879,11 +964,21 @@ document.addEventListener('click', e => {
   if (d.aktiverauppdrag) return aktiveraTidigare(d.aktiverauppdrag);
   if (d.aktiverabefintligt) return aktiveraBefintligt(d.aktiverabefintligt);
   if (d.valjkund) { ark.clientId = d.valjkund; return rita(); }
+  if (d.redigerakund) {
+    const c = L.kundFor(s, d.redigerakund);
+    if (!c) return visa('Kunden finns inte längre.');
+    ark = { typ: 'redigerakund', clientId: c.id, ...c };
+    return rita();
+  }
+  if (d.valjkundstatus) { ark.status = d.valjkundstatus; return rita(); }
+  if (d.sparakund) return sparaKund(d.sparakund);
   if (d.valjdebitering) { ark.debitering = d.valjdebitering; ark.pris = ''; return rita(); }
   if (d.valjnyvat !== undefined) { ark.vatRate = Number(d.valjnyvat); return rita(); }
   if (d.sparanyttuppdrag) return sparaNyttUppdrag();
   if (d.sparaveckomal) return sparaVeckomal();
   if (d.tabortveckomal) return taBortVeckomal();
+  if (d.sparamanadsmal) return sparaManadsmal();
+  if (d.tabortmanadsmal) return taBortManadsmal();
 
   if (d.spara) return sparaNy();
   if (d.post) { ark = { typ: 'andra', postId: d.post, rubrik: 'Ändra registrering' }; return rita(); }
@@ -954,6 +1049,28 @@ function taBortVeckomal() {
   visa('Veckomålet är borttaget.');
 }
 
+function sparaManadsmal() {
+  try {
+    s = L.sattManadsmal(s, ark.manadsmal);
+    spara(); ark = null;
+    visa('Månadsmålet är sparat.');
+  } catch (e) { visa(e.message); }
+}
+
+function taBortManadsmal() {
+  s = L.taBortManadsmal(s);
+  spara(); ark = null;
+  visa('Månadsmålet är borttaget.');
+}
+
+function sparaKund(id) {
+  try {
+    s = L.uppdateraKund(s, id, ark);
+    spara(); ark = { typ: 'kunder' };
+    visa('Kunduppgifterna är sparade.');
+  } catch (e) { visa(e.message); }
+}
+
 function synkaOmFranOneDrive() {
   if (harOsparadeAndringar()) return visa('Vänta tills Sparat visas innan du synkar om.');
   if (installningar.synkaOm) installningar.synkaOm();
@@ -1022,7 +1139,7 @@ function importeraHelaHistoriken() {
   historikForslag = null;
   spara();
   ark = { typ: 'historik', manadsindex: 0 };
-  visa(`${antal} äldre registreringar har lagts in och väntar på granskning.`);
+  visa(`${antal} historikposter och fastprisperioder har lagts in som redan klara.`);
 }
 
 function sparaHistorikbeslut(varde) {
@@ -1183,6 +1300,8 @@ export function startaApp(opts) {
   s = L.normaliseraTillstand(opts.tillstand);
   sparlage = 'sparat';
   vy = 'idag';
+  veckoOffset = 0;
+  manadsOffset = 0;
   rita();
 }
 
@@ -1190,7 +1309,7 @@ function borjaOm() {
   if (!installningar.tillaterAterstallning || !installningar.aterstall) return;
   if (!window.confirm('Vill du återställa till utgångsläget? Det du har registrerat försvinner.')) return;
   s = installningar.aterstall();
-  veckoOffset = 0; ark = null;
+  veckoOffset = 0; manadsOffset = 0; ark = null;
   spara();
   rita();
 }

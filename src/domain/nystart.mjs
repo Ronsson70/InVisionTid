@@ -142,7 +142,7 @@ export function nystart(v1data, { nu }) {
 
   return {
     ...v2,
-    installningar: { veckomalOre: null },        // målet sätts av användaren
+    installningar: { veckomalOre: null, manadsmalOre: null }, // målen sätts av användaren
     nystart: {
       at: nu,
       kalla: 'InVisionTid/invisiontid-data.json',

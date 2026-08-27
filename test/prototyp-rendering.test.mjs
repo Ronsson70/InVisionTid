@@ -191,6 +191,16 @@ test('rendering: Uppföljning visar tid och kronor på egna rader', () => {
   assert.ok(!/Betalt enligt Lundify/.test(html), 'betalstatus ska vara borttagen ur första versionen');
 });
 
+test('rendering: Uppföljning visar månadsmål, fastprisandel och månadsnavigering', () => {
+  klicka({ vy: 'uppfoljning' });
+  assert.match(html, /Jobbat in denna månad/);
+  assert.match(html, /Månadens mål/);
+  assert.match(html, /Fast pris, månadens andel/);
+  assert.match(html, /data-manad="-1"/);
+  assert.match(html, /data-manad="1"/);
+  assert.match(html, /data-oppna="manadsmal"/);
+});
+
 test('rendering: registreringsarket kräver högst tre val', () => {
   klicka({ vy: 'idag' });
   klicka({ oppna: 'tillfalle' });
@@ -243,6 +253,22 @@ test('rendering: Mina uppdrag visar alla aktiva och vägen till ett nytt', () =>
   assert.match(html, /Kund A/);
   assert.match(html, /Kund B/);
   assert.match(html, /Kund C/);
+});
+
+test('rendering: Mina kunder öppnar ett riktigt redigeringsformulär', () => {
+  klicka({ oppna: 'mer' });
+  assert.match(html, /data-oppna="kunder"/);
+  klicka({ oppna: 'kunder' });
+  assert.match(html, /Mina kunder/);
+  assert.match(html, /data-redigerakund="k-a"/);
+  klicka({ redigerakund: 'k-a' });
+  for (const falt of ['name', 'orgNr', 'contact', 'phone', 'email', 'address']) {
+    assert.match(html, new RegExp(`data-falt="${falt}"`));
+  }
+  assert.match(html, /data-valjkundstatus="active"/);
+  assert.match(html, /data-valjkundstatus="paused"/);
+  assert.match(html, /data-valjkundstatus="closed"/);
+  assert.match(html, /data-sparakund="k-a"/);
 });
 
 test('rendering: Nytt uppdrag frågar efter kund, namn och debitering', () => {

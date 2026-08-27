@@ -126,6 +126,20 @@ test('hela produktionslika historiken kompletterar exakt det som saknas', () => 
   assert.equal(igen.antal.totalt, 0, 'andra körningen lägger inte till någonting');
 });
 
+test('hela den produktionslika historiken blir redan klar och fastpriset periodiseras', () => {
+  const { tillstand } = tillAppTillstand(nystart(produktionslikV1, { nu: NU }));
+  const plan = planeraHistorikimport(produktionslikV1, tillstand, { nu: NU });
+  const s = L.normaliseraTillstand(plan.tillstand);
+
+  assert.equal(plan.antal.uppdaterade, 31, 'även de 22 + 9 poster som följde med nystarten färdigmarkeras');
+  assert.equal(plan.antal.fastprisperioder, 1);
+  assert.ok(s.poster.every(p => p.status === 'handled' || p.status === 'historyOnly'),
+    'ingen gammal post står kvar som öppen eller behöver granskas');
+  assert.equal(L.underlagsgrupper(s).length, 0, 'inget gammalt kan faktureras igen');
+  assert.equal(L.manadsSammanstallning(s, '2026-02').delar.fastPrisAndelOre, 368228,
+    'fastpriset får en månadsandel även när tiden inte styr fördelningen');
+});
+
 test('P2:s fastpristid blir trackingOnly och kan inte faktureras', () => {
   const v2 = nystart(produktionslikV1, { nu: NU });
   const { tillstand } = tillAppTillstand(v2);

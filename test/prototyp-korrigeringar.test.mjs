@@ -418,7 +418,7 @@ test('målet jämförs med jobbat in, inte med det totala underlaget', () => {
 
 test('appen räknar ingen lön, skatt eller budget', () => {
   const s = nyState();
-  assert.deepEqual(Object.keys(s.installningar), ['veckomalOre']);
+  assert.deepEqual(Object.keys(s.installningar), ['veckomalOre', 'manadsmalOre']);
   const v = L.veckoSammanstallning(s, 0, IDAG);
   for (const falt of ['bruttolon', 'nettolon', 'skatt', 'avgifter', 'budget', 'prognos', 'loneutrymme']) {
     assert.ok(!(falt in v), `sammanställningen får inte innehålla ${falt}`);
