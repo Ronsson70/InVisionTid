@@ -116,7 +116,8 @@ function postrad(p, { klickbar = true } = {}) {
   const historikkund = L.arHistorikpost(p) ? `${L.kundNamnForUppdrag(s, p.projectId)} · ` : '';
   const historiklage = p.legacyReviewStatus === 'needsReview' ? 'Behöver granskas'
     : p.legacyReviewStatus === 'lundifyDone' ? 'Redan klart i Lundify'
-      : p.legacyReviewStatus === 'historyOnly' ? 'Endast historik' : null;
+      : p.legacyReviewStatus === 'historyOnly' ? 'Endast historik'
+        : p.legacyReviewStatus === 'billable' ? 'Öppen för fakturering' : null;
   return `<div class="postrad" ${klickbar ? `data-post="${esc(p.id)}" role="button" tabindex="0"` : ''}>
     <span class="prick" style="background:${farg(p.projectId)}"></span>
     <span class="txt">
@@ -401,7 +402,8 @@ function vyUppfoljning() {
 const RUBRIKER = {
   tillfalle: 'Behandlingstillfälle', tid: 'Arbetstid', resa: 'Resa',
   leverans: 'Leverans klar', mer: 'Mer', uppdrag: 'Mina uppdrag',
-  nyttuppdrag: 'Nytt uppdrag', veckomal: 'Veckomål', manadsmal: 'Månadsmål',
+  nyttuppdrag: 'Nytt uppdrag', redigerauppdrag: 'Redigera uppdrag',
+  veckomal: 'Veckomål', manadsmal: 'Månadsmål',
   kunder: 'Mina kunder', redigerakund: 'Redigera kund',
   konto: 'Konto och synk', historik: 'Hela historiken',
 };
@@ -414,7 +416,7 @@ function arkMer() {
     <button data-oppna="leverans">Leverans klar<span class="kund">Markera en avtalad leverans som genomförd</span></button>
     <button data-oppna="uppdrag">Mina uppdrag<span class="kund">Visa, återaktivera eller lägg till uppdrag</span></button>
     <button data-oppna="kunder">Mina kunder<span class="kund">Visa och redigera kunduppgifter</span></button>
-    <button data-oppna="historik">Hela historiken<span class="kund">Lägg in det gamla som redan klart i Lundify</span></button>
+    <button data-oppna="historik">Hela historiken<span class="kund">Klart före 1 augusti, öppet därefter</span></button>
     <button data-oppna="konto">Konto och synk<span class="kund">OneDrive, synkstatus och utloggning</span></button>
   </div>`;
 }
@@ -435,21 +437,22 @@ function arkHistorik() {
 
   const forslag = historikForslag?.antal;
   if (forslag?.totalt) return `
-    <div class="notis"><strong>Allt gammalt läggs in som redan klart i Lundify.</strong> Det syns på sina ursprungliga datum och räknas i Jobbat in, men kan aldrig faktureras igen. Dubbletter skapas inte.</div>
+    <div class="notis"><strong>Datumgräns 1 augusti 2026.</strong> Poster före datumet markeras som redan klara i Lundify. Fakturerbara poster från och med 1 augusti lämnas öppna och visas i Fakturera. Dubbletter skapas inte.</div>
     <div class="uppfrad"><span>Tidsposter</span><span class="v">${forslag.poster}</span></div>
     <div class="uppfrad"><span>Resor</span><span class="v">${forslag.resor}</span></div>
     <div class="uppfrad"><span>Utlägg</span><span class="v">${forslag.utlagg}</span></div>
-    ${forslag.uppdaterade ? `<div class="uppfrad"><span>Befintliga gamla poster som färdigmarkeras</span><span class="v">${forslag.uppdaterade}</span></div>` : ''}
+    ${forslag.uppdaterade ? `<div class="uppfrad"><span>Befintliga poster som får rätt status</span><span class="v">${forslag.uppdaterade}</span></div>` : ''}
     ${forslag.fastprisperioder ? `<div class="uppfrad"><span>Fastprisperioder</span><span class="v">${forslag.fastprisperioder}</span></div>` : ''}
+    ${forslag.uppdateradeFastprisperioder ? `<div class="uppfrad"><span>Fastprisperioder som öppnas igen</span><span class="v">${forslag.uppdateradeFastprisperioder}</span></div>` : ''}
     <div class="uppfrad"><span>Tidigare uppdrag</span><span class="v">${forslag.uppdrag}</span></div>
     <p class="notis">Gamla behandlingstillfällen räknas som ett pass per registrering och kan rättas i efterhand. Tid på fastprisuppdrag visas som historik; själva fastpriset fördelas över avtalets start- och slutdatum.</p>
-    <button class="primar" data-importerahistorik="1">Lägg in hela historiken som klar</button>
+    <button class="primar" data-importerahistorik="1">Tillämpa gränsen 1 augusti</button>
     <button class="avbryt" data-stang="knapp">Avbryt</button>`;
 
   const ogranskade = L.historikposterAttGranska(s);
   if (!ogranskade.length) return `
     <p class="notis">${s.historikimport
-      ? 'Hela den äldre historiken finns i appen och är markerad som redan klar i Lundify.'
+      ? 'Hela historiken finns i appen. Före 1 augusti är den klar i Lundify; fakturerbart arbete därefter är öppet.'
       : 'Ingen äldre historik finns att lägga in i den här versionen.'}</p>
     ${s.historikimport ? '<p class="notis">Du hittar posterna på sina ursprungliga datum i Vecka. Tryck på en rad om du vill rätta datum eller antal.</p>' : ''}
     <button class="avbryt" data-stang="knapp">Stäng</button>`;
@@ -557,10 +560,10 @@ function arkUppdrag() {
   return `
     <div class="faltrubrik">Aktiva uppdrag</div>
     <div class="val">${aktiva.map(p => `
-      <div class="uppdragsrad">
-        <strong>${esc(p.name)}</strong>
-        <span>${esc(L.kundNamnForUppdrag(s, p.id))}</span>
-      </div>`).join('') || '<div class="tom">Inga aktiva uppdrag.</div>'}</div>
+      <button data-redigerauppdrag="${esc(p.id)}">
+        ${esc(p.name)}
+        <span class="kund">${esc(L.kundNamnForUppdrag(s, p.id))} · Redigera priser och villkor</span>
+      </button>`).join('') || '<div class="tom">Inga aktiva uppdrag.</div>'}</div>
 
     ${installningar.tidigareUppdragFel ? `<div class="varning">
       <strong>Tidigare uppdrag kunde inte läsas</strong>${esc(installningar.tidigareUppdragFel)}
@@ -633,6 +636,65 @@ function arkNyttUppdrag() {
       </div>` : ''}
 
     <button class="spara" data-sparanyttuppdrag="1">Spara uppdraget</button>
+    <button class="avbryt" data-oppna="uppdrag">Tillbaka</button>`;
+}
+
+const prisvarde = ore => L.oreTillKortText(ore, { visaEnhet: false });
+const artikelPrisrubrik = a => a.type === 'hourly' ? 'Timpris'
+  : a.type === 'session' ? 'Pris per tillfälle'
+    : a.type === 'travel' ? 'Pris per kilometer'
+      : a.type === 'piece' ? 'Pris per styck' : a.name;
+
+function arkRedigeraUppdrag() {
+  const p = L.uppdragFor(s, ark.projectId);
+  if (!p) return '<div class="tom">Uppdraget finns inte längre.</div>';
+  const artiklar = (s.articles || []).filter(a => a.projectId === p.id);
+  const prisartiklar = artiklar.filter(a => a.type !== 'trackingOnly' && a.billable !== false);
+  const leveranser = (s.deliverables || []).filter(l => l.projectId === p.id && (l.startDate || l.endDate));
+  const valt = (nyckel, reserv) => ark[nyckel] ?? reserv;
+  return `
+    <p class="notis">Rätta uppgifter som blivit fel. Registreringar som redan ligger i ett klart Lundify-underlag behåller sitt låsta pris.</p>
+    <div class="faltrubrik">Kund</div>
+    <div class="val">${(s.clients || []).map(c => `
+      <button class="${valt('clientId', p.clientId) === c.id ? 'vald' : ''}" data-valjredigerakund="${esc(c.id)}">${esc(c.name)}</button>`).join('')}</div>
+    <div class="faltrubrik">Uppdragets namn</div>
+    <input type="text" data-falt="uppdragsnamn" value="${esc(valt('uppdragsnamn', p.name))}">
+
+    ${prisartiklar.map(a => {
+      const prisnyckel = `artikelpris_${a.id}`;
+      const momsnyckel = `artikelmoms_${a.id}`;
+      const moms = Number(valt(momsnyckel, a.vatRate));
+      return `<div class="avskild">
+        <div class="faltrubrik">${esc(artikelPrisrubrik(a))} exklusive moms</div>
+        <input type="text" inputmode="decimal" data-falt="${esc(prisnyckel)}" value="${esc(valt(prisnyckel, prisvarde(a.unitPriceOre)))}">
+        <div class="faltrubrik">Moms – ${esc(a.name)}</div>
+        <div class="snabbval">${L.MOMSSATSER.map(m => `
+          <button class="${moms === m.sats ? 'vald' : ''}" data-valjuppdragsmoms="${esc(a.id)}|${m.sats}">${esc(m.etikett)}</button>`).join('')}</div>
+      </div>`;
+    }).join('')}
+
+    ${artiklar.some(a => a.type === 'travel') ? `
+      <div class="faltrubrik">Standardresa i kilometer</div>
+      <input type="number" inputmode="decimal" data-falt="standardresaKm" value="${esc(valt('standardresaKm', p.defaultTripKm ?? ''))}" placeholder="Kan lämnas tomt">` : ''}
+
+    ${leveranser.map(l => {
+      const last = !!l.invoiceRecordId;
+      return `<div class="avskild">
+        <div class="faltrubrik">Fast pris – ${esc(l.name)}</div>
+        ${last ? '<div class="notis">Ligger i ett Lundify-underlag och måste flyttas tillbaka innan pris eller period kan rättas.</div>' : ''}
+        <input type="text" inputmode="decimal" data-falt="leveranspris_${esc(l.id)}" value="${esc(valt(`leveranspris_${l.id}`, prisvarde(l.amountOre)))}" ${last ? 'disabled' : ''}>
+        <div class="faltrubrik">Upparbetningsperiod</div>
+        <div class="tvakol">
+          <input type="date" data-falt="leveransstart_${esc(l.id)}" value="${esc(valt(`leveransstart_${l.id}`, l.startDate ?? ''))}" ${last ? 'disabled' : ''}>
+          <input type="date" data-falt="leveransslut_${esc(l.id)}" value="${esc(valt(`leveransslut_${l.id}`, l.endDate ?? ''))}" ${last ? 'disabled' : ''}>
+        </div>
+        <div class="faltrubrik">Moms – ${esc(l.name)}</div>
+        <div class="snabbval">${L.MOMSSATSER.map(m => `
+          <button class="${Number(valt(`leveransmoms_${l.id}`, l.vatRate)) === m.sats ? 'vald' : ''}" data-valjleveransmoms="${esc(l.id)}|${m.sats}" ${last ? 'disabled' : ''}>${esc(m.etikett)}</button>`).join('')}</div>
+      </div>`;
+    }).join('')}
+
+    <button class="spara" data-sparauppdrag="${esc(p.id)}">Spara uppdraget</button>
     <button class="avbryt" data-oppna="uppdrag">Tillbaka</button>`;
 }
 
@@ -777,7 +839,9 @@ function beraknaForhand(projectId, artikel) {
 function arkAndra() {
   const p = s.poster.find(x => x.id === ark.postId);
   if (!p) return '<div class="tom">Posten finns inte längre.</div>';
-  const a = L.artikelFor(s, p.articleId);
+  const valbara = L.valbaraArtiklarForPost(s, p);
+  const valdArtikelId = ark.articleId ?? p.articleId;
+  const a = L.artikelFor(s, valdArtikelId) ?? L.artikelFor(s, p.articleId);
   const arHistorik = L.arHistorikpost(p);
   const behoverBeslut = L.arHistorikOgranskad(p);
   const beslutText = p.legacyReviewStatus === 'billable' ? 'Ska faktureras'
@@ -787,6 +851,12 @@ function arkAndra() {
     <div class="faltrubrik">${esc(L.radrubrik(s, p))}</div>
     ${arHistorik ? `<div class="notis"><strong>Äldre registrering${p.legacyInvoiceMarked ? ' med gammal fakturamarkering' : ''}.</strong>
       ${behoverBeslut ? 'Kontrollera antal och datum och välj sedan vad posten ska göra.' : `Ditt val: ${esc(beslutText)}.`}</div>` : ''}
+    <div class="faltrubrik">Uppdrag och arbetstyp</div>
+    <div class="val">${valbara.map(artikel => `
+      <button class="${valdArtikelId === artikel.id ? 'vald' : ''}" data-valjandringartikel="${esc(artikel.id)}">
+        ${esc(L.kundNamnForUppdrag(s, artikel.projectId))} · ${esc(L.uppdragFor(s, artikel.projectId)?.name ?? '')}
+        <span class="kund">${esc(artikel.name)}</span>
+      </button>`).join('')}</div>
     <div class="faltrubrik">Antal ${esc(a?.unit ?? '')}</div>
     <input type="number" inputmode="decimal" step="0.5" data-falt="mangd" value="${esc(p.qtyMilli / L.MILLI)}">
     <div class="faltrubrik">Vilken dag?</div>
@@ -851,6 +921,7 @@ function ritaArk() {
   if (ark.typ === 'mer') innehall = arkMer();
   else if (ark.typ === 'uppdrag') innehall = arkUppdrag();
   else if (ark.typ === 'nyttuppdrag') innehall = arkNyttUppdrag();
+  else if (ark.typ === 'redigerauppdrag') innehall = arkRedigeraUppdrag();
   else if (ark.typ === 'veckomal') innehall = arkVeckomal();
   else if (ark.typ === 'manadsmal') innehall = arkManadsmal();
   else if (ark.typ === 'kunder') innehall = arkKunder();
@@ -912,6 +983,8 @@ const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara',
   'valjdebitering', 'valjnyvat', 'sparanyttuppdrag', 'sparaveckomal',
   'tabortveckomal', 'sparamanadsmal', 'tabortmanadsmal', 'manad',
   'redigerakund', 'valjkundstatus', 'sparakund',
+  'redigerauppdrag', 'sparauppdrag', 'valjuppdragsmoms', 'valjleveransmoms',
+  'valjredigerakund', 'valjandringartikel',
   'synkaom', 'loggautapp', 'arkivmanad', 'importerahistorik',
   'historikbeslut', 'angrahistorikbeslut'].map(n => `[data-${n}]`).join(',');
 
@@ -970,6 +1043,24 @@ document.addEventListener('click', e => {
     ark = { typ: 'redigerakund', clientId: c.id, ...c };
     return rita();
   }
+  if (d.redigerauppdrag) {
+    const p = L.uppdragFor(s, d.redigerauppdrag);
+    if (!p) return visa('Uppdraget finns inte längre.');
+    ark = { typ: 'redigerauppdrag', projectId: p.id, clientId: p.clientId, uppdragsnamn: p.name };
+    return rita();
+  }
+  if (d.valjredigerakund) { ark.clientId = d.valjredigerakund; return rita(); }
+  if (d.valjuppdragsmoms) {
+    const [id, sats] = d.valjuppdragsmoms.split('|');
+    ark[`artikelmoms_${id}`] = Number(sats);
+    return rita();
+  }
+  if (d.valjleveransmoms) {
+    const [id, sats] = d.valjleveransmoms.split('|');
+    ark[`leveransmoms_${id}`] = Number(sats);
+    return rita();
+  }
+  if (d.sparauppdrag) return sparaUppdrag(d.sparauppdrag);
   if (d.valjkundstatus) { ark.status = d.valjkundstatus; return rita(); }
   if (d.sparakund) return sparaKund(d.sparakund);
   if (d.valjdebitering) { ark.debitering = d.valjdebitering; ark.pris = ''; return rita(); }
@@ -982,6 +1073,7 @@ document.addEventListener('click', e => {
 
   if (d.spara) return sparaNy();
   if (d.post) { ark = { typ: 'andra', postId: d.post, rubrik: 'Ändra registrering' }; return rita(); }
+  if (d.valjandringartikel) { ark.articleId = d.valjandringartikel; return rita(); }
   if (d.sparaandring) return sparaAndring(d.sparaandring);
   if (d.tabort) return taBort(d.tabort);
   if (d.avboj) { return visa('Inget reseförslag den här gången.'); }
@@ -1071,6 +1163,38 @@ function sparaKund(id) {
   } catch (e) { visa(e.message); }
 }
 
+function sparaUppdrag(id) {
+  const p = L.uppdragFor(s, id);
+  if (!p) return visa('Uppdraget finns inte längre.');
+  const prisartiklar = (s.articles || [])
+    .filter(a => a.projectId === id && a.type !== 'trackingOnly' && a.billable !== false)
+    .map(a => ({
+      id: a.id,
+      pris: ark[`artikelpris_${a.id}`] ?? prisvarde(a.unitPriceOre),
+      vatRate: ark[`artikelmoms_${a.id}`] ?? a.vatRate,
+    }));
+  const leveranser = (s.deliverables || [])
+    .filter(l => l.projectId === id && (l.startDate || l.endDate))
+    .map(l => ({
+      id: l.id,
+      pris: ark[`leveranspris_${l.id}`] ?? prisvarde(l.amountOre),
+      startDate: ark[`leveransstart_${l.id}`] ?? l.startDate,
+      endDate: ark[`leveransslut_${l.id}`] ?? l.endDate,
+      vatRate: ark[`leveransmoms_${l.id}`] ?? l.vatRate,
+    }));
+  try {
+    s = L.uppdateraUppdrag(s, id, {
+      name: ark.uppdragsnamn ?? p.name,
+      clientId: ark.clientId ?? p.clientId,
+      defaultTripKm: ark.standardresaKm ?? p.defaultTripKm ?? '',
+      artiklar: prisartiklar,
+      leveranser,
+    });
+    spara(); ark = { typ: 'uppdrag' };
+    visa('Uppdragets priser och villkor är sparade.');
+  } catch (e) { visa(e.message); }
+}
+
 function synkaOmFranOneDrive() {
   if (harOsparadeAndringar()) return visa('Vänta tills Sparat visas innan du synkar om.');
   if (installningar.synkaOm) installningar.synkaOm();
@@ -1106,12 +1230,13 @@ function sparaAndring(id) {
   const datum = document.querySelector('[data-falt="datum"]')?.value;
   try {
     const p = s.poster.find(x => x.id === id);
-    const a = L.artikelFor(s, p.articleId);
+    const a = L.artikelFor(s, ark.articleId ?? p.articleId);
+    if (!a) return visa('Välj en giltig arbetstyp.');
     const qty = Math.round((Number(mangd) || 0) * L.MILLI);
     if (qty <= 0) return visa('Antalet måste vara större än noll.');
     s = L.andraPost(s, id, {
+      projectId: a.projectId, articleId: a.id,
       qtyMilli: qty, date: datum || p.date,
-      seconds: a?.unit === 'tim' ? Math.round(qty / L.MILLI * 3600) : p.seconds,
     });
     spara(); ark = null; visa('Ändringen är sparad.');
   } catch (e) { visa(e.message); }
@@ -1124,11 +1249,13 @@ function uppdateraFranAndringsformular(id) {
   const datumFalt = document.querySelector('[data-falt="datum"]');
   const qty = mangdFalt ? Math.round((Number(mangdFalt.value) || 0) * L.MILLI) : p.qtyMilli;
   if (qty <= 0) throw new Error('Antalet måste vara större än noll.');
-  const a = L.artikelFor(s, p.articleId);
+  const a = L.artikelFor(s, ark.articleId ?? p.articleId);
+  if (!a) throw new Error('Välj en giltig arbetstyp.');
   s = L.andraPost(s, id, {
+    projectId: a.projectId,
+    articleId: a.id,
     qtyMilli: qty,
     date: datumFalt?.value || p.date,
-    seconds: a?.unit === 'tim' ? Math.round(qty / L.MILLI * 3600) : p.seconds,
   });
 }
 
@@ -1139,7 +1266,7 @@ function importeraHelaHistoriken() {
   historikForslag = null;
   spara();
   ark = { typ: 'historik', manadsindex: 0 };
-  visa(`${antal} historikposter och fastprisperioder har lagts in som redan klara.`);
+  visa(`${antal} historikposter och fastprisperioder har fått rätt status vid gränsen 1 augusti.`);
 }
 
 function sparaHistorikbeslut(varde) {

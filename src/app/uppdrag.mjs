@@ -74,6 +74,85 @@ export function uppdateraKund(tillstand, clientId, indata) {
   };
 }
 
+const GILTIGA_MOMSSATSER = [0, 600, 1200, 2500];
+const giltigtDatum = v => /^\d{4}-\d{2}-\d{2}$/.test(text(v));
+
+/**
+ * Rättar grunduppgifter, priser och villkor på ett befintligt uppdrag.
+ * Poster ändras inte och låsta underlag behåller sina prissnapshots.
+ */
+export function uppdateraUppdrag(tillstand, projectId, indata) {
+  const befintligt = (tillstand.projects || []).find(p => p.id === projectId);
+  if (!befintligt) throw new Error('Uppdraget finns inte längre.');
+
+  const name = text(indata?.name);
+  if (!name) throw new Error('Uppdragets namn får inte vara tomt.');
+  const clientId = text(indata?.clientId) || befintligt.clientId;
+  if (!(tillstand.clients || []).some(c => c.id === clientId)) {
+    throw new Error('Den valda kunden finns inte längre.');
+  }
+
+  const artikelAndringar = new Map((indata?.artiklar || []).map(a => [a.id, a]));
+  for (const id of artikelAndringar.keys()) {
+    if (!(tillstand.articles || []).some(a => a.id === id && a.projectId === projectId)) {
+      throw new Error('En arbetstyp hör inte till det valda uppdraget.');
+    }
+  }
+  const articles = (tillstand.articles || []).map(a => {
+    const andring = artikelAndringar.get(a.id);
+    if (!andring) return a;
+    if (a.type === 'trackingOnly' || a.billable === false) return a;
+    const vatRate = Number(andring.vatRate);
+    if (!GILTIGA_MOMSSATSER.includes(vatRate)) throw new Error(`Välj moms för ${a.name}.`);
+    return {
+      ...a,
+      unitPriceOre: pengarOre(andring.pris, `Priset för ${a.name}`),
+      vatRate,
+      vatStatus: 'reviewed',
+      needsReview: false,
+    };
+  });
+
+  const leveransAndringar = new Map((indata?.leveranser || []).map(l => [l.id, l]));
+  for (const id of leveransAndringar.keys()) {
+    if (!(tillstand.deliverables || []).some(l => l.id === id && l.projectId === projectId)) {
+      throw new Error('En fastprisperiod hör inte till det valda uppdraget.');
+    }
+  }
+  const deliverables = (tillstand.deliverables || []).map(l => {
+    const andring = leveransAndringar.get(l.id);
+    if (!andring) return l;
+    const amountOre = pengarOre(andring.pris, `Fastpriset för ${l.name}`);
+    const startDate = text(andring.startDate);
+    const endDate = text(andring.endDate);
+    const vatRate = Number(andring.vatRate);
+    if (!giltigtDatum(startDate) || !giltigtDatum(endDate)) {
+      throw new Error(`Välj start- och slutdatum för ${l.name}.`);
+    }
+    if (endDate < startDate) throw new Error(`Slutdatumet kan inte ligga före startdatumet för ${l.name}.`);
+    if (!GILTIGA_MOMSSATSER.includes(vatRate)) throw new Error(`Välj moms för ${l.name}.`);
+    const ekonominAndras = amountOre !== l.amountOre || startDate !== l.startDate
+      || endDate !== l.endDate || vatRate !== l.vatRate;
+    if (l.invoiceRecordId && ekonominAndras) {
+      throw new Error(`${l.name} ligger i ett Lundify-underlag. Flytta tillbaka underlaget först.`);
+    }
+    return { ...l, amountOre, startDate, endDate, vatRate, vatStatus: 'reviewed', needsReview: false };
+  });
+
+  const harResa = articles.some(a => a.projectId === projectId && a.type === 'travel');
+  const defaultTripKm = harResa
+    ? heltal(indata?.defaultTripKm, 'Standardresan', { tillatTomt: true })
+    : befintligt.defaultTripKm ?? null;
+
+  return {
+    ...tillstand,
+    projects: (tillstand.projects || []).map(p => p.id === projectId
+      ? { ...p, name, clientId, defaultTripKm } : p),
+    articles,
+    deliverables,
+  };
+}
+
 /**
  * Tar fram uppdrag som finns i v1 men inte i det aktuella v2-tillståndet.
  * Resultatet innehåller bara grunddata som behövs för ett uttryckligt återval.

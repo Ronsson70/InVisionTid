@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import * as L from '../src/app/logik.mjs';
 import { franAppTillstand } from '../src/app/tillstand.mjs';
-import { tidigareUppdragFranV1, aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag, uppdateraKund }
+import { tidigareUppdragFranV1, aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag, uppdateraKund, uppdateraUppdrag }
   from '../src/app/uppdrag.mjs';
 
 const artikel = (id, projectId, type, unit) => ({
@@ -181,4 +181,89 @@ test('kundredigering avvisar tomt namn och okänd status', () => {
   assert.throws(() => uppdateraKund(grund(), 'k1', { name: '', status: 'active' }), /namn/);
   assert.throws(() => uppdateraKund(grund(), 'k1', { name: 'Kund', status: 'fel' }), /kundstatus/);
   assert.throws(() => uppdateraKund(grund(), 'saknas', { name: 'Kund', status: 'active' }), /finns inte/);
+});
+
+test('uppdragets priser, moms, kund och standardresa kan rättas', () => {
+  const s = {
+    ...grund(),
+    clients: [...grund().clients, { id: 'k2', name: 'Kund B' }],
+    deliverables: [{
+      id: 'l1', projectId: 'u1', name: 'Fast del', amountOre: 5000000,
+      vatRate: 2500, vatStatus: 'reviewed', status: 'planned', invoiceRecordId: null,
+      startDate: '2026-09-01', endDate: '2026-09-30',
+    }],
+  };
+  const ut = uppdateraUppdrag(s, 'u1', {
+    name: 'Rättat uppdrag', clientId: 'k2', defaultTripKm: '46',
+    artiklar: [
+      { id: 'a-tid', pris: '950', vatRate: 2500 },
+      { id: 'a-resa', pris: '6,25', vatRate: 2500 },
+      { id: 'a-utlagg', pris: '1', vatRate: 0 },
+    ],
+    leveranser: [{ id: 'l1', pris: '60 000', vatRate: 1200, startDate: '2026-10-01', endDate: '2026-10-31' }],
+  });
+
+  assert.equal(ut.projects[0].name, 'Rättat uppdrag');
+  assert.equal(ut.projects[0].clientId, 'k2');
+  assert.equal(ut.projects[0].defaultTripKm, 46);
+  assert.equal(ut.articles.find(a => a.id === 'a-tid').unitPriceOre, 95000);
+  assert.equal(ut.articles.find(a => a.id === 'a-resa').unitPriceOre, 625);
+  assert.equal(ut.articles.find(a => a.id === 'a-utlagg').vatRate, 0);
+  assert.equal(ut.deliverables[0].amountOre, 6000000);
+  assert.equal(ut.deliverables[0].vatRate, 1200);
+  assert.equal(ut.deliverables[0].startDate, '2026-10-01');
+  assert.equal(ut.deliverables[0].endDate, '2026-10-31');
+});
+
+test('ett låst fastpris kan inte rättas förrän underlaget flyttats tillbaka', () => {
+  const s = {
+    ...grund(),
+    deliverables: [{
+      id: 'l1', projectId: 'u1', name: 'Låst del', amountOre: 5000000,
+      vatRate: 2500, vatStatus: 'reviewed', status: 'included', invoiceRecordId: 'und-1',
+      startDate: '2026-09-01', endDate: '2026-09-30',
+    }],
+  };
+  const fore = JSON.stringify(s);
+  assert.throws(() => uppdateraUppdrag(s, 'u1', {
+    name: 'Uppdrag A', clientId: 'k1', defaultTripKm: '', artiklar: [],
+    leveranser: [{ id: 'l1', pris: '60000', vatRate: 2500, startDate: '2026-09-01', endDate: '2026-09-30' }],
+  }), /Flytta tillbaka/);
+  assert.equal(JSON.stringify(s), fore, 'indata får inte delvis ändras när valideringen stoppar');
+});
+
+test('en registrering kan flyttas till rätt uppdrag och arbetstyp', () => {
+  const s = {
+    ...grund(),
+    clients: [...grund().clients, { id: 'k2', name: 'Kund B' }],
+    projects: [...grund().projects, { id: 'u2', clientId: 'k2', name: 'Uppdrag B', kind: 'billable', active: true }],
+    articles: [...grund().articles, artikel('a-tid-2', 'u2', 'hourly', 'tim')],
+    poster: [{
+      id: 'fel', projectId: 'u1', articleId: 'a-tid', sourceType: 'entry',
+      date: '2026-08-27', qtyMilli: 1000, seconds: 3600, status: 'open', invoiceRecordId: null,
+    }],
+  };
+  const ut = L.andraPost(s, 'fel', {
+    projectId: 'u2', articleId: 'a-tid-2', date: '2026-08-28', qtyMilli: 2500,
+  });
+  const p = ut.poster[0];
+  assert.equal(p.projectId, 'u2');
+  assert.equal(p.articleId, 'a-tid-2');
+  assert.equal(p.date, '2026-08-28');
+  assert.equal(p.qtyMilli, 2500);
+  assert.equal(p.seconds, 9000);
+  assert.equal(p.sourceType, 'entry');
+});
+
+test('en registrering kan inte byta huvudtyp eller ändras när den är låst', () => {
+  const s = {
+    ...grund(),
+    poster: [{
+      id: 'fel', projectId: 'u1', articleId: 'a-tid', sourceType: 'entry',
+      date: '2026-08-27', qtyMilli: 1000, seconds: 3600, status: 'open', invoiceRecordId: null,
+    }],
+  };
+  assert.throws(() => L.andraPost(s, 'fel', { projectId: 'u1', articleId: 'a-resa' }), /huvudtyp/);
+  const last = { ...s, poster: [{ ...s.poster[0], invoiceRecordId: 'und-1' }] };
+  assert.throws(() => L.andraPost(last, 'fel', { qtyMilli: 2000 }), /överfört/);
 });

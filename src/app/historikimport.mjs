@@ -13,6 +13,8 @@ export const HISTORIK_BEHOVER_GRANSKAS = 'needsReview';
 export const HISTORIK_FAKTURERA = 'billable';
 export const HISTORIK_KLAR_I_LUNDIFY = 'lundifyDone';
 export const HISTORIK_ENDAST = 'historyOnly';
+/** Äldre än detta datum är redan klart. Från och med datumet är arbetet öppet. */
+export const OPPEN_FAKTURERING_FRAN = '2026-08-01';
 
 const lista = v => Array.isArray(v) ? v : [];
 const laggTillSaknade = (nuvarande, kandidater, omvandla = x => x) => {
@@ -31,25 +33,26 @@ const fastprisSignatur = leverans => [
 ].join('|');
 
 /**
- * All historik är enligt användaren redan fakturerad och klar i Lundify.
- * Fakturerbart arbete och kostnadsersättningar räknas därför på sina gamla
- * datum, men kan aldrig hamna i ett nytt underlag. Tid som ingår i fast pris,
- * internt eller ideellt arbete behålls bara som historik.
+ * Allt före 1 augusti 2026 är enligt användaren redan fakturerat och klart.
+ * Fakturerbara poster från och med 1 augusti förblir öppna. Tid som ingår i
+ * fast pris, internt eller ideellt arbete behålls alltid bara som historik.
  */
 function slutlageForHistorik(gammalt, post) {
   const artikel = lista(gammalt.articles).find(a => a.id === post.articleId);
   const uppdrag = lista(gammalt.projects).find(p => p.id === post.projectId);
   const endastHistorik = !artikel || uppdrag?.kind !== 'billable' || artikel.type === 'trackingOnly';
-  return endastHistorik
-    ? { legacyReviewStatus: HISTORIK_ENDAST, status: 'historyOnly' }
+  if (endastHistorik) return { legacyReviewStatus: HISTORIK_ENDAST, status: 'historyOnly' };
+  return String(post.date ?? '') >= OPPEN_FAKTURERING_FRAN
+    ? { legacyReviewStatus: HISTORIK_FAKTURERA, status: 'open' }
     : { legacyReviewStatus: HISTORIK_KLAR_I_LUNDIFY, status: 'handled' };
 }
 
-/** Skapar en periodiserad, redan fakturerad fastprispost ur ett komplett v1-avtal. */
+/** Skapar en periodiserad fastprispost ur ett komplett v1-avtal. */
 function fastprisFranV1(project, period, index, nu) {
   const amountOre = kronorTillOre(Number(period?.amount) || 0);
   if (period?.type !== 'fixed' || !period.startDate || !period.endDate || amountOre <= 0) return null;
   if (period.endDate < period.startDate) return null;
+  const redanKlar = period.endDate < OPPEN_FAKTURERING_FRAN;
   return {
     id: fastprisId(project.id, period, index),
     projectId: project.id,
@@ -58,10 +61,12 @@ function fastprisFranV1(project, period, index, nu) {
     vatRate: null,
     vatStatus: 'needsReview',
     needsReview: true,
-    reviewNote: 'Historiskt fastpris. Redan fakturerat och klart i Lundify.',
+    reviewNote: redanKlar
+      ? 'Historiskt fastpris. Redan fakturerat och klart i Lundify.'
+      : 'Fastpris från eller efter 1 augusti 2026. Kontrollera moms och markera leveransen klar när den ska faktureras.',
     order: index + 1,
-    status: 'invoiced',
-    completedAt: period.endDate,
+    status: redanKlar ? 'invoiced' : 'planned',
+    completedAt: redanKlar ? period.endDate : null,
     invoiceRecordId: null,
     priceSnapshot: null,
     startDate: period.startDate,
@@ -140,7 +145,21 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
   // mellan två datum. De fördelas över kalenderdagar av den befintliga
   // fastprisregeln. Signaturen hindrar dubbelräkning även om samma period
   // redan lagts upp manuellt med ett annat id.
-  const befintligaLeveranser = lista(tillstand?.deliverables);
+  let uppdateradeFastprisperioder = 0;
+  const befintligaLeveranser = lista(tillstand?.deliverables).map(l => {
+    const skaOppnas = l.legacySource === HISTORIK_KALLA
+      && !l.invoiceRecordId
+      && l.status === 'invoiced'
+      && String(l.endDate ?? '') >= OPPEN_FAKTURERING_FRAN;
+    if (!skaOppnas) return l;
+    uppdateradeFastprisperioder += 1;
+    return {
+      ...l,
+      status: 'planned',
+      completedAt: null,
+      reviewNote: 'Fastpris från eller efter 1 augusti 2026. Kontrollera moms och markera leveransen klar när den ska faktureras.',
+    };
+  });
   const leveransIdn = new Set(befintligaLeveranser.map(l => l.id));
   const leveransSignaturer = new Set(befintligaLeveranser.map(fastprisSignatur));
   const nyaFastprisperioder = [];
@@ -189,7 +208,8 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
       utlagg: nyaPoster.filter(p => p.sourceType === 'expense').length,
       uppdaterade: uppdateradePoster,
       fastprisperioder: nyaFastprisperioder.length,
-      totalt: nyaPoster.length + uppdateradePoster + nyaFastprisperioder.length,
+      uppdateradeFastprisperioder,
+      totalt: nyaPoster.length + uppdateradePoster + nyaFastprisperioder.length + uppdateradeFastprisperioder,
       gamlaFakturamarkeringar: nyaPoster.filter(p => p.legacyInvoiceMarked).length,
       kunder: nyttTillstand.clients.length - lista(tillstand?.clients).length,
       uppdrag: nyttTillstand.projects.length - lista(tillstand?.projects).length,

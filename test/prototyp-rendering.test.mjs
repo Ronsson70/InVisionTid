@@ -250,9 +250,31 @@ test('rendering: Mina uppdrag visar alla aktiva och vägen till ett nytt', () =>
   klicka({ oppna: 'uppdrag' });
   assert.match(html, /Aktiva uppdrag/);
   assert.match(html, /Lägg till nytt uppdrag/);
+  assert.match(html, /data-redigerauppdrag="u-behandling"/);
+  assert.match(html, /Redigera priser och villkor/);
   assert.match(html, /Kund A/);
   assert.match(html, /Kund B/);
   assert.match(html, /Kund C/);
+});
+
+test('rendering: ett befintligt uppdrag kan få priser och villkor rättade', () => {
+  klicka({ redigerauppdrag: 'u-behandling' });
+  assert.match(html, /Redigera uppdrag/);
+  assert.match(html, /data-falt="uppdragsnamn"/);
+  assert.match(html, /Timpris|Pris per tillfälle/);
+  assert.match(html, /Pris per kilometer/);
+  assert.match(html, /data-valjuppdragsmoms=/);
+  assert.match(html, /Standardresa i kilometer/);
+  assert.match(html, /data-sparauppdrag="u-behandling"/);
+});
+
+test('rendering: en registrering kan flyttas till rätt uppdrag och arbetstyp', () => {
+  klicka({ post: 'p-1' });
+  assert.match(html, /Ändra registrering/);
+  assert.match(html, /Uppdrag och arbetstyp/);
+  assert.match(html, /data-valjandringartikel="a-tillfalle"/);
+  assert.match(html, /data-valjandringartikel="b-timme"/);
+  assert.match(html, /data-sparaandring="p-1"/);
 });
 
 test('rendering: Mina kunder öppnar ett riktigt redigeringsformulär', () => {

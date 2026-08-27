@@ -20,7 +20,7 @@ import {
 export {
   DEBITERINGSTYPER, KUNDSTATUSAR, tidigareUppdragFranV1,
   aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag,
-  uppdateraKund,
+  uppdateraKund, uppdateraUppdrag,
 } from './uppdrag.mjs';
 
 export { harAvtalsperiod, periodKontroll, periodandelOre, arGenomford };
@@ -964,17 +964,35 @@ export function perKund(s, datumLista) {
 
 // ── Ändra och ta bort ───────────────────────────────────────────────────────
 
+const kalltypForArtikel = artikel => artikel?.type === 'travel' ? 'trip'
+  : artikel?.type === 'piece' && artikel?.unit === 'kr' ? 'expense'
+    : 'entry';
+
+/** Arbetstyper som en befintlig registrering säkert kan flyttas till. */
+export function valbaraArtiklarForPost(s, post) {
+  if (!post) return [];
+  const befintligArtikel = artikelFor(s, post.articleId);
+  const kalltyp = post.sourceType ?? kalltypForArtikel(befintligArtikel);
+  return (s.articles || [])
+    .filter(a => kalltypForArtikel(a) === kalltyp)
+    .filter(a => (s.projects || []).some(p => p.id === a.projectId))
+    .sort((a, b) => {
+      const pa = uppdragFor(s, a.projectId);
+      const pb = uppdragFor(s, b.projectId);
+      const ka = kundNamnForUppdrag(s, a.projectId);
+      const kb = kundNamnForUppdrag(s, b.projectId);
+      return ka.localeCompare(kb, 'sv') || String(pa?.name).localeCompare(String(pb?.name), 'sv')
+        || (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    });
+}
+
 export function laggTillPost(s, post) {
   const artikel = artikelFor(s, post.articleId);
   if (!artikel) throw new Error('Registreringen saknar en giltig arbetstyp. Ingenting har sparats.');
 
   // Källtypen sätts när posten skapas, aldrig först när lagringen försöker
   // dela upp tillståndet. Då kan ett ogiltigt tillstånd inte nå OneDrive.
-  const sourceType = post.sourceType ?? (
-    artikel.type === 'travel' ? 'trip'
-      : artikel.type === 'piece' && artikel.unit === 'kr' ? 'expense'
-        : 'entry'
-  );
+  const sourceType = post.sourceType ?? kalltypForArtikel(artikel);
   if (!['entry', 'trip', 'expense'].includes(sourceType)) {
     throw new Error('Registreringen har en okänd typ. Ingenting har sparats.');
   }
@@ -982,13 +1000,39 @@ export function laggTillPost(s, post) {
 }
 
 export function andraPost(s, id, andringar) {
+  const befintlig = s.poster.find(p => p.id === id);
+  if (!befintlig) throw new Error('Registreringen finns inte längre.');
+  if (befintlig.invoiceRecordId) {
+    throw new Error('Posten hör till ett underlag som redan är överfört och kan inte ändras.');
+  }
+  const articleId = andringar.articleId ?? befintlig.articleId;
+  const artikel = artikelFor(s, articleId);
+  if (!artikel) throw new Error('Välj en giltig arbetstyp.');
+  const projectId = andringar.projectId ?? artikel.projectId;
+  if (artikel.projectId !== projectId) throw new Error('Arbetstypen hör inte till det valda uppdraget.');
+  const befintligKalltyp = befintlig.sourceType ?? kalltypForArtikel(artikelFor(s, befintlig.articleId));
+  if (kalltypForArtikel(artikel) !== befintligKalltyp) {
+    throw new Error('Registreringens huvudtyp kan inte bytas. Ta bort den och registrera rätt typ i stället.');
+  }
+  const qtyMilli = andringar.qtyMilli ?? befintlig.qtyMilli;
+  if (!Number.isInteger(qtyMilli) || qtyMilli <= 0) throw new Error('Antalet måste vara större än noll.');
+  const date = andringar.date ?? befintlig.date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date))) throw new Error('Välj ett giltigt datum.');
+  const uppdaterad = {
+    ...befintlig,
+    ...andringar,
+    projectId,
+    articleId,
+    qtyMilli,
+    date,
+    sourceType: befintligKalltyp,
+    beskrivning: artikel.name,
+    seconds: artikel.unit === 'tim' ? Math.round(qtyMilli / MILLI * 3600) : null,
+    priceSnapshot: null,
+  };
   return {
     ...s,
-    poster: s.poster.map(p => {
-      if (p.id !== id) return p;
-      if (p.invoiceRecordId) throw new Error('Posten hör till ett underlag som redan är överfört och kan inte ändras.');
-      return { ...p, ...andringar };
-    }),
+    poster: s.poster.map(p => p.id === id ? uppdaterad : p),
   };
 }
 

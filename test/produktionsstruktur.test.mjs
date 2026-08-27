@@ -126,16 +126,20 @@ test('hela produktionslika historiken kompletterar exakt det som saknas', () => 
   assert.equal(igen.antal.totalt, 0, 'andra körningen lägger inte till någonting');
 });
 
-test('hela den produktionslika historiken blir redan klar och fastpriset periodiseras', () => {
+test('produktionslik historik låses före 1 augusti och lämnas öppen därefter', () => {
   const { tillstand } = tillAppTillstand(nystart(produktionslikV1, { nu: NU }));
   const plan = planeraHistorikimport(produktionslikV1, tillstand, { nu: NU });
   const s = L.normaliseraTillstand(plan.tillstand);
 
-  assert.equal(plan.antal.uppdaterade, 31, 'även de 22 + 9 poster som följde med nystarten färdigmarkeras');
+  assert.equal(plan.antal.uppdaterade, 31, 'även de 22 + 9 poster som följde med nystarten får gränsstatus');
   assert.equal(plan.antal.fastprisperioder, 1);
-  assert.ok(s.poster.every(p => p.status === 'handled' || p.status === 'historyOnly'),
-    'ingen gammal post står kvar som öppen eller behöver granskas');
-  assert.equal(L.underlagsgrupper(s).length, 0, 'inget gammalt kan faktureras igen');
+  const fakturerbara = s.poster.filter(p => L.historikpostKanFaktureras(s, p));
+  assert.ok(fakturerbara.filter(p => p.date < '2026-08-01').every(p => p.status === 'handled'));
+  assert.ok(fakturerbara.filter(p => p.date >= '2026-08-01').every(p => p.status === 'open'));
+  assert.ok(L.underlagsgrupper(s).some(g => g.rader.some(r => r.post.date >= '2026-08-01')),
+    'arbete från augusti ska nå Fakturera');
+  assert.ok(!L.underlagsgrupper(s).some(g => g.rader.some(r => r.post.date < '2026-08-01')),
+    'arbete före augusti får inte faktureras igen');
   assert.equal(L.manadsSammanstallning(s, '2026-02').delar.fastPrisAndelOre, 368228,
     'fastpriset får en månadsandel även när tiden inte styr fördelningen');
 });

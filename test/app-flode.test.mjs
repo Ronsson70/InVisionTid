@@ -7,6 +7,7 @@ import { planeraHistorikimport } from '../src/app/historikimport.mjs';
 
 let html = '';
 const lyssnare = {};
+const faltvarden = new Map();
 const app = {
   set innerHTML(v) { html = v; },
   get innerHTML() { return html; },
@@ -15,7 +16,10 @@ const app = {
 globalThis.document = {
   getElementById: () => app,
   addEventListener: (typ, fn) => { lyssnare[typ] = fn; },
-  querySelector: () => null,
+  querySelector: valjare => {
+    const match = String(valjare).match(/^\[data-falt="([^"]+)"\]$/);
+    return match && faltvarden.has(match[1]) ? { value: faltvarden.get(match[1]) } : null;
+  },
 };
 globalThis.window = { addEventListener() {}, location: { reload() {} }, confirm: () => true };
 globalThis.setTimeout = fn => { queueMicrotask(fn); return 1; };
@@ -25,7 +29,10 @@ const klicka = dataset => {
   const nod = { dataset, classList: { contains: () => false }, closest: () => nod };
   lyssnare.click({ target: nod });
 };
-const fyll = (falt, value) => lyssnare.input({ target: { dataset: { falt }, value } });
+const fyll = (falt, value) => {
+  faltvarden.set(falt, value);
+  lyssnare.input({ target: { dataset: { falt }, value } });
+};
 const tom = () => new Promise(resolve => setImmediate(resolve));
 
 const { startaApp } = await import('../src/app/ui.mjs');
@@ -111,12 +118,12 @@ test('klickflöde: hela historiken läggs in som redan klar och förblir rediger
 
   klicka({ oppna: 'mer' });
   klicka({ oppna: 'historik' });
-  assert.match(html, /Lägg in hela historiken/);
+  assert.match(html, /Tillämpa gränsen 1 augusti/);
   assert.match(html, /Tidsposter<\/span><span class="v">2/);
   klicka({ importerahistorik: '1' });
   await tom();
 
-  assert.match(html, /markerad som redan klar i Lundify/);
+  assert.match(html, /före 1 augusti är den klar i Lundify/i);
   assert.equal(sparade.at(-1).poster.filter(p => p.legacySource === 'v1-full-history').length, 3);
   assert.ok(sparade.at(-1).poster.every(p => p.legacySource !== 'v1-full-history' || p.status === 'handled'));
 
@@ -154,4 +161,40 @@ test('klickflöde: månadsmål och kunduppgifter sparas', async () => {
   assert.equal(kund.name, 'Kund A uppdaterad');
   assert.equal(kund.contact, 'Kontaktperson');
   assert.equal(kund.status, 'paused');
+});
+
+test('klickflöde: priser och en felregistrering kan rättas', async () => {
+  const sparade = [];
+  startaApp({
+    lagring: { async spara(s) { sparade.push(structuredClone(s)); } },
+    tillstand: skapaTestdata(),
+  });
+
+  klicka({ oppna: 'uppdrag' });
+  klicka({ redigerauppdrag: 'u-behandling' });
+  fyll('artikelpris_a-tillfalle', '2 500');
+  klicka({ valjuppdragsmoms: 'a-tillfalle|1200' });
+  fyll('standardresaKm', '46');
+  klicka({ sparauppdrag: 'u-behandling' });
+  await tom();
+
+  let senast = sparade.at(-1);
+  assert.equal(senast.articles.find(a => a.id === 'a-tillfalle').unitPriceOre, 250000);
+  assert.equal(senast.articles.find(a => a.id === 'a-tillfalle').vatRate, 1200);
+  assert.equal(senast.projects.find(p => p.id === 'u-behandling').defaultTripKm, 46);
+
+  klicka({ post: 'p-1' });
+  klicka({ valjandringartikel: 'b-timme' });
+  fyll('mangd', '2');
+  fyll('datum', '2026-08-20');
+  klicka({ sparaandring: 'p-1' });
+  await tom();
+
+  senast = sparade.at(-1);
+  const rattad = senast.poster.find(p => p.id === 'p-1');
+  assert.equal(rattad.projectId, 'u-lektioner');
+  assert.equal(rattad.articleId, 'b-timme');
+  assert.equal(rattad.qtyMilli, 2000);
+  assert.equal(rattad.date, '2026-08-20');
+  assert.equal(rattad.seconds, 7200);
 });

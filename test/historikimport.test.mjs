@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   planeraHistorikimport, beslutaHistorikpost, aterstallHistorikbeslut,
-  HISTORIK_FAKTURERA, HISTORIK_KLAR_I_LUNDIFY, HISTORIK_ENDAST,
+  HISTORIK_FAKTURERA, HISTORIK_KLAR_I_LUNDIFY, HISTORIK_ENDAST, OPPEN_FAKTURERING_FRAN,
 } from '../src/app/historikimport.mjs';
 import { franAppTillstand, tillAppTillstand } from '../src/app/tillstand.mjs';
 import * as L from '../src/app/logik.mjs';
@@ -35,7 +35,8 @@ const tomt = () => ({
 test('hela v1-historiken planeras för v2 utan att en rad försvinner', () => {
   const plan = planeraHistorikimport(v1(), tomt(), { nu: NU });
   assert.deepEqual(plan.antal, {
-    poster: 2, resor: 1, utlagg: 1, uppdaterade: 0, fastprisperioder: 1, totalt: 5,
+    poster: 2, resor: 1, utlagg: 1, uppdaterade: 0, fastprisperioder: 1,
+    uppdateradeFastprisperioder: 0, totalt: 5,
     gamlaFakturamarkeringar: 3, kunder: 2, uppdrag: 2,
   });
   assert.deepEqual(new Set(plan.tillstand.poster.map(p => p.id)), new Set(['e1', 'e2', 't1', 'x1']));
@@ -44,6 +45,54 @@ test('hela v1-historiken planeras för v2 utan att en rad försvinner', () => {
   assert.ok(plan.tillstand.poster.filter(p => ['e1', 't1', 'x1'].includes(p.id)).every(p => p.status === 'handled'));
   assert.equal(plan.tillstand.deliverables[0].status, 'invoiced');
   assert.equal(plan.tillstand.deliverables[0].amountOre, 5000000);
+});
+
+test('1 augusti är en skarp gräns mellan redan klart och öppet för fakturering', () => {
+  const data = v1();
+  data.entries = [
+    { id: 'juli', projectId: 'p1', date: '2026-07-31', moment: 'Juli', seconds: 3600 },
+    { id: 'augusti', projectId: 'p1', date: OPPEN_FAKTURERING_FRAN, moment: 'Augusti', seconds: 3600 },
+  ];
+  data.trips = [];
+  data.expenses = [];
+  const s = planeraHistorikimport(data, tomt(), { nu: NU }).tillstand;
+  const juli = s.poster.find(p => p.id === 'juli');
+  const augusti = s.poster.find(p => p.id === 'augusti');
+
+  assert.equal(juli.status, 'handled');
+  assert.equal(juli.legacyReviewStatus, HISTORIK_KLAR_I_LUNDIFY);
+  assert.equal(augusti.status, 'open');
+  assert.equal(augusti.legacyReviewStatus, HISTORIK_FAKTURERA);
+  assert.ok(L.underlagsgrupper(s).some(g => g.rader.some(r => r.post.id === 'augusti')));
+  assert.ok(!L.underlagsgrupper(s).some(g => g.rader.some(r => r.post.id === 'juli')));
+});
+
+test('en post som tidigare låstes efter 1 augusti öppnas igen', () => {
+  const data = v1();
+  data.entries = [{ id: 'augusti', projectId: 'p1', date: '2026-08-10', moment: 'Augusti', seconds: 3600 }];
+  data.trips = [];
+  data.expenses = [];
+  const migrerad = planeraHistorikimport(data, tomt(), { nu: NU }).tillstand;
+  const felaktigtLast = {
+    ...migrerad,
+    poster: migrerad.poster.map(p => p.id === 'augusti'
+      ? { ...p, status: 'handled', legacyReviewStatus: HISTORIK_KLAR_I_LUNDIFY } : p),
+  };
+  const plan = planeraHistorikimport(data, felaktigtLast, { nu: NU });
+  assert.equal(plan.tillstand.poster.find(p => p.id === 'augusti').status, 'open');
+  assert.equal(plan.antal.uppdaterade, 1);
+});
+
+test('fastpris som slutar efter gränsen är öppet för upparbetning men inte automatiskt genomfört', () => {
+  const data = v1();
+  data.projects[1].pricingPeriods = [
+    { id: 'aug', type: 'fixed', amount: 50000, startDate: '2026-08-01', endDate: '2026-08-31' },
+  ];
+  const plan = planeraHistorikimport(data, tomt(), { nu: NU });
+  const l = plan.tillstand.deliverables[0];
+  assert.equal(l.status, 'planned');
+  assert.equal(l.completedAt, null);
+  assert.equal(L.manadsSammanstallning(plan.tillstand, '2026-08').delar.fastPrisAndelOre, 5000000);
 });
 
 test('befintlig v2-post vinner och importen skapar aldrig dubbletter', () => {
