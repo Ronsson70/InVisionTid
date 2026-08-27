@@ -1,23 +1,32 @@
-// Införandet: från v1-filen till en ny v2-fil, i sju låsta steg.
+// Införandet: från v1-filen till en ny v2-fil.
 //
 // v1-filen är LÄSBAR under hela förloppet och ändras aldrig. Skrivspärren i
 // lagring.mjs gör det tekniskt omöjligt, inte bara osannolikt.
 //
-// Ordningen är inte förhandlingsbar:
+// Ordningen är inte förhandlingsbar, och den är ändrad efter det första
+// misslyckade försöket:
 //
-//   1. läs v1 som råtext och räkna checksumma
-//   2. visa exakt vad som finns och vad som skulle föras över
-//   3. vänta på den ordagranna bekräftelsen
-//   4. skriv en byte-identisk backup av v1
-//   5. läs tillbaka backupen och verifiera checksumma och bytelängd
-//   6. skapa v2-filen
-//   7. läs tillbaka v2 och verifiera
+//   FÖRE BEKRÄFTELSEN — ingenting skrivs, någonsin
+//     1. läs v1 som råtext och räkna checksumma
+//     2. validera strukturen: varje samling vid namn
+//     3. migrera i minnet och kontrollera hela resultatet
+//     4. visa sammanfattningen
 //
-// Misslyckas något steg avbryts hela införandet. v1 är då fortfarande orörd,
-// eftersom ingenting någonsin skrivits till den.
+//   EFTER BEKRÄFTELSEN
+//     5. kräv JA, SKRIV ordagrant
+//     6. skriv en backup av v1 och verifiera den
+//     7. skriv v2-filen
+//     8. läs tillbaka v2 och verifiera
+//
+// Första försöket hade steg 6 före migreringen. Migreringen lyckades, men
+// resultatet gick inte att visa i appen — och då låg backupen och v2-filen
+// redan i OneDrive. Nu sker allt som kan misslyckas innan något skrivs.
 
 import { analysera, nystart } from '../domain/nystart.mjs';
-import { V1_SOKVAG, V2_SOKVAG, backupSokvag, sha256, bytesFor } from '../integrations/onedrive/lagring.mjs';
+import { valideraV1, kontrolleraForeSkrivning, OgiltigStruktur } from './tillstand.mjs';
+import {
+  V1_SOKVAG, V2_SOKVAG, backupSokvag, ledigBackupSokvag, sha256, bytesFor,
+} from '../integrations/onedrive/lagring.mjs';
 
 export const BEKRAFTELSE = 'JA, SKRIV';
 
@@ -31,30 +40,71 @@ export class InfrandeAvbrutet extends Error {
 }
 
 /**
- * Steg 1–2. Läser v1 och visar vad som finns. Skriver ingenting.
- * @returns {object} kontrolluppgifter och en sammanfattning av nystarten
+ * Jämför vad analysen lovade med vad migreringen faktiskt valde ut.
+ *
+ * Analysen och nystarten räknar samma sak på två olika sätt. Går de isär har
+ * någon ändrat den ena utan den andra, och då ska införandet stanna i stället
+ * för att skriva en fil ingen kan förklara.
+ *
+ * @returns {string[]} avvikelser i klartext, tom lista när allt stämmer
+ */
+export function jamforUrval(analys, antal) {
+  const avvikelser = [];
+  const kolla = (vad, valtUt, oppna) => {
+    if (valtUt !== oppna) avvikelser.push(`${vad}: ${valtUt} valdes ut, ${oppna} var öppna`);
+  };
+  kolla('tidsposter', antal.tidsposter, analys.forsOver.oppnaPoster);
+  kolla('resor', antal.resor, analys.forsOver.oppnaResor);
+  return avvikelser;
+}
+
+/**
+ * Steg 1–4. Läser, validerar, migrerar och kontrollerar — allt i minnet.
+ * Skriver ingenting, oavsett vad som händer.
+ *
+ * @returns {object} kontrolluppgifter, sammanfattning och ett färdigt v2-resultat
  */
 export async function forbered(lagring, { nu }) {
-  const v2Finns = await lagring.metadata(V2_SOKVAG);
-  if (v2Finns) {
-    throw new InfrandeAvbrutet('kontroll',
-      'Det finns redan en v2-fil. Införandet görs bara en gång.');
-  }
-
+  // ── Steg 1: läs v1 ───────────────────────────────────────────────────────
   const v1 = await lagring.las(V1_SOKVAG);
   if (!v1) {
-    throw new InfrandeAvbrutet('läsning',
-      `Hittade ingen fil på ${V1_SOKVAG}.`);
+    throw new InfrandeAvbrutet('läsning', `Hittade ingen fil på ${V1_SOKVAG}.`);
   }
 
-  let indata;
+  let ravaraObjekt;
   try {
-    indata = JSON.parse(v1.text);
+    ravaraObjekt = JSON.parse(v1.text);
   } catch (e) {
     throw new InfrandeAvbrutet('läsning', 'Filen är inte giltig JSON: ' + e.message);
   }
 
+  // ── Steg 2: validera strukturen ──────────────────────────────────────────
+  let indata, saknadeIV1;
+  try {
+    ({ data: indata, saknadeValfria: saknadeIV1 } = valideraV1(ravaraObjekt));
+  } catch (e) {
+    if (e instanceof OgiltigStruktur) throw new InfrandeAvbrutet('validering', e.message);
+    throw e;
+  }
+
   const analys = analysera(indata, { nu });
+
+  // ── Steg 3: migrera i minnet och kontrollera hela resultatet ─────────────
+  let v2, kontroll;
+  try {
+    v2 = nystart(indata, { nu });
+    kontroll = kontrolleraForeSkrivning(v2);
+  } catch (e) {
+    throw new InfrandeAvbrutet('migrering',
+      'Den gamla filen gick att läsa, men resultatet gick inte att använda: ' + e.message);
+  }
+
+  // Det migreringen valde ut måste stämma med det analysen lovade.
+  const avvikelser = jamforUrval(analys, kontroll.antal);
+  if (avvikelser.length) {
+    throw new InfrandeAvbrutet('kontroll',
+      'Urvalet stämmer inte med analysen — ' + avvikelser.join('; ') + '.');
+  }
 
   return {
     nu,
@@ -70,6 +120,7 @@ export async function forbered(lagring, { nu }) {
       graphByte: v1.byte,
       checksumma: v1.checksumma,
       eTag: v1.eTag,
+      saknadeSamlingar: saknadeIV1,
       antal: {
         kunder: analys.kalla.clients,
         uppdrag: analys.kalla.projects,
@@ -80,6 +131,10 @@ export async function forbered(lagring, { nu }) {
       },
     },
     analys,
+    // Färdigt och kontrollerat. Skrivs först efter bekräftelsen.
+    v2,
+    tillstand: kontroll.tillstand,
+    valtUt: kontroll.antal,
     ravara: v1.text,
     indata,
     bekraftat: false,
@@ -87,24 +142,40 @@ export async function forbered(lagring, { nu }) {
 }
 
 /**
- * Steg 3–7. Kräver den ordagranna bekräftelsen.
- * Skriver backup först, verifierar den, och skapar sedan v2.
+ * Steg 5–8. Kräver den ordagranna bekräftelsen.
+ *
+ * Allt som kunde misslyckas har redan gjort det i forbered(). Här återstår
+ * bara skrivningarna, och backupen skrivs före v2.
  */
 export async function genomfor(forberedelse, lagring, { bekraftelse, nu }) {
+  // ── Steg 5: bekräftelsen ─────────────────────────────────────────────────
   if (bekraftelse !== BEKRAFTELSE) {
     throw new InfrandeAvbrutet('bekräftelse',
       `Skriv exakt "${BEKRAFTELSE}" för att genomföra införandet.`);
   }
+  if (!forberedelse?.v2 || !forberedelse?.ravara) {
+    throw new InfrandeAvbrutet('kontroll',
+      'Förberedelsen är ofullständig. Ladda om sidan och börja om.');
+  }
 
-  // ── Steg 4: backup av v1, byte för byte ──────────────────────────────────
-  const backupVag = backupSokvag('v1', nu);
+  // v2-filen får inte finnas. Kontrollen görs så sent som möjligt, så att ett
+  // annat försök i en annan flik inte hinner emellan.
+  if (await lagring.metadata(V2_SOKVAG)) {
+    throw new InfrandeAvbrutet('kontroll',
+      `Det finns redan en fil på ${V2_SOKVAG}. Införandet görs bara en gång, `
+      + 'och en befintlig fil skrivs aldrig över.');
+  }
+
+  // ── Steg 6: backup av v1, byte för byte ──────────────────────────────────
+  //
+  // Namnet väljs så att en backup från ett tidigare försök aldrig skrivs över.
+  const backupVag = await ledigBackupSokvag(lagring, 'v1', nu);
   try {
     await lagring.skriv(backupVag, forberedelse.ravara);
   } catch (e) {
     throw new InfrandeAvbrutet('backup', 'Backupen kunde inte skrivas: ' + e.message);
   }
 
-  // ── Steg 5: läs tillbaka och verifiera ───────────────────────────────────
   const kontroll = await lagring.las(backupVag);
   if (!kontroll) throw new InfrandeAvbrutet('backup', 'Backupen gick inte att läsa tillbaka.');
   if (kontroll.checksumma !== forberedelse.kalla.checksumma) {
@@ -116,13 +187,12 @@ export async function genomfor(forberedelse, lagring, { bekraftelse, nu }) {
       `Backupens bytelängd stämmer inte. Väntade ${forberedelse.kalla.byteLangd}, fick ${kontroll.byteLangd}.`);
   }
 
-  // ── Steg 6: skapa v2 ─────────────────────────────────────────────────────
-  const v2 = nystart(forberedelse.indata, { nu });
-  const text = JSON.stringify(v2, null, 2);
+  // ── Steg 7: skriv v2 ─────────────────────────────────────────────────────
+  const text = JSON.stringify(forberedelse.v2, null, 2);
   const forvantad = await sha256(text);
   await lagring.skriv(V2_SOKVAG, text);
 
-  // ── Steg 7: läs tillbaka och verifiera ───────────────────────────────────
+  // ── Steg 8: läs tillbaka och verifiera ───────────────────────────────────
   const tillbaka = await lagring.las(V2_SOKVAG);
   if (!tillbaka) throw new InfrandeAvbrutet('kontroll', 'v2-filen gick inte att läsa tillbaka.');
   if (tillbaka.checksumma !== forvantad) {
@@ -153,7 +223,8 @@ export async function genomfor(forberedelse, lagring, { bekraftelse, nu }) {
     },
     v1Oforandrad,
     v1Efter: v1Efter && { byte: v1Efter.byte, andrad: v1Efter.andrad },
-    data: v2,
+    data: forberedelse.v2,
+    tillstand: forberedelse.tillstand,
     text,
   };
 }

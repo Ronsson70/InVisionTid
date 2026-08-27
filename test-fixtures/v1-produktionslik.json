@@ -1,0 +1,2249 @@
+{
+  "_kommentar": "SANERAD fixtur. Samma struktur och samma aggregat som den verkliga filen, men påhittade namn och belopp. Innehåller ingen kunddata.",
+  "clients": [
+    {
+      "id": "k1",
+      "name": "Kund 1",
+      "contact": "",
+      "phone": "",
+      "email": "",
+      "orgNr": "",
+      "address": "",
+      "status": "active"
+    },
+    {
+      "id": "k2",
+      "name": "Kund 2",
+      "contact": "",
+      "phone": "",
+      "email": "",
+      "orgNr": "",
+      "address": "",
+      "status": "active"
+    },
+    {
+      "id": "k3",
+      "name": "Kund 3",
+      "contact": "",
+      "phone": "",
+      "email": "",
+      "orgNr": "",
+      "address": "",
+      "status": "active"
+    },
+    {
+      "id": "k4",
+      "name": "Kund 4",
+      "contact": "",
+      "phone": "",
+      "email": "",
+      "orgNr": "",
+      "address": "",
+      "status": "active"
+    },
+    {
+      "id": "k5",
+      "name": "Kund 5",
+      "contact": "",
+      "phone": "",
+      "email": "",
+      "orgNr": "",
+      "address": "",
+      "status": "active"
+    },
+    {
+      "id": "k6",
+      "name": "Kund 6",
+      "contact": "",
+      "phone": "",
+      "email": "",
+      "orgNr": "",
+      "address": "",
+      "status": "active"
+    }
+  ],
+  "projects": [
+    {
+      "id": "p1",
+      "name": "Uppdrag 1",
+      "clientId": "k1",
+      "sessionPrice": 0,
+      "defaultTripKm": 24
+    },
+    {
+      "id": "p2",
+      "name": "Uppdrag 2",
+      "clientId": "k1",
+      "sessionPrice": 0,
+      "defaultTripKm": 18,
+      "pricingPeriods": [
+        {
+          "id": "per-1",
+          "type": "fixed",
+          "amount": 48000,
+          "startDate": "2026-01-01",
+          "endDate": "2026-12-31"
+        }
+      ]
+    },
+    {
+      "id": "p3",
+      "name": "Uppdrag 3",
+      "clientId": "k2",
+      "sessionPrice": 650,
+      "defaultTripKm": 12
+    },
+    {
+      "id": "p4",
+      "name": "Uppdrag 4",
+      "clientId": "k3",
+      "sessionPrice": 0,
+      "defaultTripKm": 40
+    },
+    {
+      "id": "p5",
+      "name": "Uppdrag 5",
+      "clientId": "k4",
+      "sessionPrice": 0,
+      "defaultTripKm": 8
+    },
+    {
+      "id": "p6",
+      "name": "Uppdrag 6",
+      "clientId": "k5",
+      "sessionPrice": 0,
+      "defaultTripKm": 30
+    },
+    {
+      "id": "p7",
+      "name": "Uppdrag 7",
+      "clientId": "k6",
+      "sessionPrice": 0,
+      "defaultTripKm": 30
+    }
+  ],
+  "entries": [
+    {
+      "id": "e-p1-m0",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m1",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-02-02",
+      "createdAt": "2026-02-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m2",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-03-03",
+      "createdAt": "2026-03-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m3",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-04-04",
+      "createdAt": "2026-04-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m4",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-05",
+      "createdAt": "2026-05-05T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m5",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-06",
+      "createdAt": "2026-06-06T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m6",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m7",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-02-08",
+      "createdAt": "2026-02-08T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m8",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-03-09",
+      "createdAt": "2026-03-09T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m9",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-04-10",
+      "createdAt": "2026-04-10T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m10",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-05-11",
+      "createdAt": "2026-05-11T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m11",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-06-12",
+      "createdAt": "2026-06-12T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m12",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-13",
+      "createdAt": "2026-01-13T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m13",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-02-14",
+      "createdAt": "2026-02-14T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m14",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-03-15",
+      "createdAt": "2026-03-15T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m15",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-04-16",
+      "createdAt": "2026-04-16T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m16",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-17",
+      "createdAt": "2026-05-17T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m17",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-18",
+      "createdAt": "2026-06-18T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m18",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-19",
+      "createdAt": "2026-01-19T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-m19",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-02-20",
+      "createdAt": "2026-02-20T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m0",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m1",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-02-02",
+      "createdAt": "2026-02-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m2",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-03-03",
+      "createdAt": "2026-03-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m3",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-04-04",
+      "createdAt": "2026-04-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m4",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-05",
+      "createdAt": "2026-05-05T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m5",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-06",
+      "createdAt": "2026-06-06T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m6",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m7",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-02-08",
+      "createdAt": "2026-02-08T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m8",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-03-09",
+      "createdAt": "2026-03-09T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m9",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-04-10",
+      "createdAt": "2026-04-10T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m10",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-05-11",
+      "createdAt": "2026-05-11T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m11",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-06-12",
+      "createdAt": "2026-06-12T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m12",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-13",
+      "createdAt": "2026-01-13T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m13",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-02-14",
+      "createdAt": "2026-02-14T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m14",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-03-15",
+      "createdAt": "2026-03-15T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m15",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-04-16",
+      "createdAt": "2026-04-16T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m16",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-17",
+      "createdAt": "2026-05-17T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m17",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-18",
+      "createdAt": "2026-06-18T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m18",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-19",
+      "createdAt": "2026-01-19T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-m19",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-02-20",
+      "createdAt": "2026-02-20T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m0",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m1",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-02-02",
+      "createdAt": "2026-02-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m2",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-03-03",
+      "createdAt": "2026-03-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m3",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-01-04",
+      "createdAt": "2026-01-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m4",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-02-05",
+      "createdAt": "2026-02-05T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m5",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-03-06",
+      "createdAt": "2026-03-06T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m6",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m7",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-02-08",
+      "createdAt": "2026-02-08T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m8",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-03-09",
+      "createdAt": "2026-03-09T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m9",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-01-10",
+      "createdAt": "2026-01-10T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m10",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-02-11",
+      "createdAt": "2026-02-11T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m11",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-03-12",
+      "createdAt": "2026-03-12T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m12",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-13",
+      "createdAt": "2026-01-13T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m13",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-02-14",
+      "createdAt": "2026-02-14T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-m14",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-03-15",
+      "createdAt": "2026-03-15T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m0",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-01",
+      "createdAt": "2026-05-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m1",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-02",
+      "createdAt": "2026-06-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m2",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-03",
+      "createdAt": "2026-07-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m3",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-04",
+      "createdAt": "2026-08-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m4",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-05",
+      "createdAt": "2026-05-05T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m5",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-06",
+      "createdAt": "2026-06-06T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m6",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-07",
+      "createdAt": "2026-07-07T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m7",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-08",
+      "createdAt": "2026-08-08T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m8",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-09",
+      "createdAt": "2026-05-09T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m9",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-10",
+      "createdAt": "2026-06-10T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m10",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-11",
+      "createdAt": "2026-07-11T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m11",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-12",
+      "createdAt": "2026-08-12T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m12",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-13",
+      "createdAt": "2026-05-13T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m13",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-14",
+      "createdAt": "2026-06-14T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m14",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-15",
+      "createdAt": "2026-07-15T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m15",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-16",
+      "createdAt": "2026-08-16T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m16",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-17",
+      "createdAt": "2026-05-17T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m17",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-18",
+      "createdAt": "2026-06-18T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m18",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-19",
+      "createdAt": "2026-07-19T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m19",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-20",
+      "createdAt": "2026-08-20T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m20",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-21",
+      "createdAt": "2026-05-21T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m21",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-06-22",
+      "createdAt": "2026-06-22T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m22",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-23",
+      "createdAt": "2026-07-23T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m23",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-24",
+      "createdAt": "2026-08-24T16:00:00.000Z"
+    },
+    {
+      "id": "e-p4-m24",
+      "projectId": "p4",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-05-25",
+      "createdAt": "2026-05-25T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m0",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-01",
+      "createdAt": "2026-07-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m1",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-02",
+      "createdAt": "2026-08-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m2",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-03",
+      "createdAt": "2026-07-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m3",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-04",
+      "createdAt": "2026-08-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m4",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-05",
+      "createdAt": "2026-07-05T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m5",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-06",
+      "createdAt": "2026-08-06T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m6",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-07",
+      "createdAt": "2026-07-07T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m7",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-08",
+      "createdAt": "2026-08-08T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m8",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-09",
+      "createdAt": "2026-07-09T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m9",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-10",
+      "createdAt": "2026-08-10T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m10",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-11",
+      "createdAt": "2026-07-11T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m11",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-12",
+      "createdAt": "2026-08-12T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m12",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-13",
+      "createdAt": "2026-07-13T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m13",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-14",
+      "createdAt": "2026-08-14T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m14",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-15",
+      "createdAt": "2026-07-15T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m15",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-16",
+      "createdAt": "2026-08-16T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m16",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-17",
+      "createdAt": "2026-07-17T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m17",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-18",
+      "createdAt": "2026-08-18T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m18",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-19",
+      "createdAt": "2026-07-19T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m19",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-20",
+      "createdAt": "2026-08-20T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m20",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-21",
+      "createdAt": "2026-07-21T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m21",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-22",
+      "createdAt": "2026-08-22T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m22",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-23",
+      "createdAt": "2026-07-23T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m23",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-08-24",
+      "createdAt": "2026-08-24T16:00:00.000Z"
+    },
+    {
+      "id": "e-p5-m24",
+      "projectId": "p5",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-25",
+      "createdAt": "2026-07-25T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m0",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m1",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-01-02",
+      "createdAt": "2026-01-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m2",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-03",
+      "createdAt": "2026-01-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m3",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-01-04",
+      "createdAt": "2026-01-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m4",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-05",
+      "createdAt": "2026-01-05T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m5",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-01-06",
+      "createdAt": "2026-01-06T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m6",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m7",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-01-08",
+      "createdAt": "2026-01-08T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m8",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-09",
+      "createdAt": "2026-01-09T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m9",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-01-10",
+      "createdAt": "2026-01-10T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m10",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-11",
+      "createdAt": "2026-01-11T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m11",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-01-12",
+      "createdAt": "2026-01-12T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m12",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-13",
+      "createdAt": "2026-01-13T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m13",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-01-14",
+      "createdAt": "2026-01-14T16:00:00.000Z"
+    },
+    {
+      "id": "e-p6-m14",
+      "projectId": "p6",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-15",
+      "createdAt": "2026-01-15T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m0",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m1",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-01-02",
+      "createdAt": "2026-01-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m2",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-03",
+      "createdAt": "2026-01-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m3",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-01-04",
+      "createdAt": "2026-01-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m4",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-05",
+      "createdAt": "2026-01-05T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m5",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-01-06",
+      "createdAt": "2026-01-06T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m6",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m7",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-01-08",
+      "createdAt": "2026-01-08T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m8",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-09",
+      "createdAt": "2026-01-09T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m9",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-01-10",
+      "createdAt": "2026-01-10T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m10",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-11",
+      "createdAt": "2026-01-11T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m11",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 9000,
+      "date": "2026-01-12",
+      "createdAt": "2026-01-12T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m12",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-01-13",
+      "createdAt": "2026-01-13T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m13",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-01-14",
+      "createdAt": "2026-01-14T16:00:00.000Z"
+    },
+    {
+      "id": "e-p7-m14",
+      "projectId": "p7",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-01-15",
+      "createdAt": "2026-01-15T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-o0",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-01",
+      "createdAt": "2026-07-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-o1",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-02",
+      "createdAt": "2026-08-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-o2",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-03",
+      "createdAt": "2026-07-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-o3",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-08-04",
+      "createdAt": "2026-08-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-o4",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-07-05",
+      "createdAt": "2026-07-05T16:00:00.000Z"
+    },
+    {
+      "id": "e-p1-o5",
+      "projectId": "p1",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-08-06",
+      "createdAt": "2026-08-06T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o0",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-01",
+      "createdAt": "2026-07-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o1",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-02",
+      "createdAt": "2026-08-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o2",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-03",
+      "createdAt": "2026-07-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o3",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-08-04",
+      "createdAt": "2026-08-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o4",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-07-05",
+      "createdAt": "2026-07-05T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o5",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-08-06",
+      "createdAt": "2026-08-06T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o6",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-07",
+      "createdAt": "2026-07-07T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o7",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-08",
+      "createdAt": "2026-08-08T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o8",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-09",
+      "createdAt": "2026-07-09T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o9",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-08-10",
+      "createdAt": "2026-08-10T16:00:00.000Z"
+    },
+    {
+      "id": "e-p2-o10",
+      "projectId": "p2",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-07-11",
+      "createdAt": "2026-07-11T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-o0",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-07-01",
+      "createdAt": "2026-07-01T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-o1",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-08-02",
+      "createdAt": "2026-08-02T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-o2",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 7200,
+      "date": "2026-07-03",
+      "createdAt": "2026-07-03T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-o3",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 3600,
+      "date": "2026-08-04",
+      "createdAt": "2026-08-04T16:00:00.000Z"
+    },
+    {
+      "id": "e-p3-o4",
+      "projectId": "p3",
+      "moment": "Arbete",
+      "seconds": 5400,
+      "date": "2026-07-05",
+      "createdAt": "2026-07-05T16:00:00.000Z"
+    }
+  ],
+  "expenses": [
+    {
+      "id": "x-p1-0",
+      "projectId": "p1",
+      "amount": 120,
+      "description": "Material",
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T18:00:00.000Z"
+    },
+    {
+      "id": "x-p2-1",
+      "projectId": "p2",
+      "amount": 160,
+      "description": "Material",
+      "date": "2026-01-02",
+      "createdAt": "2026-01-02T18:00:00.000Z"
+    },
+    {
+      "id": "x-p4-2",
+      "projectId": "p4",
+      "amount": 200,
+      "description": "Material",
+      "date": "2026-05-03",
+      "createdAt": "2026-05-03T18:00:00.000Z"
+    },
+    {
+      "id": "x-p5-3",
+      "projectId": "p5",
+      "amount": 240,
+      "description": "Material",
+      "date": "2026-07-04",
+      "createdAt": "2026-07-04T18:00:00.000Z"
+    },
+    {
+      "id": "x-p6-4",
+      "projectId": "p6",
+      "amount": 280,
+      "description": "Material",
+      "date": "2026-01-05",
+      "createdAt": "2026-01-05T18:00:00.000Z"
+    }
+  ],
+  "trips": [
+    {
+      "id": "t-p1-m0",
+      "projectId": "p1",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m1",
+      "projectId": "p1",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-02-02",
+      "createdAt": "2026-02-02T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m2",
+      "projectId": "p1",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-03-03",
+      "createdAt": "2026-03-03T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m3",
+      "projectId": "p1",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-04-04",
+      "createdAt": "2026-04-04T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m4",
+      "projectId": "p1",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-05-05",
+      "createdAt": "2026-05-05T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m5",
+      "projectId": "p1",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-06-06",
+      "createdAt": "2026-06-06T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m6",
+      "projectId": "p1",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m7",
+      "projectId": "p1",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-02-08",
+      "createdAt": "2026-02-08T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m8",
+      "projectId": "p1",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-03-09",
+      "createdAt": "2026-03-09T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m9",
+      "projectId": "p1",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-04-10",
+      "createdAt": "2026-04-10T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m10",
+      "projectId": "p1",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-05-11",
+      "createdAt": "2026-05-11T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-m11",
+      "projectId": "p1",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-06-12",
+      "createdAt": "2026-06-12T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m0",
+      "projectId": "p2",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m1",
+      "projectId": "p2",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-02-02",
+      "createdAt": "2026-02-02T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m2",
+      "projectId": "p2",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-03-03",
+      "createdAt": "2026-03-03T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m3",
+      "projectId": "p2",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-04-04",
+      "createdAt": "2026-04-04T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m4",
+      "projectId": "p2",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-05-05",
+      "createdAt": "2026-05-05T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m5",
+      "projectId": "p2",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-06-06",
+      "createdAt": "2026-06-06T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m6",
+      "projectId": "p2",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m7",
+      "projectId": "p2",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-02-08",
+      "createdAt": "2026-02-08T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m8",
+      "projectId": "p2",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-03-09",
+      "createdAt": "2026-03-09T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m9",
+      "projectId": "p2",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-04-10",
+      "createdAt": "2026-04-10T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m10",
+      "projectId": "p2",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-05-11",
+      "createdAt": "2026-05-11T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-m11",
+      "projectId": "p2",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-06-12",
+      "createdAt": "2026-06-12T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m0",
+      "projectId": "p3",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m1",
+      "projectId": "p3",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-02-02",
+      "createdAt": "2026-02-02T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m2",
+      "projectId": "p3",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-03-03",
+      "createdAt": "2026-03-03T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m3",
+      "projectId": "p3",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-01-04",
+      "createdAt": "2026-01-04T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m4",
+      "projectId": "p3",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-02-05",
+      "createdAt": "2026-02-05T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m5",
+      "projectId": "p3",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-03-06",
+      "createdAt": "2026-03-06T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m6",
+      "projectId": "p3",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m7",
+      "projectId": "p3",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-02-08",
+      "createdAt": "2026-02-08T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m8",
+      "projectId": "p3",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-03-09",
+      "createdAt": "2026-03-09T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-m9",
+      "projectId": "p3",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-01-10",
+      "createdAt": "2026-01-10T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m0",
+      "projectId": "p4",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-05-01",
+      "createdAt": "2026-05-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m1",
+      "projectId": "p4",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-06-02",
+      "createdAt": "2026-06-02T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m2",
+      "projectId": "p4",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-07-03",
+      "createdAt": "2026-07-03T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m3",
+      "projectId": "p4",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-08-04",
+      "createdAt": "2026-08-04T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m4",
+      "projectId": "p4",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-05-05",
+      "createdAt": "2026-05-05T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m5",
+      "projectId": "p4",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-06-06",
+      "createdAt": "2026-06-06T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m6",
+      "projectId": "p4",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-07-07",
+      "createdAt": "2026-07-07T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m7",
+      "projectId": "p4",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-08-08",
+      "createdAt": "2026-08-08T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m8",
+      "projectId": "p4",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-05-09",
+      "createdAt": "2026-05-09T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m9",
+      "projectId": "p4",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-06-10",
+      "createdAt": "2026-06-10T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m10",
+      "projectId": "p4",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-07-11",
+      "createdAt": "2026-07-11T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m11",
+      "projectId": "p4",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-08-12",
+      "createdAt": "2026-08-12T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m12",
+      "projectId": "p4",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-05-13",
+      "createdAt": "2026-05-13T17:00:00.000Z"
+    },
+    {
+      "id": "t-p4-m13",
+      "projectId": "p4",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-06-14",
+      "createdAt": "2026-06-14T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m0",
+      "projectId": "p5",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-07-01",
+      "createdAt": "2026-07-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m1",
+      "projectId": "p5",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-08-02",
+      "createdAt": "2026-08-02T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m2",
+      "projectId": "p5",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-07-03",
+      "createdAt": "2026-07-03T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m3",
+      "projectId": "p5",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-08-04",
+      "createdAt": "2026-08-04T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m4",
+      "projectId": "p5",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-07-05",
+      "createdAt": "2026-07-05T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m5",
+      "projectId": "p5",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-08-06",
+      "createdAt": "2026-08-06T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m6",
+      "projectId": "p5",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-07-07",
+      "createdAt": "2026-07-07T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m7",
+      "projectId": "p5",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-08-08",
+      "createdAt": "2026-08-08T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m8",
+      "projectId": "p5",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-07-09",
+      "createdAt": "2026-07-09T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m9",
+      "projectId": "p5",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-08-10",
+      "createdAt": "2026-08-10T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m10",
+      "projectId": "p5",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-07-11",
+      "createdAt": "2026-07-11T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m11",
+      "projectId": "p5",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-08-12",
+      "createdAt": "2026-08-12T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m12",
+      "projectId": "p5",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-07-13",
+      "createdAt": "2026-07-13T17:00:00.000Z"
+    },
+    {
+      "id": "t-p5-m13",
+      "projectId": "p5",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-08-14",
+      "createdAt": "2026-08-14T17:00:00.000Z"
+    },
+    {
+      "id": "t-p6-m0",
+      "projectId": "p6",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p6-m1",
+      "projectId": "p6",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-01-02",
+      "createdAt": "2026-01-02T17:00:00.000Z"
+    },
+    {
+      "id": "t-p6-m2",
+      "projectId": "p6",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-01-03",
+      "createdAt": "2026-01-03T17:00:00.000Z"
+    },
+    {
+      "id": "t-p6-m3",
+      "projectId": "p6",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-01-04",
+      "createdAt": "2026-01-04T17:00:00.000Z"
+    },
+    {
+      "id": "t-p6-m4",
+      "projectId": "p6",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-01-05",
+      "createdAt": "2026-01-05T17:00:00.000Z"
+    },
+    {
+      "id": "t-p6-m5",
+      "projectId": "p6",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-01-06",
+      "createdAt": "2026-01-06T17:00:00.000Z"
+    },
+    {
+      "id": "t-p6-m6",
+      "projectId": "p6",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T17:00:00.000Z"
+    },
+    {
+      "id": "t-p6-m7",
+      "projectId": "p6",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-01-08",
+      "createdAt": "2026-01-08T17:00:00.000Z"
+    },
+    {
+      "id": "t-p7-m0",
+      "projectId": "p7",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-01-01",
+      "createdAt": "2026-01-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p7-m1",
+      "projectId": "p7",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-01-02",
+      "createdAt": "2026-01-02T17:00:00.000Z"
+    },
+    {
+      "id": "t-p7-m2",
+      "projectId": "p7",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-01-03",
+      "createdAt": "2026-01-03T17:00:00.000Z"
+    },
+    {
+      "id": "t-p7-m3",
+      "projectId": "p7",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-01-04",
+      "createdAt": "2026-01-04T17:00:00.000Z"
+    },
+    {
+      "id": "t-p7-m4",
+      "projectId": "p7",
+      "km": 36,
+      "description": "Resa",
+      "date": "2026-01-05",
+      "createdAt": "2026-01-05T17:00:00.000Z"
+    },
+    {
+      "id": "t-p7-m5",
+      "projectId": "p7",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-01-06",
+      "createdAt": "2026-01-06T17:00:00.000Z"
+    },
+    {
+      "id": "t-p7-m6",
+      "projectId": "p7",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-01-07",
+      "createdAt": "2026-01-07T17:00:00.000Z"
+    },
+    {
+      "id": "t-p7-m7",
+      "projectId": "p7",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-01-08",
+      "createdAt": "2026-01-08T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-o0",
+      "projectId": "p1",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-07-01",
+      "createdAt": "2026-07-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-o1",
+      "projectId": "p1",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-08-02",
+      "createdAt": "2026-08-02T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-o2",
+      "projectId": "p1",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-07-03",
+      "createdAt": "2026-07-03T17:00:00.000Z"
+    },
+    {
+      "id": "t-p1-o3",
+      "projectId": "p1",
+      "km": 30,
+      "description": "Resa",
+      "date": "2026-08-04",
+      "createdAt": "2026-08-04T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-o0",
+      "projectId": "p2",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-07-01",
+      "createdAt": "2026-07-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-o1",
+      "projectId": "p2",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-08-02",
+      "createdAt": "2026-08-02T17:00:00.000Z"
+    },
+    {
+      "id": "t-p2-o2",
+      "projectId": "p2",
+      "km": 24,
+      "description": "Resa",
+      "date": "2026-07-03",
+      "createdAt": "2026-07-03T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-o0",
+      "projectId": "p3",
+      "km": 12,
+      "description": "Resa",
+      "date": "2026-07-01",
+      "createdAt": "2026-07-01T17:00:00.000Z"
+    },
+    {
+      "id": "t-p3-o1",
+      "projectId": "p3",
+      "km": 18,
+      "description": "Resa",
+      "date": "2026-08-02",
+      "createdAt": "2026-08-02T17:00:00.000Z"
+    }
+  ],
+  "invoices": [
+    {
+      "projectId": "p1",
+      "month": "2026-01",
+      "invoicedAt": "2026-01-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p1",
+      "month": "2026-02",
+      "invoicedAt": "2026-02-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p1",
+      "month": "2026-03",
+      "invoicedAt": "2026-03-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p1",
+      "month": "2026-04",
+      "invoicedAt": "2026-04-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p1",
+      "month": "2026-05",
+      "invoicedAt": "2026-05-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p1",
+      "month": "2026-06",
+      "invoicedAt": "2026-06-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p2",
+      "month": "2026-01",
+      "invoicedAt": "2026-01-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p2",
+      "month": "2026-02",
+      "invoicedAt": "2026-02-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p2",
+      "month": "2026-03",
+      "invoicedAt": "2026-03-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p2",
+      "month": "2026-04",
+      "invoicedAt": "2026-04-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p2",
+      "month": "2026-05",
+      "invoicedAt": "2026-05-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p2",
+      "month": "2026-06",
+      "invoicedAt": "2026-06-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p3",
+      "month": "2026-01",
+      "invoicedAt": "2026-01-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p3",
+      "month": "2026-02",
+      "invoicedAt": "2026-02-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p3",
+      "month": "2026-03",
+      "invoicedAt": "2026-03-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p4",
+      "month": "2026-05",
+      "invoicedAt": "2026-05-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p4",
+      "month": "2026-06",
+      "invoicedAt": "2026-06-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p4",
+      "month": "2026-07",
+      "invoicedAt": "2026-07-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p4",
+      "month": "2026-08",
+      "invoicedAt": "2026-08-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p5",
+      "month": "2026-07",
+      "invoicedAt": "2026-07-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p5",
+      "month": "2026-08",
+      "invoicedAt": "2026-08-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p6",
+      "month": "2026-01",
+      "invoicedAt": "2026-01-28T10:00:00.000Z"
+    },
+    {
+      "projectId": "p7",
+      "month": "2026-01",
+      "invoicedAt": "2026-01-28T10:00:00.000Z"
+    }
+  ],
+  "deletedIds": {},
+  "hourlyRate": 850,
+  "kmRate": 2.5,
+  "weeklyGoal": 20,
+  "settings": {
+    "staleWarningDays": 14
+  },
+  "schemaVersion": 1,
+  "lastSync": "2026-08-26T21:12:03.000Z"
+}

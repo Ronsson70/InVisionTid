@@ -22,6 +22,12 @@ const repoRot = fileURLToPath(new URL('../', import.meta.url));
 const NU = '2026-08-27T14:30:00.000Z';
 const v1Fixtur = () => readFileSync(join(repoRot, 'test-fixtures', 'v1-legacy.json'), 'utf8');
 
+/** Minsta giltiga v2-fil. Alla obligatoriska samlingar finns. */
+const tomV2 = (extra = {}) => ({
+  clients: [], projects: [], articles: [], entries: [], trips: [], expenses: [],
+  deliverables: [], invoiceRecords: [], ...extra,
+});
+
 /** Graph-stubbe som registrerar varje begäran och håller filer i minnet. */
 function stubbGraph(filer = {}) {
   const anrop = [];
@@ -135,11 +141,20 @@ test('kontrollsidan visar antal, inte kundnamn eller belopp', async () => {
   assert.ok(!/\d{4,}0\b/.test(synligt.replace(/sha256:[0-9a-f]+/, '')), 'inga prisbelopp');
 });
 
-test('införandet vägrar om en v2-fil redan finns', async () => {
-  const fetch = stubbGraph({ [V1_SOKVAG]: v1Fixtur(), [V2_SOKVAG]: '{}' });
-  await assert.rejects(
-    () => forbered(skapaLagring({ token: 'T', hamta: fetch }), { nu: NU }),
+test('en befintlig v2-fil skrivs aldrig över', async () => {
+  // Kontrollen sker så sent som möjligt, sa att ett annat försök i en annan
+  // flik inte hinner emellan mellan kontroll och skrivning.
+  const fetch = stubbGraph({ [V1_SOKVAG]: v1Fixtur() });
+  const lagring = skapaLagring({ token: 'T', hamta: fetch });
+  const f = await forbered(lagring, { nu: NU });
+
+  const fore = '{"skapad-av-ett-tidigare-forsok":true}';
+  fetch.lager[V2_SOKVAG] = fore;
+
+  await assert.rejects(() => genomfor(f, lagring, { bekraftelse: BEKRAFTELSE, nu: NU }),
     e => e instanceof InfrandeAvbrutet && /bara en gång/.test(e.message));
+  assert.equal(fetch.lager[V2_SOKVAG], fore, 'filen är orörd');
+  assert.ok(!fetch.anrop.some(a => a.metod === 'PUT'), 'ingen skrivning alls');
 });
 
 test('utan den ordagranna bekräftelsen skrivs ingenting', async () => {
@@ -265,16 +280,18 @@ test('nystarten dokumenterar vad som lämnades kvar', () => {
 
 test('en ändrad fil ger synkkonflikt i stället för överskrivning', async () => {
   const { skapaOneDriveLagring } = await import('../src/app/lagring-onedrive.mjs');
-  const fetch = stubbGraph({ [V2_SOKVAG]: JSON.stringify({ poster: [] }) });
+  const fetch = stubbGraph({ [V2_SOKVAG]: JSON.stringify(tomV2()) });
   const lagring = skapaOneDriveLagring({ token: 'T', hamta: fetch, nu: () => NU });
 
-  await lagring.las();
+  const s = await lagring.las();
 
   // Någon annan skriver filen mellan läsning och sparning.
-  fetch.lager[V2_SOKVAG] = JSON.stringify({ poster: [{ id: 'annan-flik' }] });
+  fetch.lager[V2_SOKVAG] = JSON.stringify(tomV2({ entries: [{ id: 'annan-flik', date: '2026-08-01' }] }));
   const fore = fetch.lager[V2_SOKVAG];
 
-  await assert.rejects(() => lagring.spara({ poster: [{ id: 'min' }] }), Synkkonflikt);
+  await assert.rejects(
+    () => lagring.spara({ ...s, poster: [{ id: 'min', date: '2026-08-01', sourceType: 'entry' }] }),
+    Synkkonflikt);
   assert.equal(fetch.lager[V2_SOKVAG], fore, 'den andra flikens data är orörd');
 });
 
@@ -285,17 +302,21 @@ test('konfliktbeskedet är på vanlig svenska', () => {
 
 test('sparning gör backup, skriver och läser tillbaka', async () => {
   const { skapaOneDriveLagring } = await import('../src/app/lagring-onedrive.mjs');
-  const fetch = stubbGraph({ [V2_SOKVAG]: JSON.stringify({ poster: [] }) });
+  const fetch = stubbGraph({ [V2_SOKVAG]: JSON.stringify(tomV2()) });
   const lagring = skapaOneDriveLagring({ token: 'T', hamta: fetch, nu: () => NU });
 
-  await lagring.las();
-  await lagring.spara({ poster: [{ id: 'ny' }] });
+  const s = await lagring.las();
+  await lagring.spara({ ...s, poster: [{ id: 'ny', date: '2026-08-01', sourceType: 'entry' }] });
 
   const skrivningar = fetch.anrop.filter(a => a.metod === 'PUT').map(a => a.url);
   assert.equal(skrivningar.length, 2);
   assert.match(skrivningar[0], /invisiontid-data-v2-backup-/, 'backup först');
   assert.match(skrivningar[1], /invisiontid-data-v2\.json/);
-  assert.deepEqual(JSON.parse(fetch.lager[V2_SOKVAG]).poster, [{ id: 'ny' }]);
+
+  // Filen får tillbaka sin egen form: entries, inte poster.
+  const sparad = JSON.parse(fetch.lager[V2_SOKVAG]);
+  assert.equal(sparad.poster, undefined, 'filen har aldrig en poster-lista');
+  assert.deepEqual(sparad.entries.map(e => e.id), ['ny']);
 });
 
 // ── En enda tillståndsmodell ────────────────────────────────────────────────

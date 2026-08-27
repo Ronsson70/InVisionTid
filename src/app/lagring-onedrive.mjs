@@ -9,8 +9,9 @@
 // senare gissar fel.
 
 import {
-  skapaLagring, V2_SOKVAG, backupSokvag, sha256, Synkkonflikt,
+  skapaLagring, V2_SOKVAG, ledigBackupSokvag, sha256, Synkkonflikt,
 } from '../integrations/onedrive/lagring.mjs';
+import { tillAppTillstand, franAppTillstand } from './tillstand.mjs';
 
 /**
  * @param {object} opts
@@ -31,12 +32,22 @@ export function skapaOneDriveLagring({ token, hamta, nu = () => new Date().toISO
     /** Metadata för v2-filen. null när den inte finns ännu. */
     metadata: () => graph.metadata(V2_SOKVAG),
 
-    /** Läser v2-filen. Returnerar null när den inte finns. */
+    /**
+     * Läser v2-filen och ger tillbaka APPENS tillstånd, inte filens form.
+     *
+     * Filen har entries, trips och expenses. Appen har poster. Översättningen
+     * sker här och ingen annanstans — att skicka filobjektet rakt in i appen
+     * var precis det som fällde första införandet.
+     *
+     * Returnerar null när filen inte finns. Kastar OgiltigStruktur när den
+     * finns men inte går att använda.
+     */
     async las() {
       const fil = await graph.las(V2_SOKVAG);
       if (!fil) return null;
+      const { tillstand } = tillAppTillstand(JSON.parse(fil.text));
       kand = { eTag: fil.eTag, checksumma: fil.checksumma, id: fil.id, andrad: fil.andrad };
-      return JSON.parse(fil.text);
+      return tillstand;
     },
 
     /**
@@ -45,9 +56,10 @@ export function skapaOneDriveLagring({ token, hamta, nu = () => new Date().toISO
      * 1. hämta aktuell metadata
      * 2. jämför eTag med den inlästa versionen
      * 3. avvikelse → avbryt UTAN skrivning
-     * 4. backup av den senaste v2-versionen
-     * 5. skriv
-     * 6. läs tillbaka och verifiera
+     * 4. översätt tillbaka till filens form
+     * 5. backup av den senaste v2-versionen
+     * 6. skriv
+     * 7. läs tillbaka och verifiera
      */
     async spara(tillstand) {
       const aktuell = await graph.metadata(V2_SOKVAG);
@@ -57,13 +69,18 @@ export function skapaOneDriveLagring({ token, hamta, nu = () => new Date().toISO
         throw new Synkkonflikt();          // avbryter före varje skrivning
       }
 
-      // Backup av den version som är på väg att ersättas.
+      // Filens form återställs innan något skrivs. Går inte det ska det
+      // upptäckas här, före backupen — inte halvvägs genom en skrivning.
+      const fil = franAppTillstand(tillstand);
+
+      // Backup av den version som är på väg att ersättas. En befintlig backup
+      // skrivs aldrig över.
       const tidigare = await graph.las(V2_SOKVAG);
       if (tidigare) {
-        await graph.skriv(backupSokvag('v2', nu()), tidigare.text);
+        await graph.skriv(await ledigBackupSokvag(graph, 'v2', nu()), tidigare.text);
       }
 
-      const text = JSON.stringify(tillstand, null, 2);
+      const text = JSON.stringify(fil, null, 2);
       const forvantad = await sha256(text);
       await graph.skriv(V2_SOKVAG, text, { eTag: kand.eTag });
 

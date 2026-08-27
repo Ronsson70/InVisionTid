@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 import { skapaTestdata } from '../prototyp/testdata.mjs';
+import { produktionslikV1 } from '../test-fixtures/bygg-produktionslik.mjs';
 
 const repoRot = fileURLToPath(new URL('../', import.meta.url));
 const V1 = 'InVisionTid/invisiontid-data.json';
@@ -28,7 +29,7 @@ const TOKEN_NYCKEL = 'invisiontid-ms-token';
 const UTGANG_NYCKEL = 'invisiontid-ms-expiry';
 
 /** Minimal DOM som räcker för att fånga det appen renderar. */
-function stubbaWebblasare() {
+function stubbaWebblasare(v1 = v1txt) {
   const nod = () => ({
     innerHTML: '', value: '', textContent: '', dataset: {}, style: {},
     appendChild() {}, removeChild() {}, click() {}, addEventListener() {},
@@ -37,7 +38,7 @@ function stubbaWebblasare() {
   const app = nod();
   const lagrat = new Map();
   const anrop = [];
-  const filer = { [V1]: v1txt };
+  const filer = { [V1]: v1 };
 
   globalThis.document = {
     getElementById: id => (id === 'app' ? app : null),
@@ -142,4 +143,45 @@ test('rökprov: produktionssidan visar ingen testdata', async () => {
   for (const kund of JSON.parse(v1txt).clients) {
     assert.ok(!sida.includes(kund.name), `kundnamnet "${kund.name}" ska inte visas`);
   }
+});
+
+
+test('rökprov: produktionslik fil renderar kontrollsidan och skriver ingenting', async () => {
+  // Samma struktur och samma aggregat som den verkliga filen — den fil som
+  // fällde första införandet.
+  const produktionslik = JSON.stringify(produktionslikV1, null, 2);
+  const w = stubbaWebblasare(produktionslik);
+  const { start } = await import('../src/app/start.mjs');
+
+  w.loggaIn();
+  await start();
+  const sida = w.app.innerHTML;
+
+  assert.match(sida, /Starta nya InVisionTid/, 'kontrollsidan visas');
+  assert.ok(sida.includes('157'), 'antal tidsposter i filen');
+  assert.ok(sida.includes('22'), 'öppna tidsposter');
+  assert.ok(sida.includes('JA, SKRIV'));
+
+  assert.deepEqual(w.anrop.filter(a => a.metod === 'PUT'), [],
+    'migreringen sker i minnet — ingenting skrivs');
+  assert.equal(w.filer[V2], undefined, 'ingen v2-fil');
+  assert.equal(w.filer[V1], produktionslik, 'v1 är byte för byte oförändrad');
+});
+
+test('rökprov: en oanvändbar v2-fil startar inte appen och skrivs inte över', async () => {
+  const w = stubbaWebblasare();
+  // Ett avbrutet försök kan ha lämnat en fil som inte går att läsa in.
+  const halvfardig = JSON.stringify({ clients: [], projects: [] });
+  w.filer[V2] = halvfardig;
+
+  const { start } = await import('../src/app/start.mjs');
+  w.loggaIn();
+  await start();
+  const sida = w.app.innerHTML;
+
+  assert.match(sida, /går inte att använda/, 'appen säger ifrån i klartext');
+  assert.ok(/articles|entries/.test(sida), 'och namnger vad som saknas');
+  assert.deepEqual(w.anrop.filter(a => a.metod === 'PUT'), [], 'ingenting skrivs');
+  assert.equal(w.filer[V2], halvfardig, 'filen är orörd');
+  assert.equal(w.filer[V1], v1txt, 'v1 är orörd');
 });

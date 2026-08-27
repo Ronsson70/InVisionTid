@@ -12,6 +12,7 @@ import { startaApp } from './ui.mjs';
 import { skapaOneDriveLagring } from './lagring-onedrive.mjs';
 import { forbered, genomfor, BEKRAFTELSE, backupFilnamn, V1_SOKVAG, V2_SOKVAG } from './infrande.mjs';
 import { hamtaToken, fangaTokenFranAdress, logga_in, loggaUt } from './inloggning.mjs';
+import { OgiltigStruktur } from './tillstand.mjs';
 
 const rot = () => document.getElementById('app');
 const esc = t => String(t ?? '').replace(/[&<>"']/g, c =>
@@ -43,6 +44,7 @@ function visaInforande() {
   const k = f.kalla;
   const o = f.analys.forsOver;
   const a = f.analys.lamnasIArkivet;
+  const u = f.valtUt;
 
   rot().innerHTML = `
     <header><h1>Starta nya InVisionTid</h1>
@@ -61,6 +63,9 @@ function visaInforande() {
       ${rad('Resor', k.antal.resor)}
       ${rad('Utlägg', k.antal.utlagg)}
       ${rad('Fakturamarkeringar', k.antal.fakturamarkeringar)}
+      ${k.saknadeSamlingar.length
+        ? `<div class="notis">Filen saknar ${esc(k.saknadeSamlingar.join(', '))}. Det är tillåtet — de räknas som tomma.</div>`
+        : ''}
       <div class="notis">Filen läses bara. Den ändras, flyttas eller döps aldrig om.</div>
     </div>
 
@@ -72,6 +77,7 @@ function visaInforande() {
       ${rad('Öppna resor', o.oppnaResor)}
       ${rad('Öppna utlägg', o.oppnaUtlagg)}
       ${rad('Fakturamarkeringar', '0')}
+      ${rad('Redan uträknat och kontrollerat', `${u.poster} poster, ${u.artiklar} artiklar`)}
       <div class="notis">
         Tid på fastprisuppdrag följer med som uppföljning och kan inte bli fakturarader.
         Behandlingstillfällen får antal 1 och måste kontrolleras, eftersom den gamla appen
@@ -97,17 +103,46 @@ function visaInforande() {
     <div class="kort">
       <div class="rubrik">Så här går det till</div>
       <div class="notis">
+        Den nya filen är redan uträknad och kontrollerad här i webbläsaren.
+        Ingenting har skrivits, och ingenting skrivs förrän du bekräftar.<br><br>
         1. En byte-identisk backup av den gamla filen skapas i OneDrive och verifieras.<br>
         2. Backupen erbjuds också som nedladdning till datorn.<br>
         3. Först därefter skapas ${esc(V2_SOKVAG)}.<br>
         4. Den nya filen läses tillbaka och kontrolleras.<br>
         Misslyckas något steg avbryts allt, och den gamla filen är fortfarande orörd.
+        En backup som redan finns skrivs aldrig över.
       </div>
       <div class="faltrubrik">Skriv ${esc(BEKRAFTELSE)} för att genomföra</div>
       <input type="text" data-falt="bekraftelse" placeholder="${esc(BEKRAFTELSE)}" autocomplete="off">
       ${felbesked ? `<div class="varning"><strong>Införandet avbröts</strong>${esc(felbesked)}</div>` : ''}
       <button class="primar" data-genomfor="1" ${arbetar ? 'disabled' : ''}>
         ${arbetar ? 'Arbetar…' : 'Skapa backup och starta nya InVisionTid'}</button>
+      <button class="avbryt" data-loggaut="1">Logga ut</button>
+    </div>`;
+}
+
+/**
+ * v2-filen finns men går inte att använda.
+ *
+ * Appen startar inte, och skriver ingenting. Att skriva över filen hade kunnat
+ * förstöra det enda spåret av ett avbrutet införande.
+ */
+function visaOanvandbarV2(fel) {
+  rot().innerHTML = `
+    <header><h1>In Vision Tid</h1>
+      <div class="datum">Den nya filen går inte att använda</div></header>
+    <div class="kort">
+      <div class="varning">
+        <strong>${esc(V2_SOKVAG)} finns, men kunde inte läsas in</strong>
+        ${esc(fel.message)}
+      </div>
+      ${fel.samling ? rad('Samling', fel.samling) : ''}
+      <div class="notis">
+        Appen har inte ändrat någonting. Filen ligger kvar precis som den är, och den
+        gamla filen är oförändrad. Flytta undan eller döp om den nya filen i OneDrive
+        om du vill göra ett nytt införande — ta inte bort någon backup.
+      </div>
+      <button class="sekundar" data-laddaom="1">Ladda om</button>
       <button class="avbryt" data-loggaut="1">Logga ut</button>
     </div>`;
 }
@@ -134,7 +169,7 @@ async function genomforInforande() {
     const resultat = await genomfor(forberedelse, lagring.graph, { bekraftelse: skrivet, nu });
     laddaNerBackup(forberedelse.ravara, backupFilnamn(nu));
     lagring.sattVersion({ eTag: resultat.v2.eTag, checksumma: resultat.v2.checksumma, id: resultat.v2.id });
-    startaApp({ lagring, tillstand: resultat.data });
+    startaApp({ lagring, tillstand: resultat.tillstand });
   } catch (e) {
     arbetar = false;
     felbesked = e.message;
@@ -171,7 +206,16 @@ export async function start() {
   lagring = skapaOneDriveLagring({ token });
 
   try {
-    const tillstand = await lagring.las();
+    let tillstand = null;
+    try {
+      tillstand = await lagring.las();
+    } catch (e) {
+      // Filen finns, men går inte att använda. Ett avbrutet införande kan ha
+      // hunnit skapa den. Då ska appen INTE starta på den, och absolut inte
+      // skriva över den — den kan vara det enda som finns kvar av försöket.
+      if (e instanceof OgiltigStruktur) return visaOanvandbarV2(e);
+      throw e;
+    }
     if (tillstand) return startaApp({ lagring, tillstand });
 
     // Ingen v2-fil ännu: kontrollsidan. Inget skrivs.

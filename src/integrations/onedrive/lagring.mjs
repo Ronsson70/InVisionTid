@@ -21,8 +21,10 @@ export const LASBARA = Object.freeze([V1_SOKVAG, V2_SOKVAG]);
 /** Sökvägar som får skrivas. v1 finns medvetet INTE med. */
 export const SKRIVBARA = Object.freeze([V2_SOKVAG]);
 
-/** Backupfiler får skapas, men bara med det här mönstret. */
-const BACKUP_MONSTER = /^InVisionTid\/invisiontid-data-v[12]-backup-\d{8}-\d{6}\.json$/;
+// Backupfiler får skapas, men bara med det här mönstret. Suffixet -2, -3 ...
+// finns för att TVÅ försök samma sekund inte ska skriva över varandra: en
+// backup från ett misslyckat försök är ofta den enda kopian som finns.
+const BACKUP_MONSTER = /^InVisionTid\/invisiontid-data-v[12]-backup-\d{8}-\d{6}(-\d+)?\.json$/;
 
 export class SkrivvagAvvisad extends Error {
   constructor(sokvag) {
@@ -58,12 +60,32 @@ export function kontrolleraSkrivvag(sokvag) {
 }
 
 /** Backupfilnamn med tidsstämpel: invisiontid-data-v1-backup-20260827-143000.json */
-export function backupSokvag(version, nu) {
+export function backupSokvag(version, nu, ordning = 1) {
   const d = new Date(nu);
   const p = n => String(n).padStart(2, '0');
   const stampel = `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`
     + `-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
-  return `${BACKUP_MAPP}/invisiontid-data-${version}-backup-${stampel}.json`;
+  const suffix = ordning > 1 ? `-${ordning}` : '';
+  return `${BACKUP_MAPP}/invisiontid-data-${version}-backup-${stampel}${suffix}.json`;
+}
+
+/**
+ * Ett backupnamn som inte redan är upptaget.
+ *
+ * En befintlig backup skrivs ALDRIG över. Efter ett avbrutet införande kan den
+ * vara den enda kopian av den gamla filen som finns.
+ *
+ * @param {object} lagring  något med metadata(sokvag)
+ * @returns {Promise<string>}
+ */
+export async function ledigBackupSokvag(lagring, version, nu, maxForsok = 50) {
+  for (let ordning = 1; ordning <= maxForsok; ordning++) {
+    const sokvag = backupSokvag(version, nu, ordning);
+    if (!(await lagring.metadata(sokvag))) return sokvag;
+  }
+  throw new Error(
+    `Hittade inget ledigt backupnamn för ${version} vid ${nu}. `
+    + 'Ingen befintlig backup har rörts.');
 }
 
 // ── Hjälpare ────────────────────────────────────────────────────────────────
