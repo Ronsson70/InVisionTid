@@ -9,9 +9,10 @@
 // senare gissar fel.
 
 import {
-  skapaLagring, V2_SOKVAG, ledigBackupSokvag, sha256, Synkkonflikt,
+  skapaLagring, V1_SOKVAG, V2_SOKVAG, ledigBackupSokvag, sha256, Synkkonflikt,
 } from '../integrations/onedrive/lagring.mjs';
 import { tillAppTillstand, franAppTillstand } from './tillstand.mjs';
+import { tidigareUppdragFranV1 } from './uppdrag.mjs';
 
 /**
  * @param {object} opts
@@ -48,6 +49,16 @@ export function skapaOneDriveLagring({ token, hamta, nu = () => new Date().toISO
       const { tillstand } = tillAppTillstand(JSON.parse(fil.text));
       kand = { eTag: fil.eTag, checksumma: fil.checksumma, id: fil.id, andrad: fil.andrad };
       return tillstand;
+    },
+
+    /**
+     * Läser endast grunddata för uppdrag som stannade i v1-arkivet.
+     * V1-filen ändras aldrig och ingen historik returneras till appen.
+     */
+    async lasTidigareUppdrag(tillstand) {
+      const fil = await graph.las(V1_SOKVAG);
+      if (!fil) return [];
+      return tidigareUppdragFranV1(JSON.parse(fil.text), tillstand, { nu: nu() });
     },
 
     /**

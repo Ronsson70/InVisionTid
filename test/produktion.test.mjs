@@ -118,6 +118,25 @@ test('tokenet läcker inte via lagringsobjektet', () => {
   assert.ok(!JSON.stringify(lagring).includes('HEMLIGT-TOKEN-abc'));
 });
 
+test('tidigare uppdrag läses från v1 utan en enda skrivning', async () => {
+  const { skapaOneDriveLagring } = await import('../src/app/lagring-onedrive.mjs');
+  const v1 = JSON.parse(v1Fixtur());
+  const v2 = tomV2({
+    clients: [v1.clients[0]],
+    projects: [{ ...v1.projects[0], kind: 'billable', active: true }],
+  });
+  const fetch = stubbGraph({ [V1_SOKVAG]: JSON.stringify(v1), [V2_SOKVAG]: JSON.stringify(v2) });
+  const lagring = skapaOneDriveLagring({ token: 'T', hamta: fetch, nu: () => NU });
+
+  const s = await lagring.las();
+  const tidigare = await lagring.lasTidigareUppdrag(s);
+
+  assert.ok(tidigare.length > 0);
+  assert.ok(!tidigare.some(p => p.id === v1.projects[0].id), 'redan aktivt uppdrag visas inte');
+  assert.ok(fetch.anrop.every(a => a.metod === 'GET'), 'bara läsning');
+  assert.equal(fetch.lager[V1_SOKVAG], JSON.stringify(v1), 'v1 är orörd');
+});
+
 // ── Införandet ──────────────────────────────────────────────────────────────
 
 test('förberedelsen läser v1 och skriver ingenting', async () => {

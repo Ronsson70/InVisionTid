@@ -203,11 +203,32 @@ test('rendering: researket föreslår uppdragets standardavstånd', () => {
   assert.match(html, /data-km="23"/, 'standardavståndet ligger först');
 });
 
-test('rendering: Mer innehåller bara den funktion som är byggd', () => {
+test('rendering: Mer innehåller bara funktioner som är byggda', () => {
   klicka({ oppna: 'mer' });
   assert.match(html, /Leverans klar/);
   assert.match(html, /Markera en avtalad leverans som genomförd/);
+  assert.match(html, /Mina uppdrag/);
   assert.ok(!/Utlägg/.test(html), 'utlägg är inte byggt och ska inte visas');
+});
+
+test('rendering: Mina uppdrag visar alla aktiva och vägen till ett nytt', () => {
+  klicka({ oppna: 'uppdrag' });
+  assert.match(html, /Aktiva uppdrag/);
+  assert.match(html, /Lägg till nytt uppdrag/);
+  assert.match(html, /Kund A/);
+  assert.match(html, /Kund B/);
+  assert.match(html, /Kund C/);
+});
+
+test('rendering: Nytt uppdrag frågar efter kund, namn och debitering', () => {
+  klicka({ oppna: 'nyttuppdrag' });
+  assert.match(html, /Kund/);
+  assert.match(html, /Uppdragets namn/);
+  assert.match(html, /Per timme/);
+  assert.match(html, /Per tillfälle/);
+  assert.match(html, /Fast pris/);
+  assert.match(html, /Endast tidsuppföljning/);
+  assert.match(html, /Spara uppdraget/);
 });
 
 test('rendering: Leverans klar öppnar ett formulär, inte en platshållare', () => {

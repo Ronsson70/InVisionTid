@@ -13,6 +13,11 @@ import {
   oreTillKortText,
 } from '../domain/index.mjs';
 
+export {
+  DEBITERINGSTYPER, tidigareUppdragFranV1,
+  aktiveraTidigareUppdrag, skapaNyttUppdrag,
+} from './uppdrag.mjs';
+
 export { harAvtalsperiod, periodKontroll, periodandelOre, arGenomford };
 
 export { oreTillText, oreTillKortText, kvantitetTillText, MILLI };
@@ -884,7 +889,20 @@ export function perKund(s, datumLista) {
 // ── Ändra och ta bort ───────────────────────────────────────────────────────
 
 export function laggTillPost(s, post) {
-  return { ...s, poster: [...s.poster, post] };
+  const artikel = artikelFor(s, post.articleId);
+  if (!artikel) throw new Error('Registreringen saknar en giltig arbetstyp. Ingenting har sparats.');
+
+  // Källtypen sätts när posten skapas, aldrig först när lagringen försöker
+  // dela upp tillståndet. Då kan ett ogiltigt tillstånd inte nå OneDrive.
+  const sourceType = post.sourceType ?? (
+    artikel.type === 'travel' ? 'trip'
+      : artikel.type === 'piece' && artikel.unit === 'kr' ? 'expense'
+        : 'entry'
+  );
+  if (!['entry', 'trip', 'expense'].includes(sourceType)) {
+    throw new Error('Registreringen har en okänd typ. Ingenting har sparats.');
+  }
+  return { ...s, poster: [...s.poster, { ...post, sourceType }] };
 }
 
 export function andraPost(s, id, andringar) {

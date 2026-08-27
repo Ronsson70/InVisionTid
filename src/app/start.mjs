@@ -23,6 +23,19 @@ let forberedelse = null;
 let arbetar = false;
 let felbesked = null;
 
+async function startaMedUppdrag(tillstand) {
+  let tidigareUppdrag = [];
+  let tidigareUppdragFel = null;
+  try {
+    tidigareUppdrag = await lagring.lasTidigareUppdrag(tillstand);
+  } catch (e) {
+    // Tidigare uppdrag är en hjälpfunktion. Ett läsfel där får inte blockera
+    // tidsregistreringen i den nya filen.
+    tidigareUppdragFel = e.message;
+  }
+  return startaApp({ lagring, tillstand, tidigareUppdrag, tidigareUppdragFel });
+}
+
 // ── Vyer före appen ─────────────────────────────────────────────────────────
 
 function visaInloggning() {
@@ -169,7 +182,7 @@ async function genomforInforande() {
     const resultat = await genomfor(forberedelse, lagring.graph, { bekraftelse: skrivet, nu });
     laddaNerBackup(forberedelse.ravara, backupFilnamn(nu));
     lagring.sattVersion({ eTag: resultat.v2.eTag, checksumma: resultat.v2.checksumma, id: resultat.v2.id });
-    startaApp({ lagring, tillstand: resultat.tillstand });
+    await startaMedUppdrag(resultat.tillstand);
   } catch (e) {
     arbetar = false;
     felbesked = e.message;
@@ -216,7 +229,7 @@ export async function start() {
       if (e instanceof OgiltigStruktur) return visaOanvandbarV2(e);
       throw e;
     }
-    if (tillstand) return startaApp({ lagring, tillstand });
+    if (tillstand) return startaMedUppdrag(tillstand);
 
     // Ingen v2-fil ännu: kontrollsidan. Inget skrivs.
     forberedelse = await forbered(lagring.graph, { nu: new Date().toISOString() });

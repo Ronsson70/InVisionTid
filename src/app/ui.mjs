@@ -17,10 +17,14 @@ const FARGER = ['#7C9082', '#D4856A', '#8B7EA8', '#C4A55A', '#5B8A72', '#B07156'
 // ── Tillstånd ───────────────────────────────────────────────────────────────
 
 let s, vy = 'idag', veckoOffset = 0, ark = null, flash = null, kopierat = false;
+let tidigareUppdrag = [];
 
 /** Lagringen. Sätts av startaApp och byts aldrig under körning. */
 let lagring = null;
-let installningar = { testlage: false, banner: null, tillaterAterstallning: false };
+let installningar = {
+  testlage: false, banner: null, tillaterAterstallning: false,
+  tidigareUppdragFel: null,
+};
 
 /** Sparläget som visas för användaren. */
 let sparlage = 'sparat';      // sparat | sparar | osparat | konflikt | offline | fel
@@ -364,7 +368,8 @@ function vyUppfoljning() {
 
 const RUBRIKER = {
   tillfalle: 'Behandlingstillfälle', tid: 'Arbetstid', resa: 'Resa',
-  leverans: 'Leverans klar', mer: 'Mer',
+  leverans: 'Leverans klar', mer: 'Mer', uppdrag: 'Mina uppdrag',
+  nyttuppdrag: 'Nytt uppdrag',
 };
 const TYPKARTA = { tillfalle: ['session'], tid: ['hourly', 'trackingOnly'], resa: ['travel'] };
 
@@ -373,7 +378,85 @@ function arkMer() {
   // en återvändsgränd är sämre än ingen knapp alls.
   return `<div class="val">
     <button data-oppna="leverans">Leverans klar<span class="kund">Markera en avtalad leverans som genomförd</span></button>
+    <button data-oppna="uppdrag">Mina uppdrag<span class="kund">Visa, återaktivera eller lägg till uppdrag</span></button>
   </div>`;
+}
+
+function arkUppdrag() {
+  const aktiva = [...(s.projects || [])]
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, 'sv'));
+  return `
+    <div class="faltrubrik">Aktiva uppdrag</div>
+    <div class="val">${aktiva.map(p => `
+      <div class="uppdragsrad">
+        <strong>${esc(p.name)}</strong>
+        <span>${esc(L.kundNamnForUppdrag(s, p.id))}</span>
+      </div>`).join('') || '<div class="tom">Inga aktiva uppdrag.</div>'}</div>
+
+    ${installningar.tidigareUppdragFel ? `<div class="varning">
+      <strong>Tidigare uppdrag kunde inte läsas</strong>${esc(installningar.tidigareUppdragFel)}
+    </div>` : ''}
+    ${tidigareUppdrag.length ? `
+      <div class="faltrubrik">Tidigare uppdrag</div>
+      <p class="notis">Aktivera ett uppdrag om du ska börja arbeta med det igen. Gammal historik följer inte med.</p>
+      <div class="val">${tidigareUppdrag.map(p => `
+        <button data-aktiverauppdrag="${esc(p.id)}">
+          ${esc(p.project.name)}
+          <span class="kund">${esc(p.client?.name ?? 'Utan kund')} · Aktivera igen</span>
+        </button>`).join('')}</div>` : ''}
+
+    <button class="spara" data-oppna="nyttuppdrag">Lägg till nytt uppdrag</button>
+    <button class="avbryt" data-stang="knapp">Stäng</button>`;
+}
+
+function arkNyttUppdrag() {
+  const debitering = ark.debitering ?? null;
+  const fakturerbart = debitering && debitering !== 'internal';
+  const prisetikett = debitering === 'hourly' ? 'Timpris exklusive moms'
+    : debitering === 'session' ? 'Pris per tillfälle exklusive moms'
+      : 'Fast pris exklusive moms';
+
+  return `
+    <div class="faltrubrik">Kund</div>
+    <div class="val">${(s.clients || []).map(c => `
+      <button class="${ark.clientId === c.id ? 'vald' : ''}" data-valjkund="${esc(c.id)}">${esc(c.name)}</button>`).join('')}
+      <button class="${ark.clientId === 'ny' ? 'vald' : ''}" data-valjkund="ny">+ Ny kund</button>
+    </div>
+    ${ark.clientId === 'ny' ? `
+      <div class="faltrubrik">Kundens namn</div>
+      <input type="text" data-falt="kundnamn" value="${esc(ark.kundnamn ?? '')}" autocomplete="organization">` : ''}
+
+    <div class="faltrubrik">Uppdragets namn</div>
+    <input type="text" data-falt="namn" value="${esc(ark.namn ?? '')}" autocomplete="off">
+
+    <div class="faltrubrik">Hur räknas uppdraget?</div>
+    <div class="val">${L.DEBITERINGSTYPER.map(t => `
+      <button class="${debitering === t.id ? 'vald' : ''}" data-valjdebitering="${esc(t.id)}">${esc(t.etikett)}</button>`).join('')}</div>
+
+    ${fakturerbart ? `
+      <div class="faltrubrik">${esc(prisetikett)}</div>
+      <input type="text" inputmode="decimal" data-falt="pris" value="${esc(ark.pris ?? '')}" placeholder="kronor">
+
+      <div class="faltrubrik">Moms på arbete och eventuell resa</div>
+      <div class="snabbval">${L.MOMSSATSER.map(m => `
+        <button class="${ark.vatRate === m.sats ? 'vald' : ''}" data-valjnyvat="${m.sats}">${esc(m.etikett)}</button>`).join('')}</div>
+
+      ${debitering === 'fixed' ? `
+        <div class="faltrubrik">Upparbetningsperiod</div>
+        <div class="tvakol">
+          <input type="date" data-falt="startDate" value="${esc(ark.startDate ?? '')}" aria-label="Startdatum">
+          <input type="date" data-falt="endDate" value="${esc(ark.endDate ?? '')}" aria-label="Slutdatum">
+        </div>` : ''}
+
+      <div class="faltrubrik">Resa, valfritt</div>
+      <p class="notis">Fyll i båda fälten om resor ska kunna registreras på uppdraget.</p>
+      <div class="tvakol">
+        <input type="number" inputmode="decimal" data-falt="standardresaKm" value="${esc(ark.standardresaKm ?? '')}" placeholder="Standardresa, km">
+        <input type="text" inputmode="decimal" data-falt="resepris" value="${esc(ark.resepris ?? '')}" placeholder="Pris per km">
+      </div>` : ''}
+
+    <button class="spara" data-sparanyttuppdrag="1">Spara uppdraget</button>
+    <button class="avbryt" data-oppna="uppdrag">Tillbaka</button>`;
 }
 
 /**
@@ -577,6 +660,8 @@ function ritaArk() {
   if (!ark) return '';
   let innehall = '';
   if (ark.typ === 'mer') innehall = arkMer();
+  else if (ark.typ === 'uppdrag') innehall = arkUppdrag();
+  else if (ark.typ === 'nyttuppdrag') innehall = arkNyttUppdrag();
   else if (ark.typ === 'andra') innehall = arkAndra();
   else if (ark.typ === 'moms') innehall = arkMoms();
   else if (ark.typ === 'underlag') innehall = arkUnderlag();
@@ -626,7 +711,8 @@ const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara',
   'sparaandring', 'tabort', 'vecka', 'godkannresa', 'avboj', 'underlag', 'valjleverans', 'kopiera',
   'markklart', 'merinfo', 'sparanummer', 'borjaom', 'angemoms', 'valjmoms', 'sparamoms',
   'angra', 'valjlevuppdrag', 'valjleveransklar', 'markeragenomford', 'leverans',
-  'sparaleveransdatum', 'angragenomford'].map(n => `[data-${n}]`).join(',');
+  'sparaleveransdatum', 'angragenomford', 'aktiverauppdrag', 'valjkund',
+  'valjdebitering', 'valjnyvat', 'sparanyttuppdrag'].map(n => `[data-${n}]`).join(',');
 
 document.addEventListener('click', e => {
   const t = e.target.closest(VALJARE);
@@ -641,6 +727,11 @@ document.addEventListener('click', e => {
 
   if (d.oppna) {
     if (d.oppna === 'mer') ark = { typ: 'mer' };
+    else if (d.oppna === 'uppdrag') ark = { typ: 'uppdrag' };
+    else if (d.oppna === 'nyttuppdrag') ark = {
+      typ: 'nyttuppdrag', clientId: null, kundnamn: '', namn: '', debitering: null,
+      pris: '', vatRate: null, startDate: '', endDate: '', standardresaKm: '', resepris: '',
+    };
     else if (d.oppna === 'leverans') ark = { typ: 'leverans', projectId: null, leveransId: null, datum: idag() };
     else ark = { typ: d.oppna, projectId: null, antal: 1, timmar: 1, km: null, start: '', slut: '', datum: idag() };
     return rita();
@@ -655,6 +746,11 @@ document.addEventListener('click', e => {
   if (d.antal) { ark.antal = Math.max(1, ark.antal + Number(d.antal)); return rita(); }
   if (d.timmar) { ark.timmar = Number(d.timmar); ark.start = ''; ark.slut = ''; return rita(); }
   if (d.km) { ark.km = Number(d.km); return rita(); }
+  if (d.aktiverauppdrag) return aktiveraTidigare(d.aktiverauppdrag);
+  if (d.valjkund) { ark.clientId = d.valjkund; return rita(); }
+  if (d.valjdebitering) { ark.debitering = d.valjdebitering; ark.pris = ''; return rita(); }
+  if (d.valjnyvat !== undefined) { ark.vatRate = Number(d.valjnyvat); return rita(); }
+  if (d.sparanyttuppdrag) return sparaNyttUppdrag();
 
   if (d.spara) return sparaNy();
   if (d.post) { ark = { typ: 'andra', postId: d.post, rubrik: 'Ändra registrering' }; return rita(); }
@@ -684,6 +780,25 @@ document.addEventListener('input', e => {
 
 // ── Åtgärder ────────────────────────────────────────────────────────────────
 
+function aktiveraTidigare(id) {
+  const paket = tidigareUppdrag.find(p => p.id === id);
+  if (!paket) return visa('Det tidigare uppdraget finns inte längre.');
+  try {
+    s = L.aktiveraTidigareUppdrag(s, paket);
+    tidigareUppdrag = tidigareUppdrag.filter(p => p.id !== id);
+    spara(); ark = { typ: 'uppdrag' };
+    visa('Uppdraget är aktivt igen. Ingen gammal historik fördes över.');
+  } catch (e) { visa(e.message); }
+}
+
+function sparaNyttUppdrag() {
+  try {
+    s = L.skapaNyttUppdrag(s, ark);
+    spara(); ark = { typ: 'uppdrag' };
+    visa('Det nya uppdraget är sparat.');
+  } catch (e) { visa(e.message); }
+}
+
 function sparaNy() {
   const typer = TYPKARTA[ark.typ];
   const projectId = ark.projectId ?? L.uppdragEfterSenast(s, typer)[0]?.id;
@@ -698,6 +813,7 @@ function sparaNy() {
     id: L.nyttId(), projectId, articleId: artikel.id,
     date: ark.datum || idag(), beskrivning: artikel.name, qtyMilli: qty,
     seconds: artikel.unit === 'tim' ? Math.round(qty / L.MILLI * 3600) : null,
+    sourceType: ark.typ === 'resa' ? 'trip' : 'entry',
     status: 'open', invoiceRecordId: null, priceSnapshot: null,
   });
   spara(); ark = null; visa('Registrerat.');
@@ -731,7 +847,7 @@ function godkannResa(varde) {
   s = L.laggTillPost(s, {
     id: L.nyttId(), projectId, articleId: artikel.id, date: datum,
     beskrivning: 'Resa tur och retur', qtyMilli: Number(km) * L.MILLI, seconds: null,
-    status: 'open', invoiceRecordId: null, priceSnapshot: null,
+    sourceType: 'trip', status: 'open', invoiceRecordId: null, priceSnapshot: null,
   });
   spara(); visa(`Resa på ${km} km tillagd.`);
 }
@@ -832,6 +948,7 @@ function angraOverforing(id) {
  * @param {object} opts.lagring          { las(), spara(state) }
  * @param {object} opts.tillstand        redan inläst tillstånd
  * @param {string} [opts.banner]         listtext högst upp, null i produktion
+ * @param {Array} [opts.tidigareUppdrag] grunddata från skrivskyddad v1-fil
  * @param {boolean} [opts.tillaterAterstallning]
  * @param {Function} [opts.aterstall]
  */
@@ -841,7 +958,9 @@ export function startaApp(opts) {
     banner: opts.banner ?? null,
     tillaterAterstallning: !!opts.tillaterAterstallning,
     aterstall: opts.aterstall ?? null,
+    tidigareUppdragFel: opts.tidigareUppdragFel ?? null,
   };
+  tidigareUppdrag = opts.tidigareUppdrag ?? [];
   s = L.normaliseraTillstand(opts.tillstand);
   sparlage = 'sparat';
   vy = 'idag';
