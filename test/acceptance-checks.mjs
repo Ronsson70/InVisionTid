@@ -237,8 +237,14 @@ export const kontroller = [
       // Ett underlag får inte kunna färdigställas medan momsen är ogranskad.
       let blockerade = false;
       try {
-        a.byggUnderlag({ artiklar, poster: [], clientId: ett.clients[0]?.id, period: '2026-03', kravGranskadMoms: true });
-      } catch { blockerade = true; }
+        a.byggUnderlag({
+          artiklar,
+          poster: (ett.entries || []).filter(e => e.articleId),
+          clientId: ett.clients[0]?.id,
+          period: '2026-03',
+          kravGranskadMoms: true,
+        });
+      } catch (e) { blockerade = e.name === 'OgranskadMoms'; }
       lika('färdigt underlag blockeras medan momsen är ogranskad', blockerade, true);
 
       // Fastprisperioder omvandlas inte automatiskt.

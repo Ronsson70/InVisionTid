@@ -24,8 +24,9 @@ som ovan.
 
 **Node-tester** — inga beroenden, ingen byggprocess:
 ```
-node --test test/*.test.mjs     kör allt
-node test/rapport.mjs           acceptansbaslinje mot v1
+IVT_MAL=v2 node --test test/*.test.mjs    v2-domänen, 61/61 gröna
+node --test test/*.test.mjs               v1-baslinjen, acceptans avsiktligt röd
+node test/rapport.mjs v2                  acceptanstabell
 ```
 
 - `test/v1-skyddsnat.test.mjs` täcker `migrate()` och `mergeData()`, som ligger
@@ -88,6 +89,10 @@ Lundify-förstudie och öppna frågor ligger i `docs/`.
 Grundproblemet i v1: `pricingModel(project)` väljer **en** prismodell för hela
 projektet, så en dag med både ett fast behandlingspass och ett timdebiterat samtal
 kan inte räknas rätt. I v2 sitter priset på **artikeln**, inte på projektet.
+
+`src/domain/` är byggd och bevisad men **ännu inte kopplad till appen**.
+`index.html` kör fortfarande v1 oförändrad. Rör inte `src/domain/` och
+`index.html` i samma ändring.
 
 Skyddsregler under arbetet:
 - Ingen skrivning till produktionsdata eller OneDrive utan uttryckligt godkännande

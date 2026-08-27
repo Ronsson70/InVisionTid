@@ -44,18 +44,28 @@ etapp 3 påbörjas.
 
 ---
 
-## Etapp 3 — Domänen: pengar, moms, artiklar, migrering i minnet
+## Etapp 3 — Domänen: pengar, moms, artiklar, migrering i minnet ✔ klar
 
-Bygger `src/domain/`: `pengar.mjs`, `moms.mjs`, `artiklar.mjs`, `poster.mjs`,
-`leveranser.mjs`, `underlag.mjs`, `fakturareferens.mjs`, `migrering.mjs`.
-Lägger till `test/adapters/v2.mjs`.
+**Levererat:** `src/domain/` med `pengar.mjs`, `moms.mjs`, `artiklar.mjs`,
+`leveranser.mjs`, `underlag.mjs`, `fakturareferens.mjs`, `migrering.mjs`,
+`resor.mjs` och `index.mjs`. Samt `test/adapters/v2.mjs` och `test/domain.test.mjs`.
 
-**Klar när:** `IVT_MAL=v2 node --test test/*.test.mjs` är grön på alla T1–T13, och
-skyddsnätet fortfarande är grönt.
+**Resultat:** `IVT_MAL=v2 node --test test/*.test.mjs` → **61 av 61 gröna**,
+alla T1–T13 godkända. Mot v1 ligger baslinjen kvar oförändrad.
 
-**Rör inte:** `index.html`, produktionsdata, OneDrive.
+**Verifierat att testerna biter:** fyra mutationer i domänen provades — trunkering
+i stället för ROUND_HALF_UP, `trackingOnly` på fakturan, ignorerat prissnapshot och
+gissad moms vid migrering. Varje mutation fångades.
 
-**Risk:** låg. Ingenting av detta är kopplat till appen ännu.
+**Dataformatet:** oförändrat i drift. v2-strukturen finns bara i minnet och i
+tester. Ingenting har skrivits till localStorage eller OneDrive.
+
+**Rörde inte:** `index.html`, `test.html`, produktionsdata, OneDrive.
+
+### ⛔ Stoppunkt — här är vi nu
+
+Domänen är bevisad men inte kopplad till någonting. Nästa etapp är den första som
+kan skriva.
 
 ---
 

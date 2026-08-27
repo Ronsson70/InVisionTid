@@ -4,9 +4,10 @@ Två sviter som mäter olika saker. Inga beroenden, ingen `package.json`, ingen
 byggprocess. Node 18 eller senare.
 
 ```
-node --test test/*.test.mjs     kör allt
-node test/rapport.mjs           läsbar acceptanstabell mot v1
-node test/rapport.mjs v2        samma tabell mot v2, när adaptern finns
+IVT_MAL=v2 node --test test/*.test.mjs    kör allt mot v2      61/61 gröna
+node --test test/*.test.mjs               kör allt mot v1      49/61, se nedan
+node test/rapport.mjs v2                  acceptanstabell, v2
+node test/rapport.mjs                     acceptanstabell, v1
 ```
 
 Ingen `package.json` läggs i roten. Cloudflare Pages autodetekterar den och kan
@@ -30,21 +31,41 @@ hela repot.
 
 ---
 
-## `acceptance.test.mjs` — förväntat röd tills etapp 3 är klar
+## `domain.test.mjs` — ska alltid vara grön
+
+34 enhetstester för domänens primitiver. Acceptansfallen provar hela kedjan, de
+här provar kantfallen under: negativ avrundning, heltalsspill, okänd moms mot
+noll procent, otillåtna statusövergångar, migreringens kontrollsummor.
+
+## `acceptance.test.mjs` — grön mot v2, avsiktligt röd mot v1
 
 Acceptansfallen T1–T13 skrivna mot **v2-kontraktet**, inte mot en implementation.
 Samma fil körs mot vilken adapter som helst.
 
-Baslinje mot v1 per 2026-08-27:
+**Mot v2: 13 av 13 gröna.**
+
+**Mot v1** ligger baslinjen kvar som mätpunkt:
 
 | | | |
 |---|---|---|
-| T7, T12 | godkända | reseförslag och svenska tecken fungerar redan |
+| T7, T12 | godkända | reseförslag och svenska tecken fungerar redan i v1 |
 | T8 | fel svar | 2 400 kr i stället för 3 250 kr |
 | övriga 10 | saknar stöd | v1 har inget momsbegrepp och inget underlag |
 
-Att T7 och T12 är gröna är avsiktligt. De visar att baslinjen mäter något verkligt
-och inte bara faller på att koden saknas.
+Att T7 och T12 är gröna även mot v1 är avsiktligt. De visar att baslinjen mäter
+något verkligt och inte bara faller på att koden saknas.
+
+### Att testerna biter är kontrollerat
+
+En grön svit bevisar ingenting om den inte kan bli röd. Fyra mutationer i
+domänen provades, och varje gång fångades felet:
+
+| Mutation | Utfall |
+|---|---|
+| ROUND_HALF_UP byttes mot trunkering | 4 fall föll |
+| `trackingOnly` släpptes in på fakturan | T4 föll |
+| Prissnapshot ignorerades | T11 föll |
+| Migreringen gissade 25 % moms | T9 föll |
 
 ---
 
