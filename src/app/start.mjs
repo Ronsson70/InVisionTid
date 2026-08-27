@@ -33,7 +33,18 @@ async function startaMedUppdrag(tillstand) {
     // tidsregistreringen i den nya filen.
     tidigareUppdragFel = e.message;
   }
-  return startaApp({ lagring, tillstand, tidigareUppdrag, tidigareUppdragFel });
+  return startaApp({
+    lagring,
+    tillstand,
+    tidigareUppdrag,
+    tidigareUppdragFel,
+    kontoNamn: 'Microsoft OneDrive',
+    synkaOm: () => window.location.reload(),
+    loggaUt: () => {
+      loggaUt();
+      window.location.reload();
+    },
+  });
 }
 
 // ── Vyer före appen ─────────────────────────────────────────────────────────

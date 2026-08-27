@@ -23,7 +23,7 @@ let tidigareUppdrag = [];
 let lagring = null;
 let installningar = {
   testlage: false, banner: null, tillaterAterstallning: false,
-  tidigareUppdragFel: null,
+  tidigareUppdragFel: null, kontoNamn: null, synkaOm: null, loggaUt: null,
 };
 
 /** Sparläget som visas för användaren. */
@@ -150,7 +150,7 @@ function vyIdag() {
     <button class="storknapp" data-oppna="tid"><span class="ikon">⏱</span>Tid</button>
     <button class="storknapp" data-oppna="resa"><span class="ikon">⛟</span>Resa</button>
   </div>
-  <button class="merknapp" data-oppna="mer">Mer · markera en leverans klar</button>
+  <button class="merknapp" data-oppna="mer">Mer · uppdrag, leverans och synk</button>
 
   <div class="kort">
     <div class="rubrik">Dagens registreringar</div>
@@ -212,6 +212,7 @@ function vyVecka() {
   <div class="kort">
     <div class="rubrik">Jobbat in denna vecka</div>
     <div class="malbelopp">${esc(kr(v.jobbatInOre))}<small>exklusive moms</small></div>
+    <button class="lankknapp mitten" data-oppna="veckomal">${v.harMal ? 'Ändra veckomål' : 'Sätt veckomål'}</button>
     ${v.harMal ? `
       <div class="matare"><div class="matarfyll" style="width:${bredd}%"></div></div>
       <div class="maltext">${esc(L.maltext(v))}</div>
@@ -369,7 +370,7 @@ function vyUppfoljning() {
 const RUBRIKER = {
   tillfalle: 'Behandlingstillfälle', tid: 'Arbetstid', resa: 'Resa',
   leverans: 'Leverans klar', mer: 'Mer', uppdrag: 'Mina uppdrag',
-  nyttuppdrag: 'Nytt uppdrag',
+  nyttuppdrag: 'Nytt uppdrag', veckomal: 'Veckomål', konto: 'Konto och synk',
 };
 const TYPKARTA = { tillfalle: ['session'], tid: ['hourly', 'trackingOnly'], resa: ['travel'] };
 
@@ -379,7 +380,34 @@ function arkMer() {
   return `<div class="val">
     <button data-oppna="leverans">Leverans klar<span class="kund">Markera en avtalad leverans som genomförd</span></button>
     <button data-oppna="uppdrag">Mina uppdrag<span class="kund">Visa, återaktivera eller lägg till uppdrag</span></button>
+    <button data-oppna="konto">Konto och synk<span class="kund">OneDrive, synkstatus och utloggning</span></button>
   </div>`;
+}
+
+function arkVeckomal() {
+  const befintligt = s.installningar?.veckomalOre;
+  const forvalt = befintligt ? String(befintligt / 100).replace('.', ',') : '';
+  return `
+    <p class="notis">Målet jämförs bara med Jobbat in. Resor, utlägg och moms räknas inte in.</p>
+    <div class="faltrubrik">Mål per vecka, exklusive moms</div>
+    <input type="text" inputmode="decimal" data-falt="veckomal" value="${esc(ark.veckomal ?? forvalt)}" placeholder="till exempel 25 000">
+    <button class="spara" data-sparaveckomal="1">Spara veckomålet</button>
+    ${befintligt ? '<button class="sekundar" data-tabortveckomal="1">Ta bort veckomålet</button>' : ''}
+    <button class="avbryt" data-stang="knapp">Avbryt</button>`;
+}
+
+function arkKonto() {
+  const ansluten = !!installningar.kontoNamn;
+  return `
+    <div class="uppfrad"><span>Konto</span><span class="v">${esc(ansluten ? installningar.kontoNamn : 'Testversion')}</span></div>
+    <div class="uppfrad"><span>Synkstatus</span><span class="v">${esc(SPARETIKETT[sparlage] ?? sparlage)}</span></div>
+    <p class="notis">${ansluten
+      ? 'Ändringar sparas automatiskt i OneDrive. Synka om läser in den senaste sparade versionen på nytt.'
+      : 'Testversionen använder bara webbläsaren och är inte kopplad till OneDrive.'}</p>
+    ${ansluten ? `
+      <button class="sekundar" data-synkaom="1">Synka om från OneDrive</button>
+      <button class="avbryt" data-loggautapp="1">Logga ut eller byt konto</button>` : ''}
+    <button class="avbryt" data-stang="knapp">Stäng</button>`;
 }
 
 function arkUppdrag() {
@@ -662,6 +690,8 @@ function ritaArk() {
   if (ark.typ === 'mer') innehall = arkMer();
   else if (ark.typ === 'uppdrag') innehall = arkUppdrag();
   else if (ark.typ === 'nyttuppdrag') innehall = arkNyttUppdrag();
+  else if (ark.typ === 'veckomal') innehall = arkVeckomal();
+  else if (ark.typ === 'konto') innehall = arkKonto();
   else if (ark.typ === 'andra') innehall = arkAndra();
   else if (ark.typ === 'moms') innehall = arkMoms();
   else if (ark.typ === 'underlag') innehall = arkUnderlag();
@@ -696,6 +726,7 @@ function rita() {
       <span>${esc(SPARETIKETT[sparlage] ?? sparlage)}</span>
       ${sparbesked ? `<span class="sparbesked">${esc(sparbesked)}</span>` : ''}
       ${sparlage === 'konflikt' ? '<button data-laddaom="1">Ladda om</button>' : ''}
+      <button class="lankknapp" data-oppna="konto">Konto och synk</button>
     </div>
     ${flash ? `<div class="testbanner" style="background:var(--sage-deep)">${esc(flash)}</div>` : ''}
     ${vyer[vy]()}
@@ -712,7 +743,8 @@ const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara',
   'markklart', 'merinfo', 'sparanummer', 'borjaom', 'angemoms', 'valjmoms', 'sparamoms',
   'angra', 'valjlevuppdrag', 'valjleveransklar', 'markeragenomford', 'leverans',
   'sparaleveransdatum', 'angragenomford', 'aktiverauppdrag', 'valjkund',
-  'valjdebitering', 'valjnyvat', 'sparanyttuppdrag'].map(n => `[data-${n}]`).join(',');
+  'valjdebitering', 'valjnyvat', 'sparanyttuppdrag', 'sparaveckomal',
+  'tabortveckomal', 'synkaom', 'loggautapp'].map(n => `[data-${n}]`).join(',');
 
 document.addEventListener('click', e => {
   const t = e.target.closest(VALJARE);
@@ -721,6 +753,8 @@ document.addEventListener('click', e => {
 
   if (d.borjaom) return borjaOm();
   if (d.laddaom) { window.location.reload(); return; }
+  if (d.synkaom) return synkaOmFranOneDrive();
+  if (d.loggautapp) return loggaUtFranApp();
   if (d.vy) { vy = d.vy; ark = null; return rita(); }
   if (d.vecka) { veckoOffset += Number(d.vecka); return rita(); }
   if (d.stang) { if (d.stang === 'knapp' || e.target.classList.contains('ark')) { ark = null; kopierat = false; rita(); } return; }
@@ -751,6 +785,8 @@ document.addEventListener('click', e => {
   if (d.valjdebitering) { ark.debitering = d.valjdebitering; ark.pris = ''; return rita(); }
   if (d.valjnyvat !== undefined) { ark.vatRate = Number(d.valjnyvat); return rita(); }
   if (d.sparanyttuppdrag) return sparaNyttUppdrag();
+  if (d.sparaveckomal) return sparaVeckomal();
+  if (d.tabortveckomal) return taBortVeckomal();
 
   if (d.spara) return sparaNy();
   if (d.post) { ark = { typ: 'andra', postId: d.post, rubrik: 'Ändra registrering' }; return rita(); }
@@ -797,6 +833,30 @@ function sparaNyttUppdrag() {
     spara(); ark = { typ: 'uppdrag' };
     visa('Det nya uppdraget är sparat.');
   } catch (e) { visa(e.message); }
+}
+
+function sparaVeckomal() {
+  try {
+    s = L.sattVeckomal(s, ark.veckomal);
+    spara(); ark = null;
+    visa('Veckomålet är sparat.');
+  } catch (e) { visa(e.message); }
+}
+
+function taBortVeckomal() {
+  s = L.taBortVeckomal(s);
+  spara(); ark = null;
+  visa('Veckomålet är borttaget.');
+}
+
+function synkaOmFranOneDrive() {
+  if (harOsparadeAndringar()) return visa('Vänta tills Sparat visas innan du synkar om.');
+  if (installningar.synkaOm) installningar.synkaOm();
+}
+
+function loggaUtFranApp() {
+  if (harOsparadeAndringar()) return visa('Vänta tills Sparat visas innan du loggar ut.');
+  if (installningar.loggaUt) installningar.loggaUt();
 }
 
 function sparaNy() {
@@ -951,6 +1011,9 @@ function angraOverforing(id) {
  * @param {Array} [opts.tidigareUppdrag] grunddata från skrivskyddad v1-fil
  * @param {boolean} [opts.tillaterAterstallning]
  * @param {Function} [opts.aterstall]
+ * @param {string} [opts.kontoNamn]
+ * @param {Function} [opts.synkaOm]
+ * @param {Function} [opts.loggaUt]
  */
 export function startaApp(opts) {
   lagring = opts.lagring;
@@ -959,6 +1022,9 @@ export function startaApp(opts) {
     tillaterAterstallning: !!opts.tillaterAterstallning,
     aterstall: opts.aterstall ?? null,
     tidigareUppdragFel: opts.tidigareUppdragFel ?? null,
+    kontoNamn: opts.kontoNamn ?? null,
+    synkaOm: opts.synkaOm ?? null,
+    loggaUt: opts.loggaUt ?? null,
   };
   tidigareUppdrag = opts.tidigareUppdrag ?? [];
   s = L.normaliseraTillstand(opts.tillstand);

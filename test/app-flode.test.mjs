@@ -57,3 +57,34 @@ test('klickflöde: nytt uppdrag och ny registrering blir sparbara', async () => 
   assert.equal(ny.sourceType, 'entry');
   assert.ok(!/Kunde inte spara/.test(html));
 });
+
+test('klickflöde: veckomål sparas och kontoåtgärder fungerar', async () => {
+  const sparade = [];
+  let synkningar = 0;
+  let utloggningar = 0;
+  const lagring = { async spara(s) { sparade.push(structuredClone(s)); } };
+  startaApp({
+    lagring,
+    tillstand: { ...skapaTestdata(), installningar: { veckomalOre: null } },
+    kontoNamn: 'Microsoft OneDrive',
+    synkaOm: () => { synkningar++; },
+    loggaUt: () => { utloggningar++; },
+  });
+
+  klicka({ vy: 'vecka' });
+  assert.match(html, /Sätt veckomål/);
+  klicka({ oppna: 'veckomal' });
+  fyll('veckomal', '30 000');
+  klicka({ sparaveckomal: '1' });
+  await tom();
+
+  assert.equal(sparade.at(-1).installningar.veckomalOre, 3000000);
+  assert.match(html.replace(/[\u00a0\u202f]/g, ' '), /30 000 kr/);
+
+  klicka({ oppna: 'konto' });
+  assert.match(html, /Microsoft OneDrive/);
+  klicka({ synkaom: '1' });
+  assert.equal(synkningar, 1);
+  klicka({ loggautapp: '1' });
+  assert.equal(utloggningar, 1);
+});

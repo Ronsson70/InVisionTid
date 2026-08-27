@@ -170,3 +170,20 @@ test('utan mål visas ingen målruta och inget påhittat mål', () => {
   // Huvudtalet visas alltid, mål eller inte.
   assert.match(rendera('vecka'), /Jobbat in denna vecka/);
 });
+
+test('veckomålet kan ställas in och tas bort utan att ändra övrig data', () => {
+  const fore = { ...nyState(), installningar: { veckomalOre: null } };
+  const medMal = L.sattVeckomal(fore, '25 000');
+
+  assert.equal(medMal.installningar.veckomalOre, 2500000);
+  assert.deepEqual(medMal.poster, fore.poster, 'registreringarna påverkas inte');
+  assert.equal(L.taBortVeckomal(medMal).installningar.veckomalOre, null);
+});
+
+test('veckomålet accepterar svenska decimaler men aldrig tomt eller negativt belopp', () => {
+  const s = nyState();
+  assert.equal(L.sattVeckomal(s, '12 345,50').installningar.veckomalOre, 1234550);
+  for (const ogiltigt of ['', '0', '-1', 'text']) {
+    assert.throws(() => L.sattVeckomal(s, ogiltigt), /större än noll/);
+  }
+});

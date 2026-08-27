@@ -10,7 +10,7 @@ import {
   foreslaResor, hittaArtikel, arFakturerbar,
   momsAnvandbar, MILLI,
   harAvtalsperiod, periodKontroll, periodandelOre, arGenomford,
-  oreTillKortText,
+  oreTillKortText, kronorTillOre,
 } from '../domain/index.mjs';
 
 export {
@@ -28,6 +28,32 @@ export { oreTillText, oreTillKortText, kvantitetTillText, MILLI };
  * information. Ören visas så snart de inte är noll: "566,50 kr".
  */
 export const belopp = oreTillKortText;
+
+/**
+ * Sparar ett frivilligt veckomål. Beloppet anges i kronor av användaren men
+ * lagras, precis som alla andra pengar i appen, som heltalsöre.
+ */
+export function sattVeckomal(s, kronor) {
+  const normaliserat = String(kronor ?? '').trim()
+    .replace(/[\s\u00a0\u202f]/g, '')
+    .replace(',', '.');
+  const beloppKronor = Number(normaliserat);
+  if (!normaliserat || !Number.isFinite(beloppKronor) || beloppKronor <= 0) {
+    throw new Error('Veckomålet måste vara ett belopp större än noll.');
+  }
+  return {
+    ...s,
+    installningar: { ...(s.installningar || {}), veckomalOre: kronorTillOre(beloppKronor) },
+  };
+}
+
+/** Tar bort målet utan att påverka registreringar eller ekonomiska regler. */
+export function taBortVeckomal(s) {
+  return {
+    ...s,
+    installningar: { ...(s.installningar || {}), veckomalOre: null },
+  };
+}
 
 // ── Uppslag ─────────────────────────────────────────────────────────────────
 

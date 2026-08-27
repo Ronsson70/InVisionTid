@@ -101,6 +101,15 @@ test('rendering: veckomålet jämförs med jobbat in', () => {
   assert.match(html, /av veckans mål/);
   assert.match(html, /kvar\.|Målet är nått/);
   assert.match(html, /class="matare"/);
+  assert.match(html, /data-oppna="veckomal"/);
+});
+
+test('rendering: veckomålet går att ändra i ett riktigt formulär', () => {
+  klicka({ oppna: 'veckomal' });
+  assert.match(html, /Mål per vecka, exklusive moms/);
+  assert.match(html, /data-falt="veckomal"/);
+  assert.match(html, /data-sparaveckomal/);
+  assert.ok(!/inte bygg/i.test(html));
 });
 
 test('rendering: Vecka visar fastprisets veckoandel som en egen rad', () => {
@@ -208,7 +217,15 @@ test('rendering: Mer innehåller bara funktioner som är byggda', () => {
   assert.match(html, /Leverans klar/);
   assert.match(html, /Markera en avtalad leverans som genomförd/);
   assert.match(html, /Mina uppdrag/);
+  assert.match(html, /Konto och synk/);
   assert.ok(!/Utlägg/.test(html), 'utlägg är inte byggt och ska inte visas');
+});
+
+test('rendering: Konto och synk visar status utan att låtsas att prototypen är ansluten', () => {
+  klicka({ oppna: 'konto' });
+  assert.match(html, /Synkstatus/);
+  assert.match(html, /Testversion/);
+  assert.match(html, /inte kopplad till OneDrive/);
 });
 
 test('rendering: Mina uppdrag visar alla aktiva och vägen till ett nytt', () => {
