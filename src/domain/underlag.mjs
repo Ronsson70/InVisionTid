@@ -12,6 +12,20 @@ import { summera, momsAnvandbar } from './moms.mjs';
 import { artikelLista, hittaArtikel, arFakturerbar, arTidsartikel } from './artiklar.mjs';
 import { aterstaendeEfterVal, kontrolleraAvtalstotal } from './leveranser.mjs';
 
+export class RedanLast extends Error {
+  constructor(konflikter) {
+    const beskrivning = konflikter
+      .map(k => `${k.typ} ${k.id} hör redan till underlag ${k.invoiceRecordId}`)
+      .join('; ');
+    super(
+      'Underlaget kan inte skapas: ' + beskrivning + '. '
+      + 'En post kan bara höra till ett underlag. Flytta tillbaka det andra underlaget först.'
+    );
+    this.name = 'RedanLast';
+    this.konflikter = konflikter;
+  }
+}
+
 export class OgranskadMoms extends Error {
   constructor(artiklar) {
     const namn = artiklar.map(a => `"${a.name}"`).join(', ');
@@ -166,6 +180,25 @@ export function lasUnderlag({
     throw new Error('Ett underlag måste innehålla minst en post eller leverans.');
   }
 
+  // ── Validera HELA underlaget innan den första mutationen ─────────────────
+  //
+  // En post får höra till exakt ett underlag. Utan den här kontrollen skulle
+  // ett andra anrop tyst flytta posten till det nya underlaget, och samma
+  // arbete hamna på två fakturor.
+  //
+  // Att låsa om till SAMMA underlag är ett ofarligt återförsök och ska inte
+  // ändra någonting — särskilt inte prissnapshotet.
+  const valdaLevIds = new Set(valdaLeveranser);
+  const konflikter = [
+    ...valdaPoster
+      .filter(p => p.invoiceRecordId && p.invoiceRecordId !== underlagsId)
+      .map(p => ({ typ: 'Posten', id: p.id, invoiceRecordId: p.invoiceRecordId })),
+    ...(leveranser || [])
+      .filter(l => valdaLevIds.has(l.id) && l.invoiceRecordId && l.invoiceRecordId !== underlagsId)
+      .map(l => ({ typ: 'Leveransen', id: l.id, invoiceRecordId: l.invoiceRecordId })),
+  ];
+  if (konflikter.length) throw new RedanLast(konflikter);
+
   const underlag = byggUnderlag({
     artiklar: lista,
     poster: valdaPoster,
@@ -194,11 +227,27 @@ export function lasUnderlag({
         unit: artikel.unit,
         articleName: artikel.name,
       },
-      updatedAt: nu ?? post.updatedAt ?? null,
+      // Vid ett återförsök mot samma underlag ändras inte tidsstämpeln heller.
+      updatedAt: post.invoiceRecordId === underlagsId
+        ? (post.updatedAt ?? null)
+        : (nu ?? post.updatedAt ?? null),
     };
   });
 
-  return { underlag, poster: uppdaterade };
+  // Leveranserna låses av samma anrop, med samma regel.
+  const uppdateradeLeveranser = (leveranser || []).map(lev => {
+    if (!valdaLevIds.has(lev.id)) {
+      return { ...lev, invoiceRecordId: lev.invoiceRecordId ?? null };
+    }
+    return {
+      ...lev,
+      status: 'included',
+      invoiceRecordId: underlagsId,
+      priceSnapshot: lev.priceSnapshot || { unitPriceOre: lev.amountOre, vatRate: lev.vatRate },
+    };
+  });
+
+  return { underlag, poster: uppdaterade, leveranser: uppdateradeLeveranser };
 }
 
 /**

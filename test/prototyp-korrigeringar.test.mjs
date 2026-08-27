@@ -21,7 +21,8 @@ const dagar = (n) => {
 test('internt arbete visas som Inte fakturerbart, inte som noll kronor', () => {
   const s = nyState();
   const post = s.poster.find(p => p.projectId === 'u-internt');
-  assert.equal(L.arEjFakturerbar(s, post), true);
+  assert.equal(L.arEndastUppfoljning(s, post), true);
+  assert.equal(L.kanIngaIFakturaunderlag(s, post), false);
   assert.equal(L.ejFakturerbarText(s, post), 'Inte fakturerbart');
 });
 
@@ -133,40 +134,60 @@ test('momssatserna är ett fast urval utan förval', () => {
 
 // ── Ångra och rätta ─────────────────────────────────────────────────────────
 
-function medUnderlag(clientId, valdaLeveranser = []) {
+function medUnderlag(gruppId, valdaLeveranser = []) {
   let s = nyState();
-  const res = L.forberedUnderlag(s, clientId, { valdaLeveranser });
+  const res = L.forberedUnderlag(s, gruppId, { valdaLeveranser });
   assert.equal(res.ok, true);
   const referens = {
-    id: res.underlag.id, clientId, status: 'lundifyDraft',
+    id: res.underlag.id, clientId: res.grupp.clientId, period: res.grupp.period,
     nettoOre: res.underlag.nettoOre, momsOre: res.underlag.momsOre,
-    attBetalaOre: res.underlag.attBetalaOre, invoiceNumber: null, invoiceDate: null,
+    attBetalaOre: res.underlag.attBetalaOre,
+    invoiceNumber: null, klarmarkeradAt: null,
   };
   s = { ...s, poster: res.poster, invoiceRecords: [referens] };
   if (valdaLeveranser.length) {
     s = { ...s, deliverables: s.deliverables.map(l =>
       valdaLeveranser.includes(l.id) ? { ...l, status: 'included', invoiceRecordId: referens.id } : l) };
   }
+  s = L.markeraKlart(s, referens.id, { datum: '2026-08-27' }).state;
   return { s, referens, underlag: res.underlag };
 }
 
-test('ångra överföring flyttar tillbaka posterna till Att fakturera', () => {
+test('ett klarmarkerat underlag hamnar under Klart i Lundify', () => {
+  const { s } = medUnderlag('k-a');
+  const klara = L.klaraUnderlag(s);
+  assert.equal(klara.length, 1);
+  assert.equal(klara[0].kundnamn, 'Kund A');
+  assert.equal(klara[0].klarmarkeradAt, '2026-08-27');
+  assert.ok(!L.underlagsgrupper(s).some(g => g.clientId === 'k-a' && g.rader.length));
+});
+
+test('ångra flyttar tillbaka underlaget till Redo för Lundify', () => {
   const { s: fore, referens } = medUnderlag('k-a');
-  assert.ok(!L.underlagPerKund(fore).some(k => k.clientId === 'k-a'));
 
   const angrat = L.angraOverforing(fore, referens.id);
   assert.equal(angrat.ok, true);
   const s = angrat.state;
 
-  const kund = L.underlagPerKund(s).find(k => k.clientId === 'k-a');
-  assert.equal(kund.lage, 'att-fakturera');
-  assert.equal(kund.antalRader, 4, 'alla poster är tillbaka');
-  assert.equal(s.invoiceRecords.length, 0);
+  const grupp = L.underlagsgrupper(s).find(g => g.clientId === 'k-a');
+  assert.equal(grupp.lage, L.LAGE_REDO);
+  assert.equal(grupp.rader.length, 4, 'alla poster är tillbaka');
+  assert.equal(s.invoiceRecords.length, 0, 'ingen felaktig fakturamarkering blir kvar');
+  assert.equal(L.klaraUnderlag(s).length, 0);
   assert.ok(s.poster.filter(p => p.projectId === 'u-behandling')
     .every(p => p.status === 'open' && !p.invoiceRecordId && !p.priceSnapshot));
 });
 
-test('ångra överföring frigör även valda leveranser', () => {
+test('ångra tar bort även ett antecknat fakturanummer', () => {
+  let { s, referens } = medUnderlag('k-a');
+  s = L.antecknaFakturanummer(s, referens.id, '2341').state;
+  assert.equal(s.invoiceRecords[0].invoiceNumber, '2341');
+
+  s = L.angraOverforing(s, referens.id).state;
+  assert.equal(s.invoiceRecords.length, 0, 'ingen felaktig fakturamarkering blir kvar');
+});
+
+test('ångra frigör även valda leveranser', () => {
   const { s: fore, referens } = medUnderlag('k-c', ['lev-verkstad-1']);
   const s = L.angraOverforing(fore, referens.id).state;
   const lev = s.deliverables.find(l => l.id === 'lev-verkstad-1');
@@ -187,48 +208,55 @@ test('ångra ett underlag som inte finns ger ett begripligt besked', () => {
   assert.match(res.besked, /finns inte längre/);
 });
 
-test('ett felaktigt fakturanummer kan rättas', () => {
-  const s = { ...nyState(), invoiceRecords: [{ id: 'r1', clientId: 'k-a', status: 'lundifySent', nettoOre: 100, attBetalaOre: 125, invoiceNumber: '2340' }] };
-  const res = L.andraFakturanummer(s, 'r1', ' 2341 ');
-  assert.equal(res.ok, true);
-  assert.equal(res.state.invoiceRecords[0].invoiceNumber, '2341', 'blanksteg trimmas bort');
-  assert.equal(res.state.invoiceRecords[0].status, 'lundifySent');
+test('fakturanummer krävs aldrig för att markera klart', () => {
+  const { s } = medUnderlag('k-a');
+  assert.equal(L.klaraUnderlag(s)[0].invoiceNumber, null);
+  assert.ok(L.klaraUnderlag(s)[0].klarmarkeradAt, 'underlaget är ändå klart');
 });
 
-test('ett tomt fakturanummer avvisas med ett begripligt besked', () => {
-  const s = { ...nyState(), invoiceRecords: [{ id: 'r1', clientId: 'k-a', status: 'lundifySent', invoiceNumber: '2340' }] };
-  const res = L.andraFakturanummer(s, 'r1', '   ');
-  assert.equal(res.ok, false);
-  assert.match(res.besked, /Skriv in fakturanumret/);
-});
-
-test('borttaget fakturanummer gör underlaget till ett utkast igen', () => {
-  const s = { ...nyState(), invoiceRecords: [{ id: 'r1', clientId: 'k-a', status: 'lundifySent', invoiceNumber: '2341', invoiceDate: '2026-08-27' }] };
-  const r = L.taBortFakturanummer(s, 'r1').state.invoiceRecords[0];
-  assert.equal(r.invoiceNumber, null);
-  assert.equal(r.invoiceDate, null);
-  assert.equal(r.status, 'lundifyDraft', 'en faktura utan nummer är inte skickad');
+test('ett antecknat fakturanummer ändrar inte läget', () => {
+  let { s, referens } = medUnderlag('k-a');
+  const fore = L.klaraUnderlag(s)[0].klarmarkeradAt;
+  s = L.antecknaFakturanummer(s, referens.id, '2341').state;
+  assert.equal(L.klaraUnderlag(s)[0].klarmarkeradAt, fore);
+  assert.equal(L.klaraUnderlag(s)[0].invoiceNumber, '2341');
 });
 
 // ── Tomma lägen ─────────────────────────────────────────────────────────────
 
-test('ett korrekt överfört underlag ger inget fel, bara ett neutralt besked', () => {
+test('en kund vars poster är klara visas inte som tomt underlag', () => {
   const { s } = medUnderlag('k-a');
-  assert.ok(!L.underlagPerKund(s).some(k => k.clientId === 'k-a'),
-    'kunden ska inte ligga kvar under Att fakturera');
-  assert.deepEqual(L.allaOverfordaKunder(s).map(k => k.clientId), ['k-a']);
+  const kvar = L.underlagsgrupper(s).filter(g => g.clientId === 'k-a');
+  assert.deepEqual(kvar, [], 'ingen tom rad och inga noll kronor');
 });
 
 test('en kund med bara en ovald leverans visar Ingen leverans vald', () => {
-  const kund = L.underlagPerKund(nyState()).find(k => k.clientId === 'k-c');
-  assert.equal(kund.lage, 'ingen-leverans-vald');
-  assert.equal(kund.antalRader, 0);
-  assert.equal(kund.valbaraLeveranser, 1);
+  const grupp = L.underlagsgrupper(nyState()).find(g => g.clientId === 'k-c');
+  assert.equal(grupp.lage, L.LAGE_KONTROLL);
+  assert.equal(grupp.atgard.besked, 'Ingen leverans vald');
+  assert.equal(grupp.antalRader, 0);
+  assert.equal(grupp.valbaraLeveranser, 1);
 });
 
-test('en kund med poster att fakturera har läget att-fakturera', () => {
-  const kund = L.underlagPerKund(nyState()).find(k => k.clientId === 'k-a');
-  assert.equal(kund.lage, 'att-fakturera');
+test('en kund med ogranskad moms hamnar under Behöver kontrolleras', () => {
+  const grupp = L.underlagsgrupper(nyState()).find(g => g.clientId === 'k-b');
+  assert.equal(grupp.lage, L.LAGE_KONTROLL);
+  assert.equal(grupp.atgard.besked, 'Momsen behöver anges');
+  assert.deepEqual(grupp.utanMoms.map(a => a.name), ['Lektion']);
+});
+
+test('en kund med poster att fakturera är Redo för Lundify', () => {
+  const grupp = L.underlagsgrupper(nyState()).find(g => g.clientId === 'k-a');
+  assert.equal(grupp.lage, L.LAGE_REDO);
+  assert.equal(L.lagetikett(grupp.lage), 'Redo för Lundify');
+});
+
+test('kundkortet bär kund, period, sammanfattning och belopp', () => {
+  const grupp = L.underlagsgrupper(nyState()).find(g => g.clientId === 'k-a');
+  assert.equal(grupp.kundnamn, 'Kund A');
+  assert.match(grupp.period, /^\d{4}-\d{2}$/);
+  assert.ok(grupp.sammanfattning.length > 0);
+  assert.ok(grupp.summaOre > 0);
 });
 
 // ── Underlaget ──────────────────────────────────────────────────────────────
@@ -267,16 +295,16 @@ test('momstexten skiljer noll procent från okänd moms', () => {
   assert.equal(L.momsText(null), 'ej fastställd');
 });
 
-test('beskedet före en statusändring säger vad som händer', () => {
-  assert.equal(L.OVERFORINGSBESKED, 'Posterna flyttas från Att fakturera till Överfört till Lundify.');
+test('beskedet före klarmarkeringen säger vad som händer', () => {
+  assert.equal(L.OVERFORINGSBESKED, 'Posterna flyttas från Redo för Lundify till Klart i Lundify.');
 });
 
 // ── Jobbat in ───────────────────────────────────────────────────────────────
 
 test('jobbat in räknar tillfällen och timarbete, men inte resor', () => {
   const v = L.veckoSammanstallning(nyState(), 0, IDAG);
-  // Veckan innehåller 2 tillfällen (4 800) + 1 tim samtal (850) = 5 650.
-  assert.equal(v.jobbatInOre, 480000 + 85000);
+  assert.equal(v.delar.tillfallenOre, 480000, '2 tillfällen à 2 400');
+  assert.equal(v.delar.timarbeteOre, 85000, '1 tim à 850');
   assert.equal(v.resorOre, 12650, 'resan redovisas separat');
   assert.equal(v.totaltUnderlagOre, 480000 + 85000 + 12650);
 });
@@ -287,9 +315,10 @@ test('jobbat in räknar inte trackingOnly-tid i fastprisuppdrag', () => {
   assert.ok(fastprispost, 'testdatat har loggad fastpristid');
   assert.equal(L.raknasSomJobbatIn(s, fastprispost), false);
 
-  const v = L.veckoSammanstallning(s, 0, IDAG);
-  assert.equal(v.jobbatInOre, 565000, 'fastpristiden ökar inte beloppet');
-  assert.ok(v.arbetadTidSekunder > 0, 'men tiden syns som arbetad tid');
+  const fore = L.veckoSammanstallning(s, 0, IDAG);
+  assert.equal(fore.delar.timarbeteOre + fore.delar.tillfallenOre, 565000,
+    'fastpristiden ökar inte det timdebiterade');
+  assert.ok(fore.arbetadTidSekunder > 0, 'men tiden syns som arbetad tid');
 });
 
 test('jobbat in räknar inte internt eller ideellt arbete', () => {
@@ -321,9 +350,19 @@ test('ett utlägg räknas aldrig som jobbat in', () => {
 test('jobbat in räknar inte moms', () => {
   const s = nyState();
   const v = L.veckoSammanstallning(s, 0, IDAG);
+
+  // Samma poster, samma vecka, men summerade rakt av utan moms.
+  const veckansPoster = s.poster.filter(p => L.veckansDatum(0, IDAG).includes(p.date));
+  const nettoUtanMoms = L.fakturerbartOre(s, veckansPoster.filter(p =>
+    L.uppdragFor(s, p.projectId)?.kind === 'billable'));
+
+  assert.equal(v.delar.timarbeteOre + v.delar.tillfallenOre + v.resorOre, nettoUtanMoms,
+    'jobbat in bygger på nettot');
+
+  // Och beloppet inklusive moms är ett annat, större tal.
   const underlag = L.forhandsvisa(s, 'k-a');
   assert.ok(underlag.momsOre > 0, 'det finns moms att råka räkna med');
-  assert.ok(v.jobbatInOre < underlag.attBetalaOre, 'jobbat in är exklusive moms');
+  assert.ok(underlag.attBetalaOre > underlag.nettoOre);
 });
 
 test('jobbat in räknar inte rena utlägg', () => {
@@ -345,19 +384,22 @@ test('jobbat in räknar inte rena utlägg', () => {
   const v = L.veckoSammanstallning(s, 0, IDAG);
   assert.equal(v.jobbatInOre, fore, 'utlägget ökar inte det inarbetade');
   assert.equal(v.utlaggOre, 30000, 'men redovisas separat');
+  assert.equal(L.raknasSomJobbatIn(s, s.poster.find(p => p.id === 'p-utlagg')), false);
 });
 
-test('en fast leverans räknas först när den är genomförd och vald', () => {
+test('en enstaka leverans räknas när den är genomförd, inte när den planeras', () => {
   let s = nyState();
-  const fore = L.veckoSammanstallning(s, 0, IDAG).jobbatInOre;
+  const fore = L.veckoSammanstallning(s, 0, IDAG).delar.leveransOre;
 
-  // Genomförd men inte vald: räknas inte.
-  s = { ...s, deliverables: s.deliverables.map(l => l.id === 'lev-verkstad-1' ? { ...l, completedAt: dagar(1) } : l) };
-  assert.equal(L.veckoSammanstallning(s, 0, IDAG).jobbatInOre, fore);
+  // Planerad, även med datum: räknas inte.
+  s = { ...s, deliverables: s.deliverables.map(l =>
+    l.id === 'lev-verkstad-2' ? { ...l, completedAt: dagar(1) } : l) };
+  assert.equal(L.veckoSammanstallning(s, 0, IDAG).delar.leveransOre, fore);
 
-  // Vald som fakturerbar: räknas.
-  s = { ...s, deliverables: s.deliverables.map(l => l.id === 'lev-verkstad-1' ? { ...l, status: 'included' } : l) };
-  assert.equal(L.veckoSammanstallning(s, 0, IDAG).jobbatInOre, fore + 5000000);
+  // Genomförd: räknas.
+  s = { ...s, deliverables: s.deliverables.map(l =>
+    l.id === 'lev-verkstad-2' ? { ...l, status: 'open' } : l) };
+  assert.equal(L.veckoSammanstallning(s, 0, IDAG).delar.leveransOre, fore + 5000000);
 });
 
 test('veckomålet jämförs med jobbat in och är frivilligt', () => {
@@ -365,7 +407,7 @@ test('veckomålet jämförs med jobbat in och är frivilligt', () => {
   const v = L.veckoSammanstallning(s, 0, IDAG);
   assert.equal(v.harMal, true);
   assert.equal(v.malOre, 2500000);
-  assert.equal(v.kvarOre, 2500000 - v.jobbatInOre);
+  assert.equal(v.kvarOre, Math.max(2500000 - v.jobbatInOre, 0));
   assert.match(L.maltext(v), /av veckans mål/);
 
   const u = L.veckoSammanstallning({ ...s, installningar: { veckomalOre: null } }, 0, IDAG);
@@ -375,8 +417,9 @@ test('veckomålet jämförs med jobbat in och är frivilligt', () => {
 
 test('målet jämförs med jobbat in, inte med det totala underlaget', () => {
   const v = L.veckoSammanstallning(nyState(), 0, IDAG);
-  assert.ok(v.totaltUnderlagOre > v.jobbatInOre, 'underlaget är större eftersom resan ingår');
-  assert.equal(v.kvarOre, v.malOre - v.jobbatInOre, 'men målet räknar bara jobbat in');
+  assert.notEqual(v.totaltUnderlagOre, v.jobbatInOre, 'de två talen är inte samma sak');
+  const forvantat = v.jobbatInOre >= v.malOre ? 0 : v.malOre - v.jobbatInOre;
+  assert.equal(v.kvarOre, forvantat, 'målet räknar bara jobbat in');
 });
 
 test('appen räknar ingen lön, skatt eller budget', () => {

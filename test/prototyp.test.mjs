@@ -44,19 +44,18 @@ test('en dag med både tillfälle och timarbete reduceras inte till en prismodel
 
 test('scenario 3: loggad tid på fastprisuppdrag ökar inte fakturabeloppet', () => {
   const s = nyState();
-  const kund = L.underlagPerKund(s).find(k => k.clientId === 'k-c');
-  const uppdrag = kund.uppdrag.find(u => u.projectId === 'u-verkstad');
+  const grupp = L.underlagsgrupper(s).find(g => g.clientId === 'k-c');
 
-  assert.equal(uppdrag.rader.length, 0, 'tiden blir ingen fakturarad');
-  assert.equal(uppdrag.summaOre, 0);
-  assert.equal(uppdrag.loggadTidSekunder, 6 * 3600, 'men tiden syns som loggad');
+  assert.equal(grupp.rader.length, 0, 'tiden blir ingen fakturarad');
+  assert.equal(grupp.summaOre, 0);
+  assert.equal(grupp.loggadTidSekunder, 6 * 3600, 'men tiden syns som loggad');
 });
 
 test('scenario 3: ett underlag utan vald leverans går inte att skapa', () => {
   const s = nyState();
   const res = L.forberedUnderlag(s, 'k-c');
   assert.equal(res.ok, false);
-  assert.match(res.besked, /tomt/i);
+  assert.equal(res.besked, 'Ingen leverans vald');
 });
 
 // ── Scenario 4: uttrycklig leverans ─────────────────────────────────────────
@@ -72,9 +71,8 @@ test('scenario 4: en fastprisleverans faktureras bara när den uttryckligen väl
 
 test('scenario 4: en planerad leverans erbjuds inte för fakturering', () => {
   const s = nyState();
-  const kund = L.underlagPerKund(s).find(k => k.clientId === 'k-c');
-  const leveranser = kund.uppdrag.flatMap(u => u.leveranser).map(l => l.id);
-  assert.deepEqual(leveranser, ['lev-verkstad-1'], 'bara den genomförda leveransen');
+  const grupp = L.underlagsgrupper(s).find(g => g.clientId === 'k-c');
+  assert.deepEqual(grupp.leveranser.map(l => l.id), ['lev-verkstad-1'], 'bara den genomförda leveransen');
 });
 
 // ── Scenario 5: ogranskad moms blockerar ────────────────────────────────────
@@ -83,7 +81,7 @@ test('scenario 5: ogranskad moms blockerar underlaget med ett begripligt besked'
   const s = nyState();
   const res = L.forberedUnderlag(s, 'k-b');
   assert.equal(res.ok, false);
-  assert.equal(res.besked, 'Momsen behöver kontrolleras innan underlaget kan föras över till Lundify.');
+  assert.equal(res.besked, 'Momsen behöver anges');
   assert.deepEqual(res.artiklar, ['Lektion']);
 });
 
@@ -107,16 +105,15 @@ test('scenario 5: när momsen granskats går underlaget igenom', () => {
 // ── Scenario 6: internt arbete ──────────────────────────────────────────────
 
 test('scenario 6: internt arbete hamnar aldrig i ett fakturaunderlag', () => {
-  const s = nyState();
-  const kunder = L.underlagPerKund(s);
-  assert.ok(!kunder.some(k => k.clientId === 'k-eget'), 'egna bolaget ska inte kunna faktureras');
-  assert.ok(!kunder.some(k => k.uppdrag.some(u => u.projectId === 'u-internt')));
+  const grupper = L.underlagsgrupper(nyState());
+  assert.ok(!grupper.some(g => g.clientId === 'k-eget'), 'egna bolaget ska inte kunna faktureras');
+  assert.ok(!grupper.some(g => g.rader.some(r => r.post.projectId === 'u-internt')));
 });
 
 test('scenario 6: internt arbete räknas som arbetad tid men inte som fakturerbart', () => {
   const s = nyState();
-  const u = L.uppfoljning(s, dagar(0).slice(0, 7));
-  const internt = u.perKund.find(k => k.namn === 'Eget bolag');
+  const manad = dagar(0).slice(0, 7);
+  const internt = L.perKund(s, L.manadensDatum(s, manad)).find(k => k.namn === 'Eget bolag');
   assert.ok(internt, 'internt arbete syns i uppföljningen');
   assert.equal(internt.beloppOre, 0);
   assert.ok(internt.sekunder > 0);
@@ -214,17 +211,45 @@ test('endast uppdrag som har arbetstypen erbjuds', () => {
 
 // ── Fakturering och Lundify ─────────────────────────────────────────────────
 
-test('fakturering: poster grupperas per kund och därunder per uppdrag', () => {
-  const s = nyState();
-  const kunder = L.underlagPerKund(s);
-  assert.deepEqual(kunder.map(k => k.kundnamn).sort(), ['Kund A', 'Kund B', 'Kund C']);
-  assert.ok(kunder.every(k => Array.isArray(k.uppdrag) && k.uppdrag.length));
+test('fakturering: underlagen grupperas per kund och faktureringsmånad', () => {
+  const grupper = L.underlagsgrupper(nyState());
+  assert.deepEqual([...new Set(grupper.map(g => g.kundnamn))].sort(), ['Kund A', 'Kund B', 'Kund C']);
+  assert.ok(grupper.every(g => /^\d{4}-\d{2}$/.test(g.period)), 'varje grupp har en månad');
+  assert.ok(grupper.every(g => g.id === g.clientId + '|' + g.period));
+});
+
+test('fakturering: flera uppdrag hos samma kund blir separata rader i samma underlag', () => {
+  let s = nyState();
+  s = {
+    ...s,
+    projects: [...s.projects,
+      { id: 'u-extra', name: 'Handledning', clientId: 'k-a', kind: 'billable', defaultTripKm: null, sortOrder: 9 }],
+    articles: [...s.articles,
+      { id: 'a-extra', projectId: 'u-extra', name: 'Handledning', type: 'hourly', unit: 'tim',
+        unitPriceOre: 95000, vatRate: 2500, vatStatus: 'reviewed', billable: true, active: true, sortOrder: 10 }],
+  };
+  const dag = s.poster.find(p => p.id === 'p-1').date;
+  s = L.laggTillPost(s, {
+    id: 'p-extra', projectId: 'u-extra', articleId: 'a-extra', date: dag,
+    beskrivning: 'Handledning', qtyMilli: 2 * L.MILLI, seconds: 7200,
+    status: 'open', invoiceRecordId: null, priceSnapshot: null,
+  });
+
+  const grupper = L.underlagsgrupper(s).filter(g => g.clientId === 'k-a');
+  assert.equal(grupper.length, 1, 'samma kund och månad ger ETT underlag');
+  assert.deepEqual(grupper[0].uppdrag.sort(), ['Behandling', 'Handledning']);
+  assert.equal(grupper[0].rader.length, 5, 'men fem separata fakturarader');
 });
 
 test('fakturering: resor ligger sist bland raderna', () => {
-  const s = nyState();
-  const uppdrag = L.underlagPerKund(s).find(k => k.clientId === 'k-a').uppdrag[0];
-  assert.equal(uppdrag.rader.at(-1).artikel.type, 'travel');
+  const grupp = L.underlagsgrupper(nyState()).find(g => g.clientId === 'k-a');
+  assert.equal(grupp.rader.at(-1).artikel.type, 'travel');
+});
+
+test('fakturering: sammanfattningen slår ihop rader med samma artikel', () => {
+  const grupp = L.underlagsgrupper(nyState()).find(g => g.clientId === 'k-a');
+  const antal = (grupp.sammanfattning.match(/behandlingstillfälle/g) || []).length;
+  assert.equal(antal, 1, 'artikelnamnet ska inte upprepas');
 });
 
 test('fakturering: blandad moms summeras rätt hela vägen till att betala', () => {
@@ -238,51 +263,50 @@ test('fakturering: blandad moms summeras rätt hela vägen till att betala', () 
   assert.equal(res.underlag.attBetalaOre, 842100);
 });
 
-test('Lundify: ett utkast kan markeras utan fakturanummer', () => {
-  const res = L.satStatus({ id: 'r1' }, 'lundifyDraft');
+test('Lundify: tre synliga lägen, inga tekniska statusar', () => {
+  assert.deepEqual(L.LAGEN.map(l => l.id), ['behover-kontrolleras', 'redo', 'klart']);
+  assert.deepEqual(L.LAGEN.map(l => l.etikett),
+    ['Behöver kontrolleras', 'Redo för Lundify', 'Klart i Lundify']);
+  const etiketter = L.LAGEN.map(l => l.etikett).join(' ').toLowerCase();
+  for (const tekniskt of ['prepared', 'draft', 'sent', 'skickad', 'betal']) {
+    assert.ok(!etiketter.includes(tekniskt), tekniskt + ' ska inte visas för användaren');
+  }
+});
+
+test('Lundify: ett underlag kan markeras klart utan fakturanummer', () => {
+  const s = { ...nyState(), invoiceRecords: [{ id: 'r1', clientId: 'k-a', period: '2026-08', nettoOre: 100, invoiceNumber: null, klarmarkeradAt: null }] };
+  const res = L.markeraKlart(s, 'r1', { datum: '2026-08-27' });
   assert.equal(res.ok, true);
-  assert.equal(res.referens.invoiceNumber, null);
+  assert.equal(res.state.invoiceRecords[0].klarmarkeradAt, '2026-08-27');
+  assert.equal(res.state.invoiceRecords[0].invoiceNumber, null, 'inget nummer krävs');
 });
 
-test('Lundify: skickad kräver fakturanummer, med ett begripligt besked', () => {
-  const res = L.satStatus({ id: 'r1' }, 'lundifySent');
-  assert.equal(res.ok, false);
-  assert.equal(res.besked, 'Skriv in fakturanumret från Lundify innan du markerar fakturan som skickad.');
-});
+test('Lundify: fakturanummer är frivilligt och kan tas bort', () => {
+  let s = { ...nyState(), invoiceRecords: [{ id: 'r1', clientId: 'k-a', period: '2026-08', nettoOre: 100, invoiceNumber: null, klarmarkeradAt: '2026-08-27' }] };
+  s = L.antecknaFakturanummer(s, 'r1', ' 2341 ').state;
+  assert.equal(s.invoiceRecords[0].invoiceNumber, '2341');
+  assert.equal(s.invoiceRecords[0].klarmarkeradAt, '2026-08-27', 'läget ändras inte av anteckningen');
 
-test('Lundify: fakturanumret kan läggas in i efterhand', () => {
-  const utkast = L.satStatus({ id: 'r1' }, 'lundifyDraft').referens;
-  const skickad = L.satStatus(utkast, 'lundifySent', { invoiceNumber: '2026-118', invoiceDate: '2026-08-27' });
-  assert.equal(skickad.ok, true);
-  assert.equal(skickad.referens.invoiceNumber, '2026-118');
+  s = L.antecknaFakturanummer(s, 'r1', '').state;
+  assert.equal(s.invoiceRecords[0].invoiceNumber, null, 'tomt tar bort anteckningen');
+  assert.equal(s.invoiceRecords[0].klarmarkeradAt, '2026-08-27', 'underlaget är fortfarande klart');
 });
 
 test('Lundify: appen har inget läge för betald faktura', () => {
-  assert.deepEqual(L.LUNDIFY_LAGEN.map(l => l.status), ['prepared', 'lundifyDraft', 'lundifySent']);
-  const etiketter = L.LUNDIFY_LAGEN.map(l => l.etikett).join(' ').toLowerCase();
+  const etiketter = L.LAGEN.map(l => l.etikett).join(' ').toLowerCase();
   assert.ok(!etiketter.includes('betal'), 'utan koppling till Lundify vet appen inte om något är betalt');
-});
-
-test('Lundify-texten innehåller allt som ska skrivas av, i ordning', () => {
-  const s = nyState();
-  const res = L.forberedUnderlag(s, 'k-a');
-  const text = L.lundifyText(s, res.underlag);
-  assert.match(text, /^Underlag till Lundify – Kund A/);
-  assert.match(text, /^Avser: /m, 'underlaget ska ange vilken period det avser');
-  assert.match(text, /Beskrivning\tAntal\tÁ-pris\tMoms\tBelopp/);
-  assert.match(text, /Summa exklusive moms:/);
-  assert.match(text, /Summa inklusive moms:/);
-  assert.ok(text.includes('Moms 25 % på'));
 });
 
 // ── Uppföljning ─────────────────────────────────────────────────────────────
 
-test('uppföljning: tid och kronor hålls isär', () => {
+test('uppföljning: tid och kronor hålls isär i EN sammanställning', () => {
   const s = nyState();
-  const u = L.uppfoljning(s, dagar(0).slice(0, 7));
-  assert.equal(typeof u.arbetadTidSekunder, 'number');
-  assert.equal(typeof u.fakturerbartNuOre, 'number');
-  assert.equal(u.overfortOre, 0, 'inget är överfört från början');
+  const m = L.manadsSammanstallning(s, dagar(0).slice(0, 7));
+  assert.equal(typeof m.arbetadTidSekunder, 'number');
+  assert.equal(typeof m.jobbatInOre, 'number');
+  assert.equal(typeof m.redoForLundifyOre, 'number');
+  assert.equal(m.klartILundifyOre, 0, 'inget är klart i Lundify från början');
+  assert.equal(typeof L.uppfoljning, 'undefined', 'den parallella beräkningen finns inte kvar');
 });
 
 // ── Gränssnittets språk ─────────────────────────────────────────────────────

@@ -41,7 +41,7 @@ test('rendering: Idag visar de tre huvudvalen och Mer', () => {
 
 test('rendering: en dag med bara internt arbete visar Inte fakturerbart, inte 0,00 kr', () => {
   klicka({ vy: 'idag' });
-  assert.match(html, /Att fakturera/);
+  assert.match(html, /Fakturaunderlag idag/);
   assert.match(html, /Inte fakturerbart/);
   assert.ok(!/class="varde">0,00 kr/.test(html), 'inget stort nollbelopp');
 });
@@ -58,11 +58,19 @@ test('rendering: fakturerbara belopp är märkta med moms', () => {
   assert.match(html, /exklusive moms/, 'huvudtalet märks');
 });
 
-test('rendering: Fakturera märker exklusive moms, moms och inklusive moms', () => {
+test('rendering: Fakturera märker belopp som exklusive moms', () => {
   klicka({ vy: 'fakturera' });
-  assert.match(html, /Exklusive moms/);
-  assert.match(html, />Moms</);
-  assert.match(html, /Inklusive moms/);
+  assert.match(html, /exklusive moms/);
+  assert.match(html, /Redo för Lundify/);
+});
+
+test('rendering: inga andra ord används för de tre lägena', () => {
+  for (const vy of ['idag', 'vecka', 'fakturera', 'uppfoljning']) {
+    klicka({ vy });
+    const text = html.replace(/<[^>]+>/g, ' ');
+    assert.ok(!/Att fakturera/.test(text), vy + ' använder det gamla ordet');
+    assert.ok(!/överfört till Lundify/i.test(text), vy + ' säger överfört i stället för klart');
+  }
 });
 
 test('rendering: navigeringen har eget utrymme och kan inte täcka innehåll', () => {
@@ -88,11 +96,22 @@ test('rendering: Vecka håller isär jobbat in, resor och utlägg', () => {
   assert.match(html, /Totalt fakturaunderlag/);
 });
 
-test('rendering: veckomålet jämförs med jobbat in och visar vad som är kvar', () => {
+test('rendering: veckomålet jämförs med jobbat in', () => {
   klicka({ vy: 'vecka' });
   assert.match(html, /av veckans mål/);
-  assert.match(html, /kvar\./);
+  assert.match(html, /kvar\.|Målet är nått/);
   assert.match(html, /class="matare"/);
+});
+
+test('rendering: Vecka visar fastprisets veckoandel som en egen rad', () => {
+  klicka({ vy: 'vecka' });
+  assert.match(html, /Fast pris, veckans andel/);
+  assert.match(html, /faktureras enligt avtalet, inte per vecka/);
+});
+
+test('rendering: en ofullständig fastprisperiod flaggas i stället för att räknas', () => {
+  klicka({ vy: 'vecka' });
+  assert.match(html, /Fastprisperioden behöver kompletteras/);
 });
 
 test('rendering: ingen lönekalkyl, skatt eller budget förekommer', () => {
@@ -104,17 +123,38 @@ test('rendering: ingen lönekalkyl, skatt eller budget förekommer', () => {
   }
 });
 
-test('rendering: Fakturera grupperar per kund och blockerar ogranskad moms', () => {
+test('rendering: Fakturera visar de tre lägena och inga tekniska statusar', () => {
+  klicka({ vy: 'fakturera' });
+  assert.match(html, /Behöver kontrolleras/);
+  assert.match(html, /Redo för Lundify/);
+  for (const tekniskt of ['prepared', 'lundifyDraft', 'lundifySent', 'Skickad']) {
+    assert.ok(!html.includes(tekniskt), tekniskt + ' ska inte visas');
+  }
+});
+
+test('rendering: Fakturera grupperar per kund och månad', () => {
   klicka({ vy: 'fakturera' });
   assert.match(html, /Kund A/);
   assert.match(html, /Kund B/);
-  assert.match(html, /Momsen behöver kontrolleras innan underlaget kan föras över till Lundify/);
-  assert.match(html, /Skapa underlag för Lundify/);
+  assert.match(html, /class="kortperiod">/);
+  assert.match(html, /Visa underlag/);
 });
 
-test('rendering: Fakturera visar loggad tid på fastpris utan att den ökar beloppet', () => {
+test('rendering: en blockerad kund visar problemet och nästa åtgärd', () => {
   klicka({ vy: 'fakturera' });
-  assert.match(html, /Ingår i fast pris och ökar inte beloppet/);
+  assert.match(html, /Momsen behöver anges/);
+  assert.match(html, /data-angemoms=/);
+  assert.match(html, />Ange moms</);
+});
+
+test('rendering: Fakturera frågar aldrig efter fakturanummer', () => {
+  klicka({ vy: 'fakturera' });
+  assert.ok(!/fakturanummer/i.test(html), 'fakturanummer är inte en del av flödet');
+});
+
+test('rendering: en leverans måste väljas uttryckligen', () => {
+  klicka({ vy: 'fakturera' });
+  assert.match(html, /Ingen leverans vald/);
   assert.match(html, /Ta med leveransen i underlaget/, 'leveransen måste väljas uttryckligen');
 });
 
@@ -129,9 +169,10 @@ test('rendering: Uppföljning visar tid och kronor på egna rader', () => {
   klicka({ vy: 'uppfoljning' });
   assert.match(html, /Arbetad tid/);
   assert.match(html, /Jobbat in/);
-  assert.match(html, /Överfört till Lundify/);
-  assert.match(html, /Resor att fakturera/);
-  assert.match(html, /Utlägg att ersätta/);
+  assert.match(html, /Redo för Lundify/);
+  assert.match(html, /Klart i Lundify/);
+  assert.match(html, />Resor</);
+  assert.match(html, />Utlägg</);
   assert.ok(!/Betalt enligt Lundify/.test(html), 'betalstatus ska vara borttagen ur första versionen');
 });
 
@@ -156,10 +197,36 @@ test('rendering: researket föreslår uppdragets standardavstånd', () => {
   assert.match(html, /data-km="23"/, 'standardavståndet ligger först');
 });
 
-test('rendering: Mer innehåller leverans och utlägg', () => {
+test('rendering: Mer innehåller bara den funktion som är byggd', () => {
   klicka({ oppna: 'mer' });
-  assert.match(html, /Fast leverans/);
-  assert.match(html, /Utlägg/);
+  assert.match(html, /Leverans klar/);
+  assert.match(html, /Markera en avtalad leverans som genomförd/);
+  assert.ok(!/Utlägg/.test(html), 'utlägg är inte byggt och ska inte visas');
+});
+
+test('rendering: Leverans klar öppnar ett formulär, inte en platshållare', () => {
+  klicka({ oppna: 'leverans' });
+  assert.match(html, /Vilken leverans\?/);
+  assert.match(html, /Vilken dag genomfördes den\?/);
+  assert.match(html, /Markera som genomförd/);
+  assert.match(html, /räknas .* som Jobbat in/);
+  assert.match(html, /läggs inte automatiskt i ett fakturaunderlag/);
+});
+
+test('rendering: priset i leveransformuläret går inte att ändra', () => {
+  klicka({ oppna: 'leverans' });
+  assert.match(html, /exklusive moms, enligt avtalet/);
+  const falt = [...html.matchAll(/data-falt="([a-z]+)"/g)].map(m => m[1]);
+  assert.deepEqual([...new Set(falt)], ['datum'], 'bara datumet är redigerbart');
+});
+
+test('rendering: ingen synlig knapp öppnar en inte byggd-ruta', () => {
+  for (const v of ['idag', 'vecka', 'fakturera', 'uppfoljning']) {
+    klicka({ vy: v });
+    assert.ok(!/inte byggd|inte byggt/i.test(html), v + ' visar en platshållare');
+  }
+  klicka({ oppna: 'mer' });
+  assert.ok(!/inte byggd|inte byggt/i.test(html));
 });
 
 test('rendering: testbannern gör tydligt att datat är påhittat', () => {

@@ -91,6 +91,27 @@ export function oreTillText(ore, { visaEnhet = true } = {}) {
   return `${negativ ? '−' : ''}${text}${visaEnhet ? ' kr' : ''}`;
 }
 
+/**
+ * Öre till kronor för ETT GRÄNSSNITT: hela kronor visas utan ören.
+ *
+ *   5000000 → "50 000 kr"
+ *     56650 → "566,50 kr"
+ *
+ * Skiljer sig från oreTillText, som alltid skriver ut båda decimalerna.
+ * Den exakta formen används där varje öre ska synas — i migreringsrapporten
+ * och i avstämningar. Den korta används där en människa läser en summa.
+ */
+export function oreTillKortText(ore, { visaEnhet = true } = {}) {
+  kravHeltal(ore, 'belopp i öre');
+  const enhet = visaEnhet ? ' kr' : '';
+  if (ore % KRONA === 0) {
+    const kronor = ore / KRONA;
+    const negativ = kronor < 0;
+    return `${negativ ? '−' : ''}${Math.abs(kronor).toLocaleString('sv-SE')}${enhet}`;
+  }
+  return oreTillText(ore, { visaEnhet });
+}
+
 /** Kvantitet till text med enhet: 3000, 'tim' → "3 tim". 2500, 'tim' → "2,5 tim" */
 export function kvantitetTillText(qtyMilli, unit) {
   kravHeltal(qtyMilli, 'kvantitet');

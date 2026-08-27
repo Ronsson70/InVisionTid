@@ -149,6 +149,8 @@ pre.underlag{background:var(--warm);border:1px solid var(--border);border-radius
 .beloppblock{margin-top:14px;padding-top:12px;border-top:1px solid var(--sage-ghost)}
 .brad{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:15px;font-variant-numeric:tabular-nums}
 .brad.stark{font-weight:700;font-size:17px;border-top:2px solid var(--sage-deep);margin-top:6px;padding-top:11px}
+.brad.under{padding-left:16px;font-size:14px;color:var(--text-muted)}
+.brad.avstand{margin-top:10px;padding-top:12px;border-top:1px solid var(--sage-ghost)}
 
 /* Veckans ekonomiska mål */
 .malbelopp{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
@@ -158,6 +160,9 @@ pre.underlag{background:var(--warm);border:1px solid var(--border);border-radius
 .maltext{font-size:15px;line-height:1.45;margin-bottom:12px}
 .malrader{border-top:1px solid var(--sage-ghost);padding-top:8px}
 .malrader.avskild{margin-top:10px}
+.malrader.malruta{background:var(--sage-ghost);border:none;border-radius:12px;
+  padding:12px 14px;margin:12px 0 16px}
+.malrader.malruta .brad.stark{border-top-color:var(--sage-light,#8FA594)}
 
 /* Statusetiketter ska se ut som etiketter, inte som knappar. */
 .statusrad{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
@@ -171,6 +176,14 @@ pre.underlag{background:var(--warm);border:1px solid var(--border);border-radius
 .statusknappar{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .sekundar.liten{width:auto;padding:10px 14px;font-size:14px;margin-top:0}
 .lankknapp{color:var(--accent);font-size:14px;font-weight:600;padding:8px 0;text-decoration:underline}
+
+/* Tre synliga lägen i Fakturera. Inga tekniska statusar. */
+.avsnitt{margin-bottom:20px}
+.avsnittsrubrik{font-size:13px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--text-muted);margin:0 16px 10px}
+.kortperiod{font-size:14px;color:var(--text-muted);margin-top:2px}
+.sammanfattning{font-size:15px;margin-top:10px;line-height:1.45}
+.lankknapp.mitten{display:block;width:100%;text-align:center;margin-top:10px}
 
 .valjknapp{background:var(--sage-deep);color:#fff;padding:12px 16px;border-radius:10px;
   font-size:14px;font-weight:600;white-space:normal;text-align:center;flex-shrink:0;max-width:180px}

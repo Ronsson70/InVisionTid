@@ -23,11 +23,19 @@ export function datum(dagarSedan = 0, idag = new Date()) {
     + String(d.getDate()).padStart(2, '0');
 }
 
+/** Datum framåt i tiden. */
+function omDagar(antal, idag = new Date()) { return datum(-antal, idag); }
+
 export function skapaTestdata(idag = new Date()) {
   const iDag = datum(0, idag);
   const iGar = datum(1, idag);
   const treDarSedan = datum(3, idag);
   const femDarSedan = datum(5, idag);
+
+  // En avtalsperiod på 91 dagar, som ett kvartal. 100 000 kr fördelat över
+  // perioden ger 7 692,30 kr för en hel vecka.
+  const periodStart = datum(45, idag);
+  const periodSlut = omDagar(45, idag);
 
   return {
     // Ett frivilligt veckomål i kronor. Inget annat.
@@ -40,6 +48,7 @@ export function skapaTestdata(idag = new Date()) {
       { id: 'k-a', name: 'Kund A' },
       { id: 'k-b', name: 'Kund B' },
       { id: 'k-c', name: 'Kund C' },
+      { id: 'k-d', name: 'Kund D' },
       { id: 'k-eget', name: 'Eget bolag' },
     ],
 
@@ -47,7 +56,8 @@ export function skapaTestdata(idag = new Date()) {
       { id: 'u-behandling', name: 'Behandling', clientId: 'k-a', kind: 'billable', defaultTripKm: 23, sortOrder: 1 },
       { id: 'u-lektioner', name: 'Lektioner', clientId: 'k-b', kind: 'billable', defaultTripKm: 34, sortOrder: 2 },
       { id: 'u-verkstad', name: 'Verkstadsserie', clientId: 'k-c', kind: 'billable', defaultTripKm: null, sortOrder: 3 },
-      { id: 'u-internt', name: 'Internt bolagsarbete', clientId: 'k-eget', kind: 'internal', defaultTripKm: null, sortOrder: 4 },
+      { id: 'u-avtal', name: 'Löpande avtal', clientId: 'k-d', kind: 'billable', defaultTripKm: null, sortOrder: 4 },
+      { id: 'u-internt', name: 'Internt bolagsarbete', clientId: 'k-eget', kind: 'internal', defaultTripKm: null, sortOrder: 5 },
     ],
 
     articles: [
@@ -91,6 +101,21 @@ export function skapaTestdata(idag = new Date()) {
       { id: 'lev-verkstad-2', projectId: 'u-verkstad', name: 'Verkstad 2, planerad',
         amountOre: 5000000, vatRate: 2500, vatStatus: 'reviewed',
         order: 2, status: 'planned', completedAt: null, invoiceRecordId: null },
+
+      // Fastpris för en AVTALSPERIOD. Tjänas in successivt och fördelas över
+      // periodens dagar när "Jobbat in" räknas. Faktureras enligt avtalet, inte
+      // per vecka.
+      { id: 'lev-avtal', projectId: 'u-avtal', name: 'Löpande avtal, kvartal',
+        amountOre: 10000000, vatRate: 2500, vatStatus: 'reviewed',
+        order: 1, status: 'open', completedAt: null, invoiceRecordId: null,
+        startDate: periodStart, endDate: periodSlut },
+
+      // Fastprisperiod där uppgifterna saknas. Ska INTE räknas in, och ska
+      // visas som något som behöver kompletteras.
+      { id: 'lev-ofullstandig', projectId: 'u-avtal', name: 'Avtal utan slutdatum',
+        amountOre: 5000000, vatRate: 2500, vatStatus: 'reviewed',
+        order: 2, status: 'open', completedAt: null, invoiceRecordId: null,
+        startDate: periodStart, endDate: null },
     ],
 
     poster: [
