@@ -131,7 +131,7 @@ test('ett ojämnt belopp fördelas utan att en enda öre försvinner', () => {
 test('en period utan slutdatum räknas inte in, och gissas inte', () => {
   const p = { ...period('2026-04-01', null) };
   assert.equal(periodKontroll(p).giltig, false);
-  assert.equal(periodKontroll(p).orsak, 'Fastprisperioden behöver kompletteras');
+  assert.equal(periodKontroll(p).orsak, 'Upparbetningsperioden behöver anges');
   assert.equal(dagsandelOre(p, '2026-04-15'), 0);
 });
 
@@ -156,10 +156,11 @@ const nyState = () => skapaTestdata(IDAG);
 
 test('veckans jobbat in innehåller fastprisets veckoandel', () => {
   const v = L.veckoSammanstallning(nyState(), 0, IDAG);
-  assert.equal(v.delar.fastPrisAndelOre, 769230, 'en hel vecka av 100 000 kr över 91 dagar');
+  // Kvartalsavtalet ger 7 692,30 kr och Verkstad 1 ger 12 499,97 kr.
+  assert.equal(v.delar.fastPrisAndelOre, 769230 + 1249997);
   assert.equal(v.jobbatInOre,
-    v.delar.timarbeteOre + v.delar.tillfallenOre + v.delar.styckOre
-    + v.delar.fastPrisAndelOre + v.delar.leveransOre);
+    v.delar.timarbeteOre + v.delar.tillfallenOre + v.delar.styckOre + v.delar.fastPrisAndelOre);
+  assert.ok(!('leveransOre' in v.delar), 'det finns ingen klumpsumma längre');
 });
 
 test('fastprisandelen ingår ALDRIG i fakturaunderlaget', () => {
@@ -199,7 +200,7 @@ test('när avtalet faktureras dubbelräknas inte upparbetningen', () => {
 test('en ofullständig period flaggas i stället för att räknas', () => {
   const v = L.veckoSammanstallning(nyState(), 0, IDAG);
   assert.equal(v.ofullstandigaPerioder.length, 1);
-  assert.equal(v.ofullstandigaPerioder[0].orsak, 'Fastprisperioden behöver kompletteras');
+  assert.equal(v.ofullstandigaPerioder[0].orsak, 'Upparbetningsperioden behöver anges');
   assert.equal(v.ofullstandigaPerioder[0].namn, 'Avtal utan slutdatum');
 });
 
@@ -230,48 +231,38 @@ test('trackingOnly-tid läggs inte ovanpå den fördelade fastprissumman', () =>
 test('moms räknas inte in i jobbat in', () => {
   const s = nyState();
   const v = L.veckoSammanstallning(s, 0, IDAG);
-  const avtal = s.deliverables.find(l => l.id === 'lev-avtal');
-  assert.equal(avtal.vatRate, 2500, 'avtalet har moms att råka räkna med');
-  // Andelen är exakt en veckas del av nettobeloppet, utan påslag.
-  assert.equal(v.delar.fastPrisAndelOre, periodandelOre(avtal, L.veckansDatum(0, IDAG)));
+  const veckan = L.veckansDatum(0, IDAG);
+  const summaAvPerioder = s.deliverables
+    .filter(l => periodKontroll(l).giltig)
+    .reduce((sum, l) => sum + periodandelOre(l, veckan), 0);
+  assert.ok(s.deliverables.every(l => l.vatRate === 2500), 'det finns moms att råka räkna med');
+  // Andelarna är exakt veckans del av nettobeloppen, utan påslag.
+  assert.equal(v.delar.fastPrisAndelOre, summaAvPerioder);
 });
 
-// ── Enstaka leverans utan period ────────────────────────────────────────────
+// ── Upparbetning kontra genomförande ────────────────────────────────────────
 
-test('en enstaka leverans utan period räknas först när den är genomförd', () => {
+test('en genomförandemarkering ändrar inte veckans jobbat in', () => {
   let s = nyState();
-  const veckansDagar = L.veckansDatum(0, IDAG);
+  const fore = L.veckoSammanstallning(s, 0, IDAG);
 
-  // Planerad, med datum: räknas inte.
-  s = { ...s, deliverables: s.deliverables.map(l =>
-    l.id === 'lev-verkstad-2' ? { ...l, completedAt: veckansDagar[1] } : l) };
-  const planerad = L.veckoSammanstallning(s, 0, IDAG).delar.leveransOre;
-  assert.equal(arGenomford(s.deliverables.find(l => l.id === 'lev-verkstad-2')), false);
+  s = L.markeraGenomford(s, 'lev-verkstad-2', L.veckansDatum(0, IDAG)[2]).state;
+  const efter = L.veckoSammanstallning(s, 0, IDAG);
 
-  // Genomförd: räknas.
-  s = { ...s, deliverables: s.deliverables.map(l =>
-    l.id === 'lev-verkstad-2' ? { ...l, status: 'open' } : l) };
-  assert.equal(L.veckoSammanstallning(s, 0, IDAG).delar.leveransOre, planerad + 5000000);
+  assert.equal(efter.jobbatInOre, fore.jobbatInOre,
+    'hela beloppet läggs aldrig ovanpå veckan');
+  assert.equal(efter.delar.fastPrisAndelOre, fore.delar.fastPrisAndelOre);
 });
 
-test('en enstaka leverans räknas den vecka den genomfördes, inte varje vecka', () => {
+test('en avtalsperiod räknas varje vecka den pågår', () => {
   const s = nyState();
   const denna = L.veckoSammanstallning(s, 0, IDAG);
   const forra = L.veckoSammanstallning(s, -1, IDAG);
-  assert.ok(denna.delar.leveransOre > 0, 'leveransen genomfördes den här veckan');
-  assert.equal(forra.delar.leveransOre, 0, 'och räknas inte om veckan innan');
+  assert.ok(denna.delar.fastPrisAndelOre > 0);
+  assert.ok(forra.delar.fastPrisAndelOre > 0, 'perioden pågår även föregående vecka');
 });
 
-test('en avtalsperiod räknas däremot varje vecka den pågår', () => {
+test('utanför alla perioder ger fastpriset ingenting', () => {
   const s = nyState();
-  const denna = L.veckoSammanstallning(s, 0, IDAG);
-  const forra = L.veckoSammanstallning(s, -1, IDAG);
-  assert.equal(denna.delar.fastPrisAndelOre, 769230);
-  assert.equal(forra.delar.fastPrisAndelOre, 769230, 'perioden pågår även föregående vecka');
-});
-
-test('utanför avtalsperioden ger fastpriset ingenting', () => {
-  const s = nyState();
-  const langtEfter = L.veckoSammanstallning(s, 20, IDAG);
-  assert.equal(langtEfter.delar.fastPrisAndelOre, 0);
+  assert.equal(L.veckoSammanstallning(s, 40, IDAG).delar.fastPrisAndelOre, 0);
 });

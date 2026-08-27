@@ -124,21 +124,30 @@ lön, skatt, avgift eller budget.
 
 ### Fastpris
 
-Ett fast pris för en avtalsperiod tjänas in successivt. Beloppet fördelas
-proportionellt över periodens kalenderdagar, i heltalsöre, och summan av alla
-veckor blir exakt periodens totalpris.
+**Varje** fast ersättning har en upparbetningsperiod med start- och slutdatum.
+Beloppet tjänas in successivt: det fördelas proportionellt över periodens
+kalenderdagar i heltalsöre, och summan av alla veckor blir exakt totalpriset.
 
-Den veckofördelade andelen ingår i "Jobbat in" men **aldrig** i
-fakturaunderlaget. Fastpriset faktureras enligt avtalet, inte per vecka, och kan
-därför inte dubbelräknas när leveransen väl faktureras.
+Ett arvode på 50 000 kr för ett arbete som pågår i fyra veckor ger alltså cirka
+12 500 kr per vecka — inte 50 000 kr den dag arbetet blev klart.
 
-Saknas startdatum, slutdatum eller belopp gissas ingenting. Perioden räknas inte
-in, och veckovyn visar "Fastprisperioden behöver kompletteras".
+Upparbetning och fakturering är skilda saker:
 
-### Enstaka leverans
+| | |
+|---|---|
+| **Upparbetning** | perioden styr. Syns i Jobbat in. Aldrig en fakturarad. |
+| **Genomförande** | styr faktureringen. En leverans som inte är genomförd kan inte tas med i ett underlag, och när den tas med används **hela** det avtalade beloppet. |
 
-En leverans utan avtalsperiod räknas den vecka den genomfördes. Den markeras
-genomförd från **Idag → Mer → Leverans klar**: välj uppdrag, välj vilken av de
+Eftersom perioden är enda vägen in i Jobbat in kan samma belopp inte
+dubbelräknas — varken av en genomförandemarkering eller av en fakturering.
+
+En ersättning för en enda dag får samma start- och slutdatum och räknas helt den
+dagen. Saknas startdatum, slutdatum eller belopp gissas ingenting: beloppet
+räknas inte in, och veckovyn visar "Upparbetningsperioden behöver anges".
+
+### Markera en leverans klar
+
+En leverans markeras genomförd från **Idag → Mer → Leverans klar**: välj uppdrag, välj vilken av de
 upplagda leveranserna det gäller, och vilken dag. Pris och moms kommer från
 avtalet och går inte att ändra i det dagliga formuläret.
 

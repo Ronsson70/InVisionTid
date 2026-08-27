@@ -91,7 +91,7 @@ test('ingen vy visar ett helt krontal med ,00', () => {
 test('ören visas fortfarande där de finns', () => {
   const vecka = rendera('vecka');
   assert.match(vecka, /126,50 kr/, 'resan har ören och ska visa dem');
-  assert.match(platt(vecka), /7 692,30 kr/, 'fastprisandelen har ören');
+  assert.match(platt(vecka), /20 192,27 kr/, 'fastprisandelen har ören');
 });
 
 test('leveransens besked visar beloppet i kortform', () => {

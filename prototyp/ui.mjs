@@ -78,7 +78,11 @@ function postrad(p, { klickbar = true } = {}) {
   </div>`;
 }
 
-/** En genomförd leverans visas som en rad, precis som en registrering. */
+/**
+ * En genomförd leverans visas som en HÄNDELSE, inte som ett belopp.
+ * Pengarna tjänas in över upparbetningsperioden, inte den dag leveransen
+ * blev klar. Att visa hela beloppet här skulle ge sken av motsatsen.
+ */
 function leveransrad(l) {
   return `<div class="postrad" data-leverans="${esc(l.id)}" role="button" tabindex="0">
     <span class="prick" style="background:${farg(l.projectId)}"></span>
@@ -86,7 +90,7 @@ function leveransrad(l) {
       <span class="namn">${esc(l.uppdragnamn)} · ${esc(l.name)}</span>
       <span class="under">leverans genomförd${l.invoiceRecordId ? ' · klart i Lundify' : ''}</span>
     </span>
-    <span class="belopp">${esc(kr(l.amountOre))}<small>exkl. moms</small></span>
+    <span class="ejfakt">Upparbetas över perioden</span>
   </div>`;
 }
 
@@ -183,15 +187,14 @@ function vyVecka() {
       ${v.delar.tillfallenOre ? `<div class="brad under"><span>Behandlingstillfällen</span><span>${esc(kr(v.delar.tillfallenOre))}</span></div>` : ''}
       ${v.delar.styckOre ? `<div class="brad under"><span>Styckprisat arbete</span><span>${esc(kr(v.delar.styckOre))}</span></div>` : ''}
       ${v.delar.fastPrisAndelOre ? `<div class="brad under"><span>Fast pris, veckans andel</span><span>${esc(kr(v.delar.fastPrisAndelOre))}</span></div>` : ''}
-      ${v.delar.leveransOre ? `<div class="brad under"><span>Genomförd leverans</span><span>${esc(kr(v.delar.leveransOre))}</span></div>` : ''}
       <div class="brad avstand"><span>Resor att fakturera</span><span>${esc(kr(v.resorOre))}</span></div>
       <div class="brad"><span>Utlägg att ersätta</span><span>${esc(kr(v.utlaggOre))}</span></div>
       <div class="brad stark"><span>Totalt fakturaunderlag</span><span>${esc(kr(v.totaltUnderlagOre))}</span></div>
       <div class="markning">exklusive moms</div>
     </div>
-    ${v.delar.fastPrisAndelOre ? `<div class="notis">Fast pris tjänas in över avtalsperioden och ingår i Jobbat in. Det faktureras enligt avtalet, inte per vecka, och ingår därför inte i fakturaunderlaget.</div>` : ''}
+    ${v.delar.fastPrisAndelOre ? `<div class="notis">Fast pris tjänas in över sin upparbetningsperiod och ingår i Jobbat in. Det faktureras när leveransen är genomförd och vald, med hela det avtalade beloppet, och ingår därför inte i veckans fakturaunderlag.</div>` : ''}
     ${v.ofullstandigaPerioder.map(p => `<div class="varning">
-      <strong>Fastprisperioden behöver kompletteras</strong>${esc(p.namn)} saknar start- eller slutdatum eller belopp, och räknas därför inte in.
+      <strong>Upparbetningsperioden behöver anges</strong>${esc(p.namn)} saknar start- eller slutdatum eller belopp, och räknas därför inte in i Jobbat in.
     </div>`).join('')}
     <div class="malrader avskild">
       <div class="brad"><span>Arbetad tid</span><span>${esc(timmar(v.arbetadTidSekunder))} h</span></div>
@@ -373,6 +376,7 @@ function arkLeverans() {
     <input type="date" data-falt="datum" value="${esc(ark.datum)}">
 
     ${vald ? `<div class="beloppforhand">${esc(kr(vald.amountOre))}<small>exklusive moms, enligt avtalet</small></div>
+      ${vald.startDate && vald.endDate ? `<div class="notis">Upparbetas ${esc(vald.startDate)} till ${esc(vald.endDate)}.</div>` : ''}
       <p class="notis forklaring">${esc(L.genomforandebesked(vald))}</p>
       <button class="spara" data-markeragenomford="${esc(vald.id)}">Markera som genomförd</button>` : ''}
     <button class="avbryt" data-stang="knapp">Avbryt</button>`;

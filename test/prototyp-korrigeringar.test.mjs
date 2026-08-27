@@ -387,19 +387,13 @@ test('jobbat in räknar inte rena utlägg', () => {
   assert.equal(L.raknasSomJobbatIn(s, s.poster.find(p => p.id === 'p-utlagg')), false);
 });
 
-test('en enstaka leverans räknas när den är genomförd, inte när den planeras', () => {
+test('en fast ersättning räknas över sin period, inte när den genomförs', () => {
   let s = nyState();
-  const fore = L.veckoSammanstallning(s, 0, IDAG).delar.leveransOre;
+  const fore = L.veckoSammanstallning(s, 0, IDAG).delar.fastPrisAndelOre;
 
-  // Planerad, även med datum: räknas inte.
-  s = { ...s, deliverables: s.deliverables.map(l =>
-    l.id === 'lev-verkstad-2' ? { ...l, completedAt: dagar(1) } : l) };
-  assert.equal(L.veckoSammanstallning(s, 0, IDAG).delar.leveransOre, fore);
-
-  // Genomförd: räknas.
-  s = { ...s, deliverables: s.deliverables.map(l =>
-    l.id === 'lev-verkstad-2' ? { ...l, status: 'open' } : l) };
-  assert.equal(L.veckoSammanstallning(s, 0, IDAG).delar.leveransOre, fore + 5000000);
+  // Att markera genomförd lägger inte till något i veckan.
+  s = L.markeraGenomford(s, 'lev-verkstad-2', dagar(1)).state;
+  assert.equal(L.veckoSammanstallning(s, 0, IDAG).delar.fastPrisAndelOre, fore);
 });
 
 test('veckomålet jämförs med jobbat in och är frivilligt', () => {

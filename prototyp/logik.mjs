@@ -150,10 +150,11 @@ export function fakturerbartOre(s, poster) {
 export function fakturaunderlagForDag(s, datum) {
   const poster = posterForDag(s, datum);
   const leveranser = genomfordaLeveranserForDag(s, datum);
+  // Leveranser räknas inte in i dagens underlag. De upparbetas över sin period
+  // och faktureras när de väljs till ett underlag i Fakturera.
   return {
-    beloppOre: fakturerbartOre(s, poster)
-      + leveranser.reduce((sum, l) => sum + l.amountOre, 0),
-    harFakturerbart: poster.some(p => kanIngaIFakturaunderlag(s, p)) || leveranser.length > 0,
+    beloppOre: fakturerbartOre(s, poster),
+    harFakturerbart: poster.some(p => kanIngaIFakturaunderlag(s, p)),
     poster, leveranser,
   };
 }
@@ -231,20 +232,29 @@ export function saknadeResorForDag(s, datum) {
 //
 // Samma ekonomiska åtagande får aldrig vara båda. Det kontrolleras i koden.
 
-/** Leveranser som går att markera genomförda, alltså de utan avtalsperiod. */
+/**
+ * Leveranser som går att markera genomförda.
+ *
+ * Alla fasta ersättningar har en upparbetningsperiod. Genomförandet handlar
+ * inte om upparbetning utan om FAKTURERING: en leverans som inte är genomförd
+ * kan inte tas med i ett underlag.
+ */
 export function enstakaLeveranser(s, { endastEjGenomforda = false } = {}) {
   return (s.deliverables || [])
-    .filter(l => !harAvtalsperiod(l))
     .filter(l => uppdragArFakturerbart(uppdragFor(s, l.projectId)))
     .filter(l => !endastEjGenomforda || !arGenomford(l))
     .map(l => ({ ...l, uppdragnamn: uppdragFor(s, l.projectId)?.name ?? '' }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
-/** Genomförda leveranser ett visst datum, för Idag och Vecka. */
+/**
+ * Leveranser som markerats genomförda ett visst datum, för Idag och Vecka.
+ * De visas som en händelse, inte som ett belopp: upparbetningen sker över
+ * perioden, inte den dag leveransen blev klar.
+ */
 export function genomfordaLeveranserForDag(s, datum) {
   return (s.deliverables || [])
-    .filter(l => !harAvtalsperiod(l) && arGenomford(l) && l.completedAt === datum)
+    .filter(l => arGenomford(l) && l.completedAt === datum)
     .map(l => ({ ...l, uppdragnamn: uppdragFor(s, l.projectId)?.name ?? '' }));
 }
 
@@ -253,8 +263,9 @@ export const leveransArLast = leverans => !!leverans?.invoiceRecordId;
 
 /** Vad som händer när leveransen markeras genomförd. Visas INNAN bekräftelsen. */
 export function genomforandebesked(leverans) {
-  return `När leveransen markeras som genomförd räknas ${belopp(leverans.amountOre)} som Jobbat in. `
-    + 'Leveransen läggs inte automatiskt i ett fakturaunderlag.';
+  return `${belopp(leverans.amountOre)} tjänas in över upparbetningsperioden och påverkar inte `
+    + 'veckans Jobbat in. Genomförandet gör att leveransen kan tas med i ett fakturaunderlag, '
+    + 'med hela beloppet. Den läggs inte in automatiskt.';
 }
 
 /**
@@ -264,13 +275,6 @@ export function genomforandebesked(leverans) {
 export function markeraGenomford(s, leveransId, datum) {
   const leverans = (s.deliverables || []).find(l => l.id === leveransId);
   if (!leverans) return { ok: false, besked: 'Leveransen finns inte längre.' };
-  if (harAvtalsperiod(leverans)) {
-    return {
-      ok: false,
-      besked: 'Det här är ett fast pris för en avtalsperiod. Det räknas automatiskt över perioden '
-        + 'och ska inte markeras genomfört som en enstaka leverans.',
-    };
-  }
   if (leveransArLast(leverans)) {
     return { ok: false, besked: 'Leveransen ligger i ett underlag som är klart i Lundify. Flytta tillbaka underlaget först.' };
   }
@@ -395,7 +399,7 @@ export function underlagsgrupper(s) {
 
   for (const l of s.deliverables || []) {
     if (l.status !== 'open' || l.invoiceRecordId) continue;
-    if (harAvtalsperiod(l)) continue;                     // avtalsperioder faktureras enligt avtalet
+    if (!arGenomford(l)) continue;                        // ej genomförd kan inte faktureras
     const u = uppdragFor(s, l.projectId);
     if (!uppdragArFakturerbart(u)) continue;
     lagg(u.clientId ?? '_utan', (l.completedAt ?? '').slice(0, 7) || 'utan-period').leveranser.push({ ...l, uppdragnamn: u.name });
@@ -453,7 +457,7 @@ export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
   }
 
   try {
-    const { underlag, poster } = lasUnderlag({
+    const { underlag, poster, leveranser } = lasUnderlag({
       artiklar: s.articles,
       poster: s.poster,
       valda: valdaPoster,
@@ -462,7 +466,7 @@ export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
       clientId: grupp.clientId,
       period: grupp.period,
     });
-    return { ok: true, underlag, poster, grupp };
+    return { ok: true, underlag, poster, leveranser, grupp };
   } catch (e) {
     if (e instanceof OgranskadMoms || e.name === 'OgranskadMoms') {
       return { ok: false, besked: 'Momsen behöver anges', artiklar: (e.artiklar || []).map(a => a.name) };
@@ -682,34 +686,29 @@ export function jobbatIn(s, datumLista) {
     else if (a.unit === 'kr') utlaggOre += belopp;
   }
 
-  // Fasta leveranser. Två slag, med olika regler.
-  let fastPrisAndelOre = 0, leveransOre = 0;
+  // Fasta ersättningar upparbetas ALLTID över sin period.
+  //
+  // Det finns ingen klumpsumma. En genomförandemarkering lägger aldrig hela
+  // beloppet ovanpå en vecka — den styr bara om leveransen får faktureras.
+  // Därför kan samma belopp inte räknas både som periodandel och som leverans.
+  let fastPrisAndelOre = 0;
   const ofullstandigaPerioder = [];
 
   for (const l of s.deliverables || []) {
     if (!uppdragArFakturerbart(uppdragFor(s, l.projectId))) continue;
-
-    if (harAvtalsperiod(l)) {
-      // Fastpris för en tidsperiod tjänas in successivt och fördelas över
-      // periodens dagar. Status spelar ingen roll: upparbetningen sker oavsett
-      // om beloppet ännu har fakturerats. Därför kan det inte dubbelräknas.
-      const kontroll = periodKontroll(l);
-      if (!kontroll.giltig) {
-        ofullstandigaPerioder.push({ id: l.id, namn: l.name, orsak: kontroll.orsak });
-        continue;                                    // gissa inte, räkna inte med
-      }
-      fastPrisAndelOre += periodandelOre(l, datumLista);
-    } else if (arGenomford(l) && ingar(l.completedAt)) {
-      // En enstaka leverans utan avtalsperiod räknas när den är genomförd.
-      leveransOre += l.amountOre;
+    const kontroll = periodKontroll(l);
+    if (!kontroll.giltig) {
+      ofullstandigaPerioder.push({ id: l.id, namn: l.name, orsak: kontroll.orsak });
+      continue;                                      // gissa inte, räkna inte med
     }
+    fastPrisAndelOre += periodandelOre(l, datumLista);
   }
 
-  const jobbatInOre = timarbeteOre + tillfallenOre + styckOre + fastPrisAndelOre + leveransOre;
+  const jobbatInOre = timarbeteOre + tillfallenOre + styckOre + fastPrisAndelOre;
 
   return {
     jobbatInOre,
-    delar: { timarbeteOre, tillfallenOre, styckOre, fastPrisAndelOre, leveransOre },
+    delar: { timarbeteOre, tillfallenOre, styckOre, fastPrisAndelOre },
     resorOre,
     utlaggOre,
     // Fakturaunderlaget innehåller det som faktiskt blir fakturarader.
@@ -833,9 +832,10 @@ export function perKund(s, datumLista) {
   }
 
   for (const l of s.deliverables || []) {
-    if (harAvtalsperiod(l) || !arGenomford(l) || !ingar(l.completedAt)) continue;
     if (!uppdragArFakturerbart(uppdragFor(s, l.projectId))) continue;
-    lagg(kundNamnForUppdrag(s, l.projectId), 'billable').beloppOre += l.amountOre;
+    if (!periodKontroll(l).giltig) continue;
+    const andel = periodandelOre(l, datumLista);
+    if (andel) lagg(kundNamnForUppdrag(s, l.projectId), 'billable').beloppOre += andel;
   }
 
   return [...rader.values()].sort((a, b) => b.beloppOre - a.beloppOre || b.sekunder - a.sekunder);

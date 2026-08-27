@@ -26,6 +26,15 @@ export function datum(dagarSedan = 0, idag = new Date()) {
 /** Datum framåt i tiden. */
 function omDagar(antal, idag = new Date()) { return datum(-antal, idag); }
 
+/** Ett datum plus eller minus ett antal dagar. */
+function plusDagar(datumStr, antal) {
+  const d = new Date(datumStr + 'T12:00:00');
+  d.setDate(d.getDate() + antal);
+  return d.getFullYear() + '-'
+    + String(d.getMonth() + 1).padStart(2, '0') + '-'
+    + String(d.getDate()).padStart(2, '0');
+}
+
 export function skapaTestdata(idag = new Date()) {
   const iDag = datum(0, idag);
   const iGar = datum(1, idag);
@@ -36,6 +45,16 @@ export function skapaTestdata(idag = new Date()) {
   // perioden ger 7 692,30 kr för en hel vecka.
   const periodStart = datum(45, idag);
   const periodSlut = omDagar(45, idag);
+
+  // Verkstad 1 upparbetas över fyra hela veckor, med innevarande vecka som
+  // vecka tre. Verkstad 2 ligger de fyra veckorna därefter.
+  const veckodag = idag.getDay();
+  const dennaVeckasMandag = plusDagar(datum(0, idag), veckodag === 0 ? -6 : 1 - veckodag);
+
+  const verkstad1Start = plusDagar(dennaVeckasMandag, -14);
+  const verkstad1Slut = plusDagar(verkstad1Start, 27);     // 28 dagar, fyra veckor
+  const verkstad2Start = plusDagar(verkstad1Slut, 1);
+  const verkstad2Slut = plusDagar(verkstad2Start, 27);
 
   return {
     // Ett frivilligt veckomål i kronor. Inget annat.
@@ -95,12 +114,20 @@ export function skapaTestdata(idag = new Date()) {
 
     // Scenario 4 — en uttrycklig leverans. Faktureras bara om den väljs.
     deliverables: [
+      // Verkstad 1: 50 000 kr som tjänas in över fyra veckor. Den aktuella
+      // veckan ligger mitt i perioden, så veckovyn visar en veckoandel — inte
+      // hela beloppet den dag leveransen markerades genomförd.
       { id: 'lev-verkstad-1', projectId: 'u-verkstad', name: 'Verkstad 1, genomförd',
         amountOre: 5000000, vatRate: 2500, vatStatus: 'reviewed',
-        order: 1, status: 'open', completedAt: treDarSedan, invoiceRecordId: null },
+        order: 1, status: 'open', completedAt: treDarSedan, invoiceRecordId: null,
+        startDate: verkstad1Start, endDate: verkstad1Slut },
+
+      // Verkstad 2: samma belopp, period som ligger framåt. Inte genomförd, och
+      // kan därför inte tas med i ett underlag.
       { id: 'lev-verkstad-2', projectId: 'u-verkstad', name: 'Verkstad 2, planerad',
         amountOre: 5000000, vatRate: 2500, vatStatus: 'reviewed',
-        order: 2, status: 'planned', completedAt: null, invoiceRecordId: null },
+        order: 2, status: 'planned', completedAt: null, invoiceRecordId: null,
+        startDate: verkstad2Start, endDate: verkstad2Slut },
 
       // Fastpris för en AVTALSPERIOD. Tjänas in successivt och fördelas över
       // periodens dagar när "Jobbat in" räknas. Faktureras enligt avtalet, inte

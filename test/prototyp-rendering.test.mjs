@@ -106,12 +106,18 @@ test('rendering: veckomålet jämförs med jobbat in', () => {
 test('rendering: Vecka visar fastprisets veckoandel som en egen rad', () => {
   klicka({ vy: 'vecka' });
   assert.match(html, /Fast pris, veckans andel/);
-  assert.match(html, /faktureras enligt avtalet, inte per vecka/);
+  assert.match(html, /tjänas in över sin upparbetningsperiod/);
 });
 
-test('rendering: en ofullständig fastprisperiod flaggas i stället för att räknas', () => {
+test('rendering: en ofullständig period flaggas i stället för att räknas', () => {
   klicka({ vy: 'vecka' });
-  assert.match(html, /Fastprisperioden behöver kompletteras/);
+  assert.match(html, /Upparbetningsperioden behöver anges/);
+});
+
+test('rendering: en genomförd leverans visas som händelse, inte som belopp', () => {
+  klicka({ vy: 'vecka' });
+  assert.match(html, /Upparbetas över perioden/);
+  assert.ok(!/Genomförd leverans/.test(html), 'ingen klumpsumma i veckouppdelningen');
 });
 
 test('rendering: ingen lönekalkyl, skatt eller budget förekommer', () => {
@@ -209,8 +215,8 @@ test('rendering: Leverans klar öppnar ett formulär, inte en platshållare', ()
   assert.match(html, /Vilken leverans\?/);
   assert.match(html, /Vilken dag genomfördes den\?/);
   assert.match(html, /Markera som genomförd/);
-  assert.match(html, /räknas .* som Jobbat in/);
-  assert.match(html, /läggs inte automatiskt i ett fakturaunderlag/);
+  assert.match(html, /tjänas in över upparbetningsperioden/);
+  assert.match(html, /påverkar inte veckans Jobbat in/);
 });
 
 test('rendering: priset i leveransformuläret går inte att ändra', () => {

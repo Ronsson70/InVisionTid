@@ -1,11 +1,15 @@
 // Fasta leveranser och milstolpar.
 //
-// Fastpris fördelas ALDRIG över kalenderdagar, veckor eller månader. En verkstad
-// är genomförd eller inte. En förstudiedel är levererad eller inte. Det var v1:s
-// dagfördelning som gjorde intäkten synlig i fel period.
+// Varje fast ersättning har en UPPARBETNINGSPERIOD med start- och slutdatum.
+// Beloppet tjänas in successivt över perioden, och det är den fördelningen som
+// besvarar frågan "hur mycket har jag jobbat in den här veckan".
 //
-// Undantaget är avtal som uttryckligen är periodiserad månadsersättning. Då skapas
-// en leverans per månad med order som löpnummer, inte en dagfördelning.
+// Genomförandemarkeringen är något annat: den styr FAKTURERINGEN. En leverans
+// som inte är genomförd kan inte tas med i ett underlag, och när den tas med
+// används hela det avtalade beloppet.
+//
+// Ett arvode för en enda dag får samma start- och slutdatum och räknas helt
+// den dagen.
 
 export const LEVERANSSTATUS = /** @type {const} */ ([
   'planned',    // planerad, inte genomförd
@@ -45,20 +49,29 @@ export function skapaLeverans(indata) {
   };
 }
 
-// ── Fastpris över en avtalsperiod ───────────────────────────────────────────
+// ── Fastpris upparbetas över en period ──────────────────────────────────────
+//
+// ALLA fasta ersättningar har en upparbetningsperiod. Ett arvode på 50 000 kr
+// för ett arbete som pågår i fyra veckor tjänas in under fyra veckor, inte på
+// den dag arbetet råkar bli klart.
 //
 // Två skilda saker som aldrig får blandas ihop:
 //
-//   1. UPPARBETNING. Ett fast pris för april–juni tjänas in successivt. För
-//      frågan "hur mycket har jag jobbat in den här veckan" fördelas beloppet
-//      proportionellt över periodens kalenderdagar.
+//   1. UPPARBETNING. Beloppet fördelas proportionellt över periodens
+//      kalenderdagar och besvarar frågan "hur mycket har jag jobbat in den här
+//      veckan". En genomförandemarkering lägger ALDRIG hela beloppet ovanpå
+//      en enskild vecka.
 //
-//   2. FAKTURERING. Beloppet faktureras enligt avtalet, vid leverans eller
-//      betalningstillfälle. Den veckofördelade andelen blir ALDRIG en
-//      fakturarad. Den finns bara som upparbetning.
+//   2. FAKTURERING. Genomförandemarkeringen styr fakturaflödet: en leverans
+//      som inte är genomförd kan inte tas med i ett underlag, och när den tas
+//      med används HELA det avtalade beloppet. Veckoandelen blir aldrig en
+//      fakturarad.
 //
 // Fördelningen sker i heltalsöre och är deterministisk: resten läggs på
 // periodens första dagar, så att summan av alla dagar blir exakt totalbeloppet.
+//
+// Ett arvode för en enda dag får samma start- och slutdatum och räknas då helt
+// den dagen.
 
 const DAG_MS = 86400000;
 const somDatum = d => new Date(String(d) + 'T12:00:00');
@@ -72,24 +85,24 @@ export function periodDagar(startDate, endDate) {
   return dagar > 0 ? dagar : null;
 }
 
-/** Sant när leveransen är ett fast pris för en avtalad tidsperiod. */
+/** Sant när leveransen har någon form av upparbetningsperiod angiven. */
 export const harAvtalsperiod = leverans =>
   !!(leverans && (leverans.startDate || leverans.endDate));
 
 /**
- * Kontrollerar att en avtalsperiod går att fördela.
+ * Kontrollerar att upparbetningsperioden går att fördela.
  * Saknas något gissas ingenting — beloppet räknas helt enkelt inte in.
  * @returns {{giltig:boolean, orsak:string|null}}
  */
 export function periodKontroll(leverans) {
   if (!leverans?.startDate || !leverans?.endDate) {
-    return { giltig: false, orsak: 'Fastprisperioden behöver kompletteras' };
+    return { giltig: false, orsak: 'Upparbetningsperioden behöver anges' };
   }
   if (!Number.isInteger(leverans.amountOre) || leverans.amountOre <= 0) {
-    return { giltig: false, orsak: 'Fastprisperioden behöver kompletteras' };
+    return { giltig: false, orsak: 'Upparbetningsperioden behöver anges' };
   }
   if (periodDagar(leverans.startDate, leverans.endDate) === null) {
-    return { giltig: false, orsak: 'Fastprisperioden behöver kompletteras' };
+    return { giltig: false, orsak: 'Upparbetningsperioden behöver anges' };
   }
   return { giltig: true, orsak: null };
 }
@@ -131,8 +144,10 @@ export function periodensDatum(leverans) {
 }
 
 /**
- * Sant när en enstaka leverans UTAN avtalsperiod är genomförd.
+ * Sant när leveransen är genomförd och därmed får faktureras.
  * En planerad leverans är inte genomförd, oavsett datum.
+ *
+ * Genomförandet påverkar ALDRIG upparbetningen — den följer perioden.
  */
 export const arGenomford = leverans =>
   !!leverans?.completedAt && leverans.status !== 'planned';
