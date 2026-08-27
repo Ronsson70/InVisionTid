@@ -218,6 +218,16 @@ pre.underlag{background:var(--warm);border:1px solid var(--border);border-radius
 <div id="app"><div style="padding:40px 20px;text-align:center;color:#6F6959">Laddar…</div></div>
 <script type="module">
   import { start } from './src/app/start.mjs';
+
+  // Gamla appen registrerade en service worker. Den cachar ingenting och kan
+  // därför inte servera v1 igen, men den ska inte sitta kvar mellan appen och
+  // nätet. Avregistreringen får aldrig hindra appen från att starta.
+  try {
+    for (const r of await navigator.serviceWorker?.getRegistrations?.() ?? []) {
+      await r.unregister();
+    }
+  } catch { /* saknas eller blockerad — appen fungerar ändå */ }
+
   start().catch(e => {
     document.getElementById('app').innerHTML =
       '<div style="padding:24px;font-family:system-ui;max-width:600px;margin:auto">'
