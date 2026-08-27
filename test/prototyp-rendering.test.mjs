@@ -217,8 +217,16 @@ test('rendering: Mer innehåller bara funktioner som är byggda', () => {
   assert.match(html, /Leverans klar/);
   assert.match(html, /Markera en avtalad leverans som genomförd/);
   assert.match(html, /Mina uppdrag/);
+  assert.match(html, /Tidigare historik/);
   assert.match(html, /Konto och synk/);
   assert.ok(!/Utlägg/.test(html), 'utlägg är inte byggt och ska inte visas');
+});
+
+test('rendering: historikvyn är byggd och beskriver sitt skrivskydd', () => {
+  klicka({ oppna: 'historik' });
+  assert.match(html, /Tidigare historik/);
+  assert.match(html, /Ingen äldre historik hittades/);
+  assert.ok(!/inte byggd|inte byggt/i.test(html));
 });
 
 test('rendering: Konto och synk visar status utan att låtsas att prototypen är ansluten', () => {

@@ -26,6 +26,8 @@ let felbesked = null;
 async function startaMedUppdrag(tillstand) {
   let tidigareUppdrag = [];
   let tidigareUppdragFel = null;
+  let historik = null;
+  let historikFel = null;
   try {
     tidigareUppdrag = await lagring.lasTidigareUppdrag(tillstand);
   } catch (e) {
@@ -33,11 +35,20 @@ async function startaMedUppdrag(tillstand) {
     // tidsregistreringen i den nya filen.
     tidigareUppdragFel = e.message;
   }
+  try {
+    historik = await lagring.lasArkiv();
+  } catch (e) {
+    // Arkivet är separat och skrivskyddat. Ett läsfel får inte hindra det
+    // dagliga arbetet i v2-filen.
+    historikFel = e.message;
+  }
   return startaApp({
     lagring,
     tillstand,
     tidigareUppdrag,
     tidigareUppdragFel,
+    historik,
+    historikFel,
     kontoNamn: 'Microsoft OneDrive',
     synkaOm: () => window.location.reload(),
     loggaUt: () => {

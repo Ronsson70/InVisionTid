@@ -8,6 +8,7 @@
 // varken testdata eller en väg tillbaka till testdata.
 
 import * as L from './logik.mjs';
+import { arkivmanad } from './arkiv.mjs';
 
 const DAGAR = ['Söndag', 'Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lördag'];
 const MANADER = ['januari', 'februari', 'mars', 'april', 'maj', 'juni',
@@ -18,12 +19,14 @@ const FARGER = ['#7C9082', '#D4856A', '#8B7EA8', '#C4A55A', '#5B8A72', '#B07156'
 
 let s, vy = 'idag', veckoOffset = 0, ark = null, flash = null, kopierat = false;
 let tidigareUppdrag = [];
+let historik = null;
 
 /** Lagringen. Sätts av startaApp och byts aldrig under körning. */
 let lagring = null;
 let installningar = {
   testlage: false, banner: null, tillaterAterstallning: false,
   tidigareUppdragFel: null, kontoNamn: null, synkaOm: null, loggaUt: null,
+  historikFel: null,
 };
 
 /** Sparläget som visas för användaren. */
@@ -370,7 +373,7 @@ function vyUppfoljning() {
 const RUBRIKER = {
   tillfalle: 'Behandlingstillfälle', tid: 'Arbetstid', resa: 'Resa',
   leverans: 'Leverans klar', mer: 'Mer', uppdrag: 'Mina uppdrag',
-  nyttuppdrag: 'Nytt uppdrag', veckomal: 'Veckomål', konto: 'Konto och synk',
+  nyttuppdrag: 'Nytt uppdrag', veckomal: 'Veckomål', konto: 'Konto och synk', historik: 'Tidigare historik',
 };
 const TYPKARTA = { tillfalle: ['session'], tid: ['hourly', 'trackingOnly'], resa: ['travel'] };
 
@@ -380,8 +383,54 @@ function arkMer() {
   return `<div class="val">
     <button data-oppna="leverans">Leverans klar<span class="kund">Markera en avtalad leverans som genomförd</span></button>
     <button data-oppna="uppdrag">Mina uppdrag<span class="kund">Visa, återaktivera eller lägg till uppdrag</span></button>
+    <button data-oppna="historik">Tidigare historik<span class="kund">Visa allt från den gamla appen, skrivskyddat</span></button>
     <button data-oppna="konto">Konto och synk<span class="kund">OneDrive, synkstatus och utloggning</span></button>
   </div>`;
+}
+
+function manadsnamn(id) {
+  if (id === 'utan-datum') return 'Utan datum';
+  const [ar, m] = String(id).split('-').map(Number);
+  return Number.isInteger(ar) && m >= 1 && m <= 12 ? `${MANADER[m - 1]} ${ar}` : id;
+}
+
+function arkivrad(r) {
+  const detalj = r.typ === 'time' ? `${timmar(r.seconds)} h`
+    : r.typ === 'trip' ? `${String(r.km).replace('.', ',')} km`
+      : `${kr(r.amountOre)} registrerat utlägg`;
+  const typ = r.typ === 'time' ? 'Tid' : r.typ === 'trip' ? 'Resa' : 'Utlägg';
+  return `<div class="postrad">
+    <span class="txt"><span class="namn">${esc(r.clientName)} · ${esc(r.projectName)}</span>
+      <span class="under">${esc(r.date)} · ${esc(typ)} · ${esc(r.description)} · ${esc(detalj)}</span>
+      ${r.gammalFakturamarkering ? '<span class="under">Gammal fakturamarkering – kontrollera i Lundify</span>' : ''}
+    </span>
+  </div>`;
+}
+
+function arkHistorik() {
+  if (installningar.historikFel) return `
+    <div class="varning"><strong>Historiken kunde inte läsas</strong>${esc(installningar.historikFel)}</div>
+    <button class="avbryt" data-stang="knapp">Stäng</button>`;
+  const index = Number(ark.manadsindex) || 0;
+  const m = arkivmanad(historik, index);
+  if (!m) return `
+    <p class="notis">Ingen äldre historik hittades i den gamla OneDrive-filen.</p>
+    <button class="avbryt" data-stang="knapp">Stäng</button>`;
+  const antal = historik.manader.length;
+  return `
+    <div class="notis"><strong>Skrivskyddad historik.</strong> Den räknas inte i Jobbat in, veckomål eller underlag till Lundify.</div>
+    <div class="veckoval">
+      <button data-arkivmanad="1" ${index >= antal - 1 ? 'disabled' : ''} aria-label="Äldre månad">◀</button>
+      <strong>${esc(manadsnamn(m.id))}</strong>
+      <button data-arkivmanad="-1" ${index <= 0 ? 'disabled' : ''} aria-label="Nyare månad">▶</button>
+    </div>
+    <div class="uppfrad"><span>Tid</span><span class="v">${esc(timmar(m.sekunder))} h · ${m.tidsposter} poster</span></div>
+    <div class="uppfrad"><span>Resor</span><span class="v">${esc(String(m.km).replace('.', ','))} km · ${m.resor} resor</span></div>
+    <div class="uppfrad"><span>Utlägg</span><span class="v">${esc(kr(m.utlaggOre))} · ${m.utlagg} poster</span></div>
+    ${m.harGamlaFakturamarkeringar ? '<p class="notis">Månaden innehåller gamla fakturamarkeringar. De visas bara som historik; Lundify är facit.</p>' : ''}
+    <div class="faltrubrik">Registreringar</div>
+    ${m.rader.map(arkivrad).join('')}
+    <button class="avbryt" data-stang="knapp">Stäng</button>`;
 }
 
 function arkVeckomal() {
@@ -402,10 +451,10 @@ function arkKonto() {
     <div class="uppfrad"><span>Konto</span><span class="v">${esc(ansluten ? installningar.kontoNamn : 'Testversion')}</span></div>
     <div class="uppfrad"><span>Synkstatus</span><span class="v">${esc(SPARETIKETT[sparlage] ?? sparlage)}</span></div>
     <p class="notis">${ansluten
-      ? 'Ändringar sparas automatiskt i OneDrive. Synka om läser in den senaste sparade versionen på nytt.'
+      ? 'Ändringar sparas automatiskt i OneDrive. Läs om hämtar v2-filen på nytt. Den äldre historiken läses separat och skrivskyddat.'
       : 'Testversionen använder bara webbläsaren och är inte kopplad till OneDrive.'}</p>
     ${ansluten ? `
-      <button class="sekundar" data-synkaom="1">Synka om från OneDrive</button>
+      <button class="sekundar" data-synkaom="1">Läs om från OneDrive</button>
       <button class="avbryt" data-loggautapp="1">Logga ut eller byt konto</button>` : ''}
     <button class="avbryt" data-stang="knapp">Stäng</button>`;
 }
@@ -692,6 +741,7 @@ function ritaArk() {
   else if (ark.typ === 'nyttuppdrag') innehall = arkNyttUppdrag();
   else if (ark.typ === 'veckomal') innehall = arkVeckomal();
   else if (ark.typ === 'konto') innehall = arkKonto();
+  else if (ark.typ === 'historik') innehall = arkHistorik();
   else if (ark.typ === 'andra') innehall = arkAndra();
   else if (ark.typ === 'moms') innehall = arkMoms();
   else if (ark.typ === 'underlag') innehall = arkUnderlag();
@@ -744,7 +794,7 @@ const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara',
   'angra', 'valjlevuppdrag', 'valjleveransklar', 'markeragenomford', 'leverans',
   'sparaleveransdatum', 'angragenomford', 'aktiverauppdrag', 'valjkund',
   'valjdebitering', 'valjnyvat', 'sparanyttuppdrag', 'sparaveckomal',
-  'tabortveckomal', 'synkaom', 'loggautapp'].map(n => `[data-${n}]`).join(',');
+  'tabortveckomal', 'synkaom', 'loggautapp', 'arkivmanad'].map(n => `[data-${n}]`).join(',');
 
 document.addEventListener('click', e => {
   const t = e.target.closest(VALJARE);
@@ -755,12 +805,18 @@ document.addEventListener('click', e => {
   if (d.laddaom) { window.location.reload(); return; }
   if (d.synkaom) return synkaOmFranOneDrive();
   if (d.loggautapp) return loggaUtFranApp();
+  if (d.arkivmanad) {
+    const sista = Math.max(0, (historik?.manader?.length || 1) - 1);
+    ark.manadsindex = Math.max(0, Math.min(sista, (Number(ark.manadsindex) || 0) + Number(d.arkivmanad)));
+    return rita();
+  }
   if (d.vy) { vy = d.vy; ark = null; return rita(); }
   if (d.vecka) { veckoOffset += Number(d.vecka); return rita(); }
   if (d.stang) { if (d.stang === 'knapp' || e.target.classList.contains('ark')) { ark = null; kopierat = false; rita(); } return; }
 
   if (d.oppna) {
     if (d.oppna === 'mer') ark = { typ: 'mer' };
+    else if (d.oppna === 'historik') ark = { typ: 'historik', manadsindex: 0 };
     else if (d.oppna === 'uppdrag') ark = { typ: 'uppdrag' };
     else if (d.oppna === 'nyttuppdrag') ark = {
       typ: 'nyttuppdrag', clientId: null, kundnamn: '', namn: '', debitering: null,
@@ -1009,6 +1065,7 @@ function angraOverforing(id) {
  * @param {object} opts.tillstand        redan inläst tillstånd
  * @param {string} [opts.banner]         listtext högst upp, null i produktion
  * @param {Array} [opts.tidigareUppdrag] grunddata från skrivskyddad v1-fil
+ * @param {object} [opts.historik]        skrivskyddad historik från v1-filen
  * @param {boolean} [opts.tillaterAterstallning]
  * @param {Function} [opts.aterstall]
  * @param {string} [opts.kontoNamn]
@@ -1022,11 +1079,13 @@ export function startaApp(opts) {
     tillaterAterstallning: !!opts.tillaterAterstallning,
     aterstall: opts.aterstall ?? null,
     tidigareUppdragFel: opts.tidigareUppdragFel ?? null,
+    historikFel: opts.historikFel ?? null,
     kontoNamn: opts.kontoNamn ?? null,
     synkaOm: opts.synkaOm ?? null,
     loggaUt: opts.loggaUt ?? null,
   };
   tidigareUppdrag = opts.tidigareUppdrag ?? [];
+  historik = opts.historik ?? null;
   s = L.normaliseraTillstand(opts.tillstand);
   sparlage = 'sparat';
   vy = 'idag';

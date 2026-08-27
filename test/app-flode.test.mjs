@@ -3,6 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { skapaTestdata } from '../prototyp/testdata.mjs';
+import { byggArkiv } from '../src/app/arkiv.mjs';
 
 let html = '';
 const lyssnare = {};
@@ -87,4 +88,31 @@ test('klickflöde: veckomål sparas och kontoåtgärder fungerar', async () => {
   assert.equal(synkningar, 1);
   klicka({ loggautapp: '1' });
   assert.equal(utloggningar, 1);
+});
+
+test('klickflöde: gammal OneDrive-historik går att läsa månad för månad', () => {
+  const historik = byggArkiv({
+    clients: [{ id: 'c', name: 'Arkivkund' }],
+    projects: [{ id: 'p', clientId: 'c', name: 'Arkivuppdrag' }],
+    entries: [
+      { id: 'e1', projectId: 'p', date: '2026-07-01', moment: 'Äldre arbete', seconds: 3600 },
+      { id: 'e2', projectId: 'p', date: '2026-06-01', moment: 'Ännu äldre arbete', seconds: 1800 },
+    ],
+    trips: [{ id: 't1', projectId: 'p', date: '2026-06-01', description: 'Äldre resa', km: 23 }],
+    invoices: [{ projectId: 'p', month: '2026-06' }],
+  });
+  startaApp({ lagring: { async spara() {} }, tillstand: skapaTestdata(), historik });
+
+  klicka({ oppna: 'mer' });
+  klicka({ oppna: 'historik' });
+  assert.match(html, /juli 2026/);
+  assert.match(html, /Arkivkund · Arkivuppdrag/);
+  assert.match(html, /Äldre arbete/);
+  assert.match(html, /räknas inte i Jobbat in, veckomål eller underlag till Lundify/);
+
+  klicka({ arkivmanad: '1' });
+  assert.match(html, /juni 2026/);
+  assert.match(html, /Ännu äldre arbete/);
+  assert.match(html, /Äldre resa/);
+  assert.match(html, /Gammal fakturamarkering/);
 });

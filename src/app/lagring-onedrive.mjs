@@ -13,6 +13,7 @@ import {
 } from '../integrations/onedrive/lagring.mjs';
 import { tillAppTillstand, franAppTillstand } from './tillstand.mjs';
 import { tidigareUppdragFranV1 } from './uppdrag.mjs';
+import { byggArkiv } from './arkiv.mjs';
 
 /**
  * @param {object} opts
@@ -25,6 +26,15 @@ export function skapaOneDriveLagring({ token, hamta, nu = () => new Date().toISO
 
   // Versionen appen läste. Grunden för konfliktkontrollen.
   let kand = { eTag: null, checksumma: null, id: null, andrad: null };
+  let v1Lasning = null;
+
+  // Grunddata och historik kommer ur samma skrivskyddade fil. Löftet cachas så
+  // att appstarten bara behöver hämta filen en gång.
+  const lasV1 = async () => {
+    if (!v1Lasning) v1Lasning = graph.las(V1_SOKVAG);
+    const fil = await v1Lasning;
+    return fil ? JSON.parse(fil.text) : null;
+  };
 
   return {
     sokvag: V2_SOKVAG,
@@ -56,9 +66,15 @@ export function skapaOneDriveLagring({ token, hamta, nu = () => new Date().toISO
      * V1-filen ändras aldrig och ingen historik returneras till appen.
      */
     async lasTidigareUppdrag(tillstand) {
-      const fil = await graph.las(V1_SOKVAG);
-      if (!fil) return [];
-      return tidigareUppdragFranV1(JSON.parse(fil.text), tillstand, { nu: nu() });
+      const data = await lasV1();
+      if (!data) return [];
+      return tidigareUppdragFranV1(data, tillstand, { nu: nu() });
+    },
+
+    /** Hela v1-historiken som en ren, skrivskyddad läsmodell. */
+    async lasArkiv() {
+      const data = await lasV1();
+      return data ? byggArkiv(data) : byggArkiv({});
     },
 
     /**

@@ -137,6 +137,38 @@ test('tidigare uppdrag läses från v1 utan en enda skrivning', async () => {
   assert.equal(fetch.lager[V1_SOKVAG], JSON.stringify(v1), 'v1 är orörd');
 });
 
+test('hela gamla historiken läses skrivskyddat och fakturamarkerade poster syns', async () => {
+  const { skapaOneDriveLagring } = await import('../src/app/lagring-onedrive.mjs');
+  const v1text = v1Fixtur();
+  const v1 = JSON.parse(v1text);
+  const fetch = stubbGraph({ [V1_SOKVAG]: v1text, [V2_SOKVAG]: JSON.stringify(tomV2()) });
+  const lagring = skapaOneDriveLagring({ token: 'T', hamta: fetch, nu: () => NU });
+
+  const arkiv = await lagring.lasArkiv();
+  const rader = arkiv.manader.flatMap(m => m.rader);
+
+  assert.equal(arkiv.totalt.tidsposter, v1.entries.length);
+  assert.equal(arkiv.totalt.resor, v1.trips.length);
+  assert.equal(arkiv.totalt.utlagg, v1.expenses.length);
+  assert.equal(rader.length, v1.entries.length + v1.trips.length + v1.expenses.length);
+  assert.ok(rader.some(r => r.gammalFakturamarkering), 'markerad historik ska visas, inte filtreras bort');
+  assert.ok(fetch.anrop.every(a => a.metod === 'GET'), 'bara läsning');
+  assert.equal(fetch.lager[V1_SOKVAG], v1text, 'v1 är byte-identisk');
+});
+
+test('grunddata och arkiv delar samma enda v1-hämtning', async () => {
+  const { skapaOneDriveLagring } = await import('../src/app/lagring-onedrive.mjs');
+  const v1text = v1Fixtur();
+  const fetch = stubbGraph({ [V1_SOKVAG]: v1text });
+  const lagring = skapaOneDriveLagring({ token: 'T', hamta: fetch, nu: () => NU });
+
+  await lagring.lasTidigareUppdrag(tomV2());
+  await lagring.lasArkiv();
+
+  const v1Anrop = fetch.anrop.filter(a => a.url.includes('invisiontid-data.json'));
+  assert.equal(v1Anrop.length, 2, 'en metadata-GET och en innehålls-GET');
+});
+
 // ── Införandet ──────────────────────────────────────────────────────────────
 
 test('förberedelsen läser v1 och skriver ingenting', async () => {
