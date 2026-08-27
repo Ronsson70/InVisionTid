@@ -112,6 +112,19 @@ export function oreTillKortText(ore, { visaEnhet = true } = {}) {
   return oreTillText(ore, { visaEnhet });
 }
 
+/**
+ * Öre till närmaste hela krona för översikter i gränssnittet.
+ * Beräkningen och den sparade datan är fortfarande exakta heltalsöre.
+ * Exakt halva avrundas bort från noll, samma regel som övrig ekonomi.
+ */
+export function oreTillAvrundadKronaText(ore, { visaEnhet = true } = {}) {
+  kravHeltal(ore, 'belopp i öre');
+  const kronor = roundHalfUp(ore, KRONA);
+  const negativ = kronor < 0;
+  const text = Math.abs(kronor).toLocaleString('sv-SE');
+  return `${negativ ? '−' : ''}${text}${visaEnhet ? ' kr' : ''}`;
+}
+
 /** Kvantitet till text med enhet: 3000, 'tim' → "3 tim". 2500, 'tim' → "2,5 tim" */
 export function kvantitetTillText(qtyMilli, unit) {
   kravHeltal(qtyMilli, 'kvantitet');

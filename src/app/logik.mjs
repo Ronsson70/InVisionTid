@@ -10,7 +10,7 @@ import {
   foreslaResor, hittaArtikel, arFakturerbar,
   momsAnvandbar, MILLI,
   harAvtalsperiod, periodKontroll, periodandelOre, arGenomford,
-  oreTillKortText, kronorTillOre,
+  oreTillKortText, oreTillAvrundadKronaText, kronorTillOre,
 } from '../domain/index.mjs';
 import {
   arImporteradHistorik, historikBehoverGranskas, beslutaHistorikpost,
@@ -25,14 +25,16 @@ export {
 
 export { harAvtalsperiod, periodKontroll, periodandelOre, arGenomford };
 
-export { oreTillText, oreTillKortText, kvantitetTillText, MILLI };
+export { oreTillText, oreTillKortText, oreTillAvrundadKronaText, kvantitetTillText, MILLI };
 
 /**
- * Beloppsformatet i gränssnittet: hela kronor utan ören.
- * "50 000 kr" är lättare att läsa än "50 000,00 kr", och ",00" bär ingen
- * information. Ören visas så snart de inte är noll: "566,50 kr".
+ * Beloppsformatet i gränssnittet: närmaste hela krona.
+ * Den exakta summan i öre ändras aldrig av visningen.
  */
-export const belopp = oreTillKortText;
+export const belopp = oreTillAvrundadKronaText;
+
+/** Exakt beloppsformat för à-priser och text som ska föras till Lundify. */
+export const exaktBelopp = oreTillKortText;
 
 /**
  * Sparar ett frivilligt veckomål. Beloppet anges i kronor av användaren men
@@ -626,7 +628,7 @@ export const momsText = sats => (sats === null || sats === undefined) ? 'ej fast
 export function lundifyText(s, underlag) {
   const rader = underlag.rader.map(r => {
     const antal = kvantitetTillText(r.qtyMilli, r.unit);
-    return `${r.beskrivning}\t${antal}\t${belopp(r.unitPriceOre)}\t${momsText(r.vatRate)}\t${belopp(r.nettoOre)}`;
+    return `${r.beskrivning}\t${antal}\t${exaktBelopp(r.unitPriceOre)}\t${momsText(r.vatRate)}\t${exaktBelopp(r.nettoOre)}`;
   });
   const kund = kundFor(s, underlag.clientId)?.name ?? '';
   const period = underlagsPeriod(underlag);
@@ -637,12 +639,12 @@ export function lundifyText(s, underlag) {
     'Beskrivning\tAntal\tÁ-pris\tMoms\tBelopp',
     ...rader,
     '',
-    `Summa exklusive moms: ${belopp(underlag.nettoOre)}`,
+    `Summa exklusive moms: ${exaktBelopp(underlag.nettoOre)}`,
     ...Object.entries(underlag.momsUnderlag).map(([sats, underlagOre]) =>
-      `Moms ${momsText(Number(sats))} på ${belopp(underlagOre)}`),
-    `Moms totalt: ${belopp(underlag.momsOre)}`,
-    underlag.avrundningOre ? `Öresavrundning: ${belopp(underlag.avrundningOre)}` : null,
-    `Summa inklusive moms: ${belopp(underlag.attBetalaOre)}`,
+      `Moms ${momsText(Number(sats))} på ${exaktBelopp(underlagOre)}`),
+    `Moms totalt: ${exaktBelopp(underlag.momsOre)}`,
+    underlag.avrundningOre ? `Öresavrundning: ${exaktBelopp(underlag.avrundningOre)}` : null,
+    `Summa inklusive moms: ${exaktBelopp(underlag.attBetalaOre)}`,
   ].filter(r => r !== null).join('\n');
 }
 

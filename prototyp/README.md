@@ -92,9 +92,12 @@ Gränssnittet frågar dem, det bedömer inte själv.
 
 ## Belopp
 
-Hela kronor visas utan ören: **50 000 kr**, inte 50 000,00 kr. Ören visas så
-snart de finns: **566,50 kr**. Samma format används på skärmen, i besked och i
-underlaget som kopieras till Lundify.
+Belopp i översikterna avrundas till närmaste hela krona: **566,50 kr** visas som
+**567 kr**. Den sparade datan och alla beräkningar ligger fortfarande kvar som
+exakta heltalsöre.
+
+À-priser och underlaget som kopieras till Lundify behåller ören. Ett kilometerpris
+på **5,50 kr** får alltså aldrig ändras till 6 kr av visningsavrundningen.
 
 Det exakta formatet med båda decimalerna finns kvar i `oreTillText` och används
 där varje öre måste synas, till exempel i migreringsrapporten.

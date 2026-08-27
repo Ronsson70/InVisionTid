@@ -823,7 +823,7 @@ function arkUnderlag() {
     <div class="underlagrader">
       ${u.rader.map(rad => `<div class="ulrad">
         <div class="ulnamn">${esc(rad.beskrivning)}</div>
-        <div class="ulunder">${esc(L.kvantitetTillText(rad.qtyMilli, rad.unit))} · ${esc(kr(rad.unitPriceOre))} per ${esc(rad.unit)} · moms ${esc(L.momsText(rad.vatRate))}</div>
+        <div class="ulunder">${esc(L.kvantitetTillText(rad.qtyMilli, rad.unit))} · ${esc(L.exaktBelopp(rad.unitPriceOre))} per ${esc(rad.unit)} · moms ${esc(L.momsText(rad.vatRate))}</div>
         <div class="ulbelopp">${esc(kr(rad.nettoOre))}</div>
       </div>`).join('')}
     </div>

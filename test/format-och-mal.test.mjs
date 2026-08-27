@@ -1,8 +1,7 @@
 // Två saker som är lätta att tappa och svåra att upptäcka:
 //
-//   1. Hela kronor ska visas utan ",00" i gränssnittet, men ören ska synas när
-//      de finns. Det exakta formatet med båda decimalerna finns kvar där varje
-//      öre måste synas — i migreringsrapporten.
+//   1. Belopp i gränssnittets översikter avrundas till hela kronor. Exakta ören
+//      finns kvar i data, avstämningar och underlaget som kopieras till Lundify.
 //   2. Ett konfigurerat veckomål ska alltid visa upparbetat, målbelopp och
 //      kvar eller över, som egna värden och inte bara i en mening.
 
@@ -11,7 +10,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import { oreTillText, oreTillKortText } from '../src/domain/index.mjs';
+import { oreTillText, oreTillKortText, oreTillAvrundadKronaText } from '../src/domain/index.mjs';
 import * as L from '../src/app/logik.mjs';
 import { skapaTestdata } from '../prototyp/testdata.mjs';
 
@@ -30,7 +29,7 @@ test('hela kronor visas utan ören', () => {
   assert.equal(platt(oreTillKortText(0)), '0 kr');
 });
 
-test('ören visas så snart de inte är noll', () => {
+test('det korta exakta formatet visar ören när de finns', () => {
   assert.equal(platt(oreTillKortText(56650)), '566,50 kr');
   assert.equal(platt(oreTillKortText(12650)), '126,50 kr');
   assert.equal(platt(oreTillKortText(769230)), '7 692,30 kr');
@@ -42,14 +41,24 @@ test('negativa belopp följer samma regel', () => {
   assert.equal(platt(oreTillKortText(-1350)), '−13,50 kr');
 });
 
+test('gränssnittsbelopp avrundas till närmaste hela krona', () => {
+  assert.equal(platt(oreTillAvrundadKronaText(56649)), '566 kr');
+  assert.equal(platt(oreTillAvrundadKronaText(56650)), '567 kr');
+  assert.equal(platt(oreTillAvrundadKronaText(769230)), '7 692 kr');
+  assert.equal(platt(oreTillAvrundadKronaText(1)), '0 kr');
+  assert.equal(platt(oreTillAvrundadKronaText(-1350)), '−14 kr');
+});
+
 test('det exakta formatet finns kvar för avstämningar', () => {
   assert.equal(platt(oreTillText(5000000)), '50 000,00 kr');
   assert.equal(platt(oreTillText(0)), '0,00 kr');
 });
 
 test('prototypen använder kortformen som sitt beloppsformat', () => {
-  assert.equal(L.belopp, oreTillKortText);
+  assert.equal(L.belopp, oreTillAvrundadKronaText);
   assert.equal(platt(L.belopp(5000000)), '50 000 kr');
+  assert.equal(platt(L.belopp(56650)), '567 kr');
+  assert.equal(platt(L.exaktBelopp(56650)), '566,50 kr');
 });
 
 const ui = readFileSync(fileURLToPath(new URL('../src/app/ui.mjs', import.meta.url)), 'utf8');
@@ -88,10 +97,11 @@ test('ingen vy visar ett helt krontal med ,00', () => {
   }
 });
 
-test('ören visas fortfarande där de finns', () => {
+test('översikterna avrundar ören till hela kronor', () => {
   const vecka = rendera('vecka');
-  assert.match(vecka, /126,50 kr/, 'resan har ören och ska visa dem');
-  assert.match(platt(vecka), /20 192,27 kr/, 'fastprisandelen har ören');
+  assert.match(vecka, /127 kr/, '126,50 kr avrundas uppåt');
+  assert.match(platt(vecka), /20 192 kr/, 'fastprisandelen visas i hela kronor');
+  assert.ok(!/,\d{2} kr/.test(vecka), 'inga ören ska visas i veckoöversikten');
 });
 
 test('leveransens besked visar beloppet i kortform', () => {
@@ -101,13 +111,14 @@ test('leveransens besked visar beloppet i kortform', () => {
   assert.ok(!besked.includes(',00'), 'inget ,00 i ett besked till användaren');
 });
 
-test('underlaget till Lundify använder samma format som skärmen', () => {
+test('underlaget till Lundify behåller exakta ören', () => {
   const s = nyState();
   const res = L.forberedUnderlag(s, 'k-a');
   const text = L.lundifyText(s, res.underlag);
   assert.ok(!/\d,00 kr/.test(text), 'inga ,00 i underlaget heller');
   assert.match(platt(text), /2 400 kr/, 'hela kronor utan ören');
-  assert.match(text, /126,50 kr/, 'men ören där de finns');
+  assert.match(text, /5,50 kr/, 'à-priset behåller ören');
+  assert.match(text, /126,50 kr/, 'radbeloppet behåller ören');
 });
 
 // ── 2. Veckomålet ───────────────────────────────────────────────────────────
