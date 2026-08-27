@@ -12,10 +12,14 @@ import {
   harAvtalsperiod, periodKontroll, periodandelOre, arGenomford,
   oreTillKortText, kronorTillOre,
 } from '../domain/index.mjs';
+import {
+  arImporteradHistorik, historikBehoverGranskas, beslutaHistorikpost,
+  aterstallHistorikbeslut, HISTORIK_FAKTURERA, HISTORIK_KLAR_I_LUNDIFY, HISTORIK_ENDAST,
+} from './historikimport.mjs';
 
 export {
   DEBITERINGSTYPER, tidigareUppdragFranV1,
-  aktiveraTidigareUppdrag, skapaNyttUppdrag,
+  aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag,
 } from './uppdrag.mjs';
 
 export { harAvtalsperiod, periodKontroll, periodandelOre, arGenomford };
@@ -103,13 +107,45 @@ export function radrubrik(s, post) {
 export const uppdragArFakturerbart = uppdrag =>
   uppdrag?.kind === 'billable';
 
-/** Sant när posten får bli en rad i ett fakturaunderlag. */
-export function kanIngaIFakturaunderlag(s, post) {
+function kanFakturerasEnligtAvtal(s, post) {
   const artikel = artikelFor(s, post.articleId);
   const uppdrag = uppdragFor(s, post.projectId);
   if (!artikel || !uppdrag) return false;
-  if (!uppdragArFakturerbart(uppdrag)) return false;   // internt och ideellt
-  return arFakturerbar(artikel);                       // inte trackingOnly
+  if (!uppdragArFakturerbart(uppdrag)) return false;
+  return arFakturerbar(artikel);
+}
+
+/** Sant när posten får bli en rad i ett fakturaunderlag. */
+export function kanIngaIFakturaunderlag(s, post) {
+  // Nyimporterad historia är ekonomiskt neutral tills användaren bestämt.
+  // "Redan klart" räknas som utfört arbete men underlagsgrupperingen stoppar
+  // den via status !== open, så den kan aldrig faktureras en gång till.
+  if (historikBehoverGranskas(post) || post?.legacyReviewStatus === HISTORIK_ENDAST) return false;
+  return kanFakturerasEnligtAvtal(s, post);
+}
+
+export const historikpostKanFaktureras = (s, post) => kanFakturerasEnligtAvtal(s, post);
+export const arHistorikpost = arImporteradHistorik;
+export const arHistorikOgranskad = historikBehoverGranskas;
+export { HISTORIK_FAKTURERA, HISTORIK_KLAR_I_LUNDIFY, HISTORIK_ENDAST };
+
+export function historikposterAttGranska(s) {
+  return s.poster.filter(historikBehoverGranskas)
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.id).localeCompare(String(b.id)));
+}
+
+export function sattHistorikbeslut(s, id, beslut, { nu } = {}) {
+  const post = s.poster.find(p => p.id === id);
+  if (!post) throw new Error('Den äldre registreringen finns inte längre.');
+  if ([HISTORIK_FAKTURERA, HISTORIK_KLAR_I_LUNDIFY].includes(beslut)
+      && !kanFakturerasEnligtAvtal(s, post)) {
+    throw new Error('Registreringen ingår i fast pris eller är inte fakturerbar. Behåll den som historik.');
+  }
+  return beslutaHistorikpost(s, id, beslut, { nu });
+}
+
+export function angraHistorikbeslut(s, id) {
+  return aterstallHistorikbeslut(s, id);
 }
 
 /** Sant när posten bara loggas för uppföljning och aldrig faktureras. */
@@ -947,7 +983,15 @@ export function taBortPost(s, id) {
   if (post?.invoiceRecordId) {
     throw new Error('Posten hör till ett underlag som redan är överfört och kan inte tas bort.');
   }
-  return { ...s, poster: s.poster.filter(p => p.id !== id) };
+  const arKandHistorik = (s.historikimport?.knownIds || []).includes(id) || arImporteradHistorik(post);
+  const ignoredIds = arKandHistorik
+    ? [...new Set([...(s.historikimport?.ignoredIds || []), id])]
+    : (s.historikimport?.ignoredIds || []);
+  return {
+    ...s,
+    poster: s.poster.filter(p => p.id !== id),
+    ...(arKandHistorik ? { historikimport: { ...(s.historikimport || {}), ignoredIds } } : {}),
+  };
 }
 
 export function nyttId(prefix = 'p') {

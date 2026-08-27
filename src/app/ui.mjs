@@ -8,7 +8,6 @@
 // varken testdata eller en väg tillbaka till testdata.
 
 import * as L from './logik.mjs';
-import { arkivmanad } from './arkiv.mjs';
 
 const DAGAR = ['Söndag', 'Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lördag'];
 const MANADER = ['januari', 'februari', 'mars', 'april', 'maj', 'juni',
@@ -19,7 +18,7 @@ const FARGER = ['#7C9082', '#D4856A', '#8B7EA8', '#C4A55A', '#5B8A72', '#B07156'
 
 let s, vy = 'idag', veckoOffset = 0, ark = null, flash = null, kopierat = false;
 let tidigareUppdrag = [];
-let historik = null;
+let historikForslag = null;
 
 /** Lagringen. Sätts av startaApp och byts aldrig under körning. */
 let lagring = null;
@@ -108,14 +107,20 @@ function postrad(p, { klickbar = true } = {}) {
   const ejFakt = L.arEndastUppfoljning(s, p);
   const mangd = L.kvantitetTillText(p.qtyMilli, a?.unit);
   const last = !!p.invoiceRecordId;
+  const historikkund = L.arHistorikpost(p) ? `${L.kundNamnForUppdrag(s, p.projectId)} · ` : '';
+  const historiklage = p.legacyReviewStatus === 'needsReview' ? 'Behöver granskas'
+    : p.legacyReviewStatus === 'lundifyDone' ? 'Redan klart i Lundify'
+      : p.legacyReviewStatus === 'historyOnly' ? 'Endast historik' : null;
   return `<div class="postrad" ${klickbar ? `data-post="${esc(p.id)}" role="button" tabindex="0"` : ''}>
     <span class="prick" style="background:${farg(p.projectId)}"></span>
     <span class="txt">
       <span class="namn">${esc(L.radrubrik(s, p))}</span>
-      <span class="under">${esc(mangd)}${last ? ' · klart i Lundify' : ''}</span>
+      <span class="under">${esc(historikkund)}${esc(mangd)}${last ? ' · klart i Lundify' : ''}${historiklage ? ' · ' + esc(historiklage) : ''}</span>
     </span>
-    ${ejFakt
-      ? `<span class="ejfakt">${esc(L.ejFakturerbarText(s, p))}</span>`
+    ${p.legacyReviewStatus === 'needsReview' || p.legacyReviewStatus === 'historyOnly'
+      ? `<span class="ejfakt">${esc(historiklage)}</span>`
+      : ejFakt
+        ? `<span class="ejfakt">${esc(L.ejFakturerbarText(s, p))}</span>`
       : `<span class="belopp">${esc(kr(L.fakturerbartOre(s, [p])))}<small>exkl. moms</small></span>`}
   </div>`;
 }
@@ -373,7 +378,7 @@ function vyUppfoljning() {
 const RUBRIKER = {
   tillfalle: 'Behandlingstillfälle', tid: 'Arbetstid', resa: 'Resa',
   leverans: 'Leverans klar', mer: 'Mer', uppdrag: 'Mina uppdrag',
-  nyttuppdrag: 'Nytt uppdrag', veckomal: 'Veckomål', konto: 'Konto och synk', historik: 'Tidigare historik',
+  nyttuppdrag: 'Nytt uppdrag', veckomal: 'Veckomål', konto: 'Konto och synk', historik: 'Hela historiken',
 };
 const TYPKARTA = { tillfalle: ['session'], tid: ['hourly', 'trackingOnly'], resa: ['travel'] };
 
@@ -383,7 +388,7 @@ function arkMer() {
   return `<div class="val">
     <button data-oppna="leverans">Leverans klar<span class="kund">Markera en avtalad leverans som genomförd</span></button>
     <button data-oppna="uppdrag">Mina uppdrag<span class="kund">Visa, återaktivera eller lägg till uppdrag</span></button>
-    <button data-oppna="historik">Tidigare historik<span class="kund">Visa allt från den gamla appen, skrivskyddat</span></button>
+    <button data-oppna="historik">Hela historiken<span class="kund">Lägg in, granska och bestäm vad gamla poster ska göra</span></button>
     <button data-oppna="konto">Konto och synk<span class="kund">OneDrive, synkstatus och utloggning</span></button>
   </div>`;
 }
@@ -394,42 +399,46 @@ function manadsnamn(id) {
   return Number.isInteger(ar) && m >= 1 && m <= 12 ? `${MANADER[m - 1]} ${ar}` : id;
 }
 
-function arkivrad(r) {
-  const detalj = r.typ === 'time' ? `${timmar(r.seconds)} h`
-    : r.typ === 'trip' ? `${String(r.km).replace('.', ',')} km`
-      : `${kr(r.amountOre)} registrerat utlägg`;
-  const typ = r.typ === 'time' ? 'Tid' : r.typ === 'trip' ? 'Resa' : 'Utlägg';
-  return `<div class="postrad">
-    <span class="txt"><span class="namn">${esc(r.clientName)} · ${esc(r.projectName)}</span>
-      <span class="under">${esc(r.date)} · ${esc(typ)} · ${esc(r.description)} · ${esc(detalj)}</span>
-      ${r.gammalFakturamarkering ? '<span class="under">Gammal fakturamarkering – kontrollera i Lundify</span>' : ''}
-    </span>
-  </div>`;
-}
+const historikmanad = post => /^\d{4}-\d{2}/.test(String(post?.date ?? ''))
+  ? String(post.date).slice(0, 7) : 'utan-datum';
 
 function arkHistorik() {
   if (installningar.historikFel) return `
     <div class="varning"><strong>Historiken kunde inte läsas</strong>${esc(installningar.historikFel)}</div>
     <button class="avbryt" data-stang="knapp">Stäng</button>`;
-  const index = Number(ark.manadsindex) || 0;
-  const m = arkivmanad(historik, index);
-  if (!m) return `
-    <p class="notis">Ingen äldre historik hittades i den gamla OneDrive-filen.</p>
+
+  const forslag = historikForslag?.antal;
+  if (forslag?.totalt) return `
+    <div class="notis"><strong>Allt läggs in i den vanliga appen.</strong> Befintliga poster ändras inte och dubbletter skapas inte.</div>
+    <div class="uppfrad"><span>Tidsposter</span><span class="v">${forslag.poster}</span></div>
+    <div class="uppfrad"><span>Resor</span><span class="v">${forslag.resor}</span></div>
+    <div class="uppfrad"><span>Utlägg</span><span class="v">${forslag.utlagg}</span></div>
+    <div class="uppfrad"><span>Tidigare uppdrag</span><span class="v">${forslag.uppdrag}</span></div>
+    <p class="notis">De nya posterna börjar som <strong>Behöver granskas</strong>. De påverkar inte Jobbat in eller Lundify-underlag förrän du väljer vad de ska göra.</p>
+    <button class="primar" data-importerahistorik="1">Lägg in hela historiken</button>
+    <button class="avbryt" data-stang="knapp">Avbryt</button>`;
+
+  const ogranskade = L.historikposterAttGranska(s);
+  if (!ogranskade.length) return `
+    <p class="notis">${s.historikimport
+      ? 'Hela den äldre historiken finns i appen. Det finns inga importerade poster kvar att granska.'
+      : 'Ingen äldre historik finns att lägga in i den här versionen.'}</p>
+    ${s.historikimport ? '<p class="notis">Du hittar posterna på sina ursprungliga datum i Vecka. Tryck på en rad om du vill ändra eller ångra ett beslut.</p>' : ''}
     <button class="avbryt" data-stang="knapp">Stäng</button>`;
-  const antal = historik.manader.length;
+
+  const manader = [...new Set(ogranskade.map(historikmanad))]
+    .sort((a, b) => a === 'utan-datum' ? 1 : b === 'utan-datum' ? -1 : b.localeCompare(a));
+  const index = Math.max(0, Math.min(manader.length - 1, Number(ark.manadsindex) || 0));
+  const manad = manader[index];
+  const rader = ogranskade.filter(p => historikmanad(p) === manad);
   return `
-    <div class="notis"><strong>Skrivskyddad historik.</strong> Den räknas inte i Jobbat in, veckomål eller underlag till Lundify.</div>
+    <div class="notis"><strong>${ogranskade.length} äldre registreringar behöver granskas.</strong> Tryck på en rad och välj vad den ska göra.</div>
     <div class="veckoval">
-      <button data-arkivmanad="1" ${index >= antal - 1 ? 'disabled' : ''} aria-label="Äldre månad">◀</button>
-      <strong>${esc(manadsnamn(m.id))}</strong>
+      <button data-arkivmanad="1" ${index >= manader.length - 1 ? 'disabled' : ''} aria-label="Äldre månad">◀</button>
+      <strong>${esc(manadsnamn(manad))}</strong>
       <button data-arkivmanad="-1" ${index <= 0 ? 'disabled' : ''} aria-label="Nyare månad">▶</button>
     </div>
-    <div class="uppfrad"><span>Tid</span><span class="v">${esc(timmar(m.sekunder))} h · ${m.tidsposter} poster</span></div>
-    <div class="uppfrad"><span>Resor</span><span class="v">${esc(String(m.km).replace('.', ','))} km · ${m.resor} resor</span></div>
-    <div class="uppfrad"><span>Utlägg</span><span class="v">${esc(kr(m.utlaggOre))} · ${m.utlagg} poster</span></div>
-    ${m.harGamlaFakturamarkeringar ? '<p class="notis">Månaden innehåller gamla fakturamarkeringar. De visas bara som historik; Lundify är facit.</p>' : ''}
-    <div class="faltrubrik">Registreringar</div>
-    ${m.rader.map(arkivrad).join('')}
+    ${rader.map(p => postrad(p)).join('')}
     <button class="avbryt" data-stang="knapp">Stäng</button>`;
 }
 
@@ -451,7 +460,7 @@ function arkKonto() {
     <div class="uppfrad"><span>Konto</span><span class="v">${esc(ansluten ? installningar.kontoNamn : 'Testversion')}</span></div>
     <div class="uppfrad"><span>Synkstatus</span><span class="v">${esc(SPARETIKETT[sparlage] ?? sparlage)}</span></div>
     <p class="notis">${ansluten
-      ? 'Ändringar sparas automatiskt i OneDrive. Läs om hämtar v2-filen på nytt. Den äldre historiken läses separat och skrivskyddat.'
+      ? 'Ändringar sparas automatiskt i OneDrive. Läs om hämtar den senaste v2-filen på nytt.'
       : 'Testversionen använder bara webbläsaren och är inte kopplad till OneDrive.'}</p>
     ${ansluten ? `
       <button class="sekundar" data-synkaom="1">Läs om från OneDrive</button>
@@ -461,7 +470,11 @@ function arkKonto() {
 
 function arkUppdrag() {
   const aktiva = [...(s.projects || [])]
+    .filter(p => p.active !== false)
     .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name, 'sv'));
+  const vilande = [...(s.projects || [])]
+    .filter(p => p.active === false)
+    .sort((a, b) => a.name.localeCompare(b.name, 'sv'));
   return `
     <div class="faltrubrik">Aktiva uppdrag</div>
     <div class="val">${aktiva.map(p => `
@@ -473,10 +486,18 @@ function arkUppdrag() {
     ${installningar.tidigareUppdragFel ? `<div class="varning">
       <strong>Tidigare uppdrag kunde inte läsas</strong>${esc(installningar.tidigareUppdragFel)}
     </div>` : ''}
-    ${tidigareUppdrag.length ? `
+    ${vilande.length ? `
+      <div class="faltrubrik">Vilande uppdrag</div>
+      <p class="notis">Historiken finns kvar. Aktivera bara om du ska registrera nytt arbete på uppdraget.</p>
+      <div class="val">${vilande.map(p => `
+        <button data-aktiverabefintligt="${esc(p.id)}">
+          ${esc(p.name)}
+          <span class="kund">${esc(L.kundNamnForUppdrag(s, p.id))} · Aktivera igen</span>
+        </button>`).join('')}</div>` : ''}
+    ${tidigareUppdrag.filter(p => !(s.projects || []).some(x => x.id === p.id)).length ? `
       <div class="faltrubrik">Tidigare uppdrag</div>
-      <p class="notis">Aktivera ett uppdrag om du ska börja arbeta med det igen. Gammal historik följer inte med.</p>
-      <div class="val">${tidigareUppdrag.map(p => `
+      <p class="notis">Aktivera ett uppdrag om du ska börja arbeta med det igen. Historiken hanteras separat under Hela historiken.</p>
+      <div class="val">${tidigareUppdrag.filter(p => !(s.projects || []).some(x => x.id === p.id)).map(p => `
         <button data-aktiverauppdrag="${esc(p.id)}">
           ${esc(p.project.name)}
           <span class="kund">${esc(p.client?.name ?? 'Utan kund')} · Aktivera igen</span>
@@ -678,14 +699,27 @@ function arkAndra() {
   const p = s.poster.find(x => x.id === ark.postId);
   if (!p) return '<div class="tom">Posten finns inte längre.</div>';
   const a = L.artikelFor(s, p.articleId);
+  const arHistorik = L.arHistorikpost(p);
+  const behoverBeslut = L.arHistorikOgranskad(p);
+  const beslutText = p.legacyReviewStatus === 'billable' ? 'Ska faktureras'
+    : p.legacyReviewStatus === 'lundifyDone' ? 'Redan klart i Lundify'
+      : p.legacyReviewStatus === 'historyOnly' ? 'Endast historik' : null;
   return `
     <div class="faltrubrik">${esc(L.radrubrik(s, p))}</div>
+    ${arHistorik ? `<div class="notis"><strong>Äldre registrering${p.legacyInvoiceMarked ? ' med gammal fakturamarkering' : ''}.</strong>
+      ${behoverBeslut ? 'Kontrollera antal och datum och välj sedan vad posten ska göra.' : `Ditt val: ${esc(beslutText)}.`}</div>` : ''}
     <div class="faltrubrik">Antal ${esc(a?.unit ?? '')}</div>
     <input type="number" inputmode="decimal" step="0.5" data-falt="mangd" value="${esc(p.qtyMilli / L.MILLI)}">
     <div class="faltrubrik">Vilken dag?</div>
     <input type="date" data-falt="datum" value="${esc(p.date)}">
     ${p.invoiceRecordId ? '<div class="varning"><strong>Posten hör till ett underlag som är klart i Lundify och kan inte ändras.</strong>Flytta tillbaka underlaget till Redo för Lundify först.</div>' : `
       <button class="spara" data-sparaandring="${esc(p.id)}">Spara ändring</button>
+      ${behoverBeslut ? `
+        ${L.historikpostKanFaktureras(s, p) ? `
+          <button class="primar" data-historikbeslut="${esc(p.id)}|billable">Ska faktureras</button>
+          <button class="sekundar" data-historikbeslut="${esc(p.id)}|lundifyDone">Redan klart i Lundify</button>` : ''}
+        <button class="sekundar" data-historikbeslut="${esc(p.id)}|historyOnly">Behåll endast som historik</button>` : ''}
+      ${arHistorik && !behoverBeslut ? '<button class="sekundar" data-angrahistorikbeslut="' + esc(p.id) + '">Ändra mitt beslut</button>' : ''}
       <button class="tabort" data-tabort="${esc(p.id)}">Ta bort registreringen</button>
       <button class="avbryt" data-stang="knapp">Avbryt</button>`}`;
 }
@@ -793,8 +827,10 @@ const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara',
   'markklart', 'merinfo', 'sparanummer', 'borjaom', 'angemoms', 'valjmoms', 'sparamoms',
   'angra', 'valjlevuppdrag', 'valjleveransklar', 'markeragenomford', 'leverans',
   'sparaleveransdatum', 'angragenomford', 'aktiverauppdrag', 'valjkund',
+  'aktiverabefintligt',
   'valjdebitering', 'valjnyvat', 'sparanyttuppdrag', 'sparaveckomal',
-  'tabortveckomal', 'synkaom', 'loggautapp', 'arkivmanad'].map(n => `[data-${n}]`).join(',');
+  'tabortveckomal', 'synkaom', 'loggautapp', 'arkivmanad', 'importerahistorik',
+  'historikbeslut', 'angrahistorikbeslut'].map(n => `[data-${n}]`).join(',');
 
 document.addEventListener('click', e => {
   const t = e.target.closest(VALJARE);
@@ -805,8 +841,12 @@ document.addEventListener('click', e => {
   if (d.laddaom) { window.location.reload(); return; }
   if (d.synkaom) return synkaOmFranOneDrive();
   if (d.loggautapp) return loggaUtFranApp();
+  if (d.importerahistorik) return importeraHelaHistoriken();
+  if (d.historikbeslut) return sparaHistorikbeslut(d.historikbeslut);
+  if (d.angrahistorikbeslut) return angraHistorikbeslut(d.angrahistorikbeslut);
   if (d.arkivmanad) {
-    const sista = Math.max(0, (historik?.manader?.length || 1) - 1);
+    const manader = new Set(L.historikposterAttGranska(s).map(historikmanad));
+    const sista = Math.max(0, manader.size - 1);
     ark.manadsindex = Math.max(0, Math.min(sista, (Number(ark.manadsindex) || 0) + Number(d.arkivmanad)));
     return rita();
   }
@@ -837,6 +877,7 @@ document.addEventListener('click', e => {
   if (d.timmar) { ark.timmar = Number(d.timmar); ark.start = ''; ark.slut = ''; return rita(); }
   if (d.km) { ark.km = Number(d.km); return rita(); }
   if (d.aktiverauppdrag) return aktiveraTidigare(d.aktiverauppdrag);
+  if (d.aktiverabefintligt) return aktiveraBefintligt(d.aktiverabefintligt);
   if (d.valjkund) { ark.clientId = d.valjkund; return rita(); }
   if (d.valjdebitering) { ark.debitering = d.valjdebitering; ark.pris = ''; return rita(); }
   if (d.valjnyvat !== undefined) { ark.vatRate = Number(d.valjnyvat); return rita(); }
@@ -880,6 +921,14 @@ function aktiveraTidigare(id) {
     tidigareUppdrag = tidigareUppdrag.filter(p => p.id !== id);
     spara(); ark = { typ: 'uppdrag' };
     visa('Uppdraget är aktivt igen. Ingen gammal historik fördes över.');
+  } catch (e) { visa(e.message); }
+}
+
+function aktiveraBefintligt(id) {
+  try {
+    s = L.aktiveraBefintligtUppdrag(s, id);
+    spara(); ark = { typ: 'uppdrag' };
+    visa('Uppdraget är aktivt igen.');
   } catch (e) { visa(e.message); }
 }
 
@@ -948,6 +997,51 @@ function sparaAndring(id) {
       seconds: a?.unit === 'tim' ? Math.round(qty / L.MILLI * 3600) : p.seconds,
     });
     spara(); ark = null; visa('Ändringen är sparad.');
+  } catch (e) { visa(e.message); }
+}
+
+function uppdateraFranAndringsformular(id) {
+  const p = s.poster.find(x => x.id === id);
+  if (!p) throw new Error('Registreringen finns inte längre.');
+  const mangdFalt = document.querySelector('[data-falt="mangd"]');
+  const datumFalt = document.querySelector('[data-falt="datum"]');
+  const qty = mangdFalt ? Math.round((Number(mangdFalt.value) || 0) * L.MILLI) : p.qtyMilli;
+  if (qty <= 0) throw new Error('Antalet måste vara större än noll.');
+  const a = L.artikelFor(s, p.articleId);
+  s = L.andraPost(s, id, {
+    qtyMilli: qty,
+    date: datumFalt?.value || p.date,
+    seconds: a?.unit === 'tim' ? Math.round(qty / L.MILLI * 3600) : p.seconds,
+  });
+}
+
+function importeraHelaHistoriken() {
+  if (!historikForslag?.antal?.totalt) return visa('Det finns ingen saknad historik att lägga in.');
+  s = L.normaliseraTillstand(historikForslag.tillstand);
+  const antal = historikForslag.antal.totalt;
+  historikForslag = null;
+  spara();
+  ark = { typ: 'historik', manadsindex: 0 };
+  visa(`${antal} äldre registreringar har lagts in och väntar på granskning.`);
+}
+
+function sparaHistorikbeslut(varde) {
+  const [id, beslut] = String(varde).split('|');
+  try {
+    uppdateraFranAndringsformular(id);
+    s = L.sattHistorikbeslut(s, id, beslut, { nu: new Date().toISOString() });
+    spara();
+    ark = { typ: 'historik', manadsindex: 0 };
+    visa('Ditt beslut är sparat.');
+  } catch (e) { visa(e.message); }
+}
+
+function angraHistorikbeslut(id) {
+  try {
+    s = L.angraHistorikbeslut(s, id);
+    spara();
+    ark = { typ: 'historik', manadsindex: 0 };
+    visa('Posten behöver granskas igen.');
   } catch (e) { visa(e.message); }
 }
 
@@ -1065,7 +1159,7 @@ function angraOverforing(id) {
  * @param {object} opts.tillstand        redan inläst tillstånd
  * @param {string} [opts.banner]         listtext högst upp, null i produktion
  * @param {Array} [opts.tidigareUppdrag] grunddata från skrivskyddad v1-fil
- * @param {object} [opts.historik]        skrivskyddad historik från v1-filen
+ * @param {object} [opts.historikForslag] saknad v1-historik redo att kopieras till v2
  * @param {boolean} [opts.tillaterAterstallning]
  * @param {Function} [opts.aterstall]
  * @param {string} [opts.kontoNamn]
@@ -1085,7 +1179,7 @@ export function startaApp(opts) {
     loggaUt: opts.loggaUt ?? null,
   };
   tidigareUppdrag = opts.tidigareUppdrag ?? [];
-  historik = opts.historik ?? null;
+  historikForslag = opts.historikForslag ?? null;
   s = L.normaliseraTillstand(opts.tillstand);
   sparlage = 'sparat';
   vy = 'idag';

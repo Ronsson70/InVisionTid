@@ -90,6 +90,21 @@ export function aktiveraTidigareUppdrag(tillstand, paket) {
   };
 }
 
+/** Återaktiverar ett uppdrag vars grunddata redan finns i v2. */
+export function aktiveraBefintligtUppdrag(tillstand, projectId) {
+  const project = (tillstand.projects || []).find(p => p.id === projectId);
+  if (!project) throw new Error('Uppdraget finns inte längre.');
+  if (project.active !== false) throw new Error('Uppdraget är redan aktivt.');
+
+  return {
+    ...tillstand,
+    clients: (tillstand.clients || []).map(c => c.id === project.clientId ? { ...c, status: 'active' } : c),
+    projects: (tillstand.projects || []).map(p => p.id === projectId
+      ? { ...p, active: true, archivedAt: null } : p),
+    articles: (tillstand.articles || []).map(a => a.projectId === projectId ? { ...a, active: true } : a),
+  };
+}
+
 /**
  * Skapar ett nytt uppdrag och de artiklar som det dagliga flödet behöver.
  * Alla ekonomiska uppgifter anges uttryckligen; ingen moms eller prissättning

@@ -28,6 +28,7 @@ import {
 } from '../src/app/tillstand.mjs';
 import { forbered, genomfor, jamforUrval, BEKRAFTELSE, InfrandeAvbrutet } from '../src/app/infrande.mjs';
 import { V1_SOKVAG, V2_SOKVAG, skapaLagring, backupSokvag } from '../src/integrations/onedrive/lagring.mjs';
+import { planeraHistorikimport } from '../src/app/historikimport.mjs';
 import * as L from '../src/app/logik.mjs';
 
 const v1text = () => JSON.stringify(produktionslikV1, null, 2);
@@ -108,6 +109,21 @@ test('exakt 22 öppna tidsposter och 9 öppna resor väljs ut', () => {
   assert.equal(antal.kunder, 4, 'aktiva kunder');
   assert.equal(antal.uppdrag, 5, 'aktiva uppdrag');
   assert.equal(antal.fakturamarkeringar, 0, 'ingen historisk fakturastatus');
+});
+
+test('hela produktionslika historiken kompletterar exakt det som saknas', () => {
+  const { tillstand } = tillAppTillstand(nystart(produktionslikV1, { nu: NU }));
+  const plan = planeraHistorikimport(produktionslikV1, tillstand, { nu: NU });
+
+  assert.equal(plan.antal.poster, 135, 'alla tidigare bortfiltrerade tidsposter');
+  assert.equal(plan.antal.resor, 78, 'alla tidigare bortfiltrerade resor');
+  assert.equal(plan.antal.utlagg, 5, 'alla gamla utlägg');
+  assert.equal(plan.antal.uppdrag, 2, 'de två vilande uppdragen');
+  assert.equal(plan.antal.kunder, 2, 'de två vilande kunderna');
+  assert.equal(plan.tillstand.poster.length, 157 + 87 + 5, 'hela historiken plus redan öppna poster, utan dubbletter');
+
+  const igen = planeraHistorikimport(produktionslikV1, plan.tillstand, { nu: NU });
+  assert.equal(igen.antal.totalt, 0, 'andra körningen lägger inte till någonting');
 });
 
 test('P2:s fastpristid blir trackingOnly och kan inte faktureras', () => {

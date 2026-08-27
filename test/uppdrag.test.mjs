@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import * as L from '../src/app/logik.mjs';
 import { franAppTillstand } from '../src/app/tillstand.mjs';
-import { tidigareUppdragFranV1, aktiveraTidigareUppdrag, skapaNyttUppdrag }
+import { tidigareUppdragFranV1, aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag }
   from '../src/app/uppdrag.mjs';
 
 const artikel = (id, projectId, type, unit) => ({
@@ -83,6 +83,23 @@ test('ett tidigare uppdrag kan aktiveras utan gamla poster eller fakturor', () =
   assert.ok(ut.articles.some(a => a.id === 'a-u2'));
   assert.equal(ut.poster.length, forePoster);
   assert.deepEqual(ut.invoiceRecords, []);
+});
+
+test('ett importerat vilande uppdrag kan återaktiveras utan att historiken ändras', () => {
+  const s = {
+    ...grund(),
+    clients: [{ id: 'k2', name: 'Kund B', status: 'paused' }],
+    projects: [{ id: 'u2', clientId: 'k2', name: 'Vilande', active: false, archivedAt: '2026-01-01' }],
+    articles: [{ ...artikel('a-u2', 'u2', 'hourly', 'tim'), active: false }],
+    poster: [{ id: 'gammal', projectId: 'u2', articleId: 'a-u2', sourceType: 'entry', date: '2025-01-01' }],
+  };
+  const fore = structuredClone(s.poster);
+  const ut = aktiveraBefintligtUppdrag(s, 'u2');
+
+  assert.equal(ut.projects[0].active, true);
+  assert.equal(ut.clients[0].status, 'active');
+  assert.equal(ut.articles[0].active, true);
+  assert.deepEqual(ut.poster, fore);
 });
 
 test('nytt timuppdrag får kund, artikel, pris, moms och valfri resa', () => {

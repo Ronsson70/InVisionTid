@@ -217,15 +217,15 @@ test('rendering: Mer innehåller bara funktioner som är byggda', () => {
   assert.match(html, /Leverans klar/);
   assert.match(html, /Markera en avtalad leverans som genomförd/);
   assert.match(html, /Mina uppdrag/);
-  assert.match(html, /Tidigare historik/);
+  assert.match(html, /Hela historiken/);
   assert.match(html, /Konto och synk/);
   assert.ok(!/Utlägg/.test(html), 'utlägg är inte byggt och ska inte visas');
 });
 
-test('rendering: historikvyn är byggd och beskriver sitt skrivskydd', () => {
+test('rendering: historikvyn är byggd även när inget finns att importera', () => {
   klicka({ oppna: 'historik' });
-  assert.match(html, /Tidigare historik/);
-  assert.match(html, /Ingen äldre historik hittades/);
+  assert.match(html, /Hela historiken/);
+  assert.match(html, /Ingen äldre historik finns att lägga in/);
   assert.ok(!/inte byggd|inte byggt/i.test(html));
 });
 

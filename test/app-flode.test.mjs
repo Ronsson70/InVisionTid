@@ -3,7 +3,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { skapaTestdata } from '../prototyp/testdata.mjs';
-import { byggArkiv } from '../src/app/arkiv.mjs';
+import { planeraHistorikimport } from '../src/app/historikimport.mjs';
 
 let html = '';
 const lyssnare = {};
@@ -90,29 +90,43 @@ test('klickflöde: veckomål sparas och kontoåtgärder fungerar', async () => {
   assert.equal(utloggningar, 1);
 });
 
-test('klickflöde: gammal OneDrive-historik går att läsa månad för månad', () => {
-  const historik = byggArkiv({
+test('klickflöde: hela historiken läggs in och kan beslutas post för post', async () => {
+  const sparade = [];
+  const tillstand = skapaTestdata();
+  const plan = planeraHistorikimport({
     clients: [{ id: 'c', name: 'Arkivkund' }],
-    projects: [{ id: 'p', clientId: 'c', name: 'Arkivuppdrag' }],
+    projects: [{ id: 'p', clientId: 'c', name: 'Arkivuppdrag', hourlyRate: 900 }],
     entries: [
       { id: 'e1', projectId: 'p', date: '2026-07-01', moment: 'Äldre arbete', seconds: 3600 },
       { id: 'e2', projectId: 'p', date: '2026-06-01', moment: 'Ännu äldre arbete', seconds: 1800 },
     ],
     trips: [{ id: 't1', projectId: 'p', date: '2026-06-01', description: 'Äldre resa', km: 23 }],
     invoices: [{ projectId: 'p', month: '2026-06' }],
+  }, tillstand, { nu: '2026-08-27T20:00:00.000Z' });
+  startaApp({
+    lagring: { async spara(s) { sparade.push(structuredClone(s)); } },
+    tillstand,
+    historikForslag: plan,
   });
-  startaApp({ lagring: { async spara() {} }, tillstand: skapaTestdata(), historik });
 
   klicka({ oppna: 'mer' });
   klicka({ oppna: 'historik' });
-  assert.match(html, /juli 2026/);
-  assert.match(html, /Arkivkund · Arkivuppdrag/);
-  assert.match(html, /Äldre arbete/);
-  assert.match(html, /räknas inte i Jobbat in, veckomål eller underlag till Lundify/);
+  assert.match(html, /Lägg in hela historiken/);
+  assert.match(html, /Tidsposter<\/span><span class="v">2/);
+  klicka({ importerahistorik: '1' });
+  await tom();
 
-  klicka({ arkivmanad: '1' });
-  assert.match(html, /juni 2026/);
-  assert.match(html, /Ännu äldre arbete/);
-  assert.match(html, /Äldre resa/);
-  assert.match(html, /Gammal fakturamarkering/);
+  assert.match(html, /juli 2026/);
+  assert.match(html, /Arkivuppdrag · Arbetad tid/);
+  assert.match(html, /Arkivkund · 1 tim/);
+  assert.match(html, /Behöver granskas/);
+  assert.equal(sparade.at(-1).poster.filter(p => p.legacySource === 'v1-full-history').length, 3);
+
+  klicka({ post: 'e1' });
+  assert.match(html, /Ska faktureras/);
+  assert.match(html, /Redan klart i Lundify/);
+  assert.match(html, /Behåll endast som historik/);
+  klicka({ historikbeslut: 'e1|billable' });
+  await tom();
+  assert.equal(sparade.at(-1).poster.find(p => p.id === 'e1').legacyReviewStatus, 'billable');
 });

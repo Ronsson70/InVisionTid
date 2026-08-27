@@ -13,7 +13,7 @@ import {
 } from '../integrations/onedrive/lagring.mjs';
 import { tillAppTillstand, franAppTillstand } from './tillstand.mjs';
 import { tidigareUppdragFranV1 } from './uppdrag.mjs';
-import { byggArkiv } from './arkiv.mjs';
+import { planeraHistorikimport } from './historikimport.mjs';
 
 /**
  * @param {object} opts
@@ -62,8 +62,8 @@ export function skapaOneDriveLagring({ token, hamta, nu = () => new Date().toISO
     },
 
     /**
-     * Läser endast grunddata för uppdrag som stannade i v1-arkivet.
-     * V1-filen ändras aldrig och ingen historik returneras till appen.
+     * Läser grunddata för uppdrag som ännu inte finns i v2.
+     * V1-filen ändras aldrig.
      */
     async lasTidigareUppdrag(tillstand) {
       const data = await lasV1();
@@ -71,10 +71,10 @@ export function skapaOneDriveLagring({ token, hamta, nu = () => new Date().toISO
       return tidigareUppdragFranV1(data, tillstand, { nu: nu() });
     },
 
-    /** Hela v1-historiken som en ren, skrivskyddad läsmodell. */
-    async lasArkiv() {
+    /** Planerar hur all saknad v1-historik kan kopieras till v2 utan dubbletter. */
+    async planeraHistorikimport(tillstand) {
       const data = await lasV1();
-      return data ? byggArkiv(data) : byggArkiv({});
+      return data ? planeraHistorikimport(data, tillstand, { nu: nu() }) : null;
     },
 
     /**
