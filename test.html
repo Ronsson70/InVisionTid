@@ -13,8 +13,8 @@
 </head>
 <body>
 <h1>In Vision Tid – enhetstester</h1>
-<p>Återanvänder de rena funktionerna direkt ur <code>index.html</code> (sektionen mellan PURE-START och PURE-END). Ingen byggprocess, ingen dubblerad logik.</p>
-<div id="out">Laddar index.html…</div>
+<p>Testar den <strong>gamla</strong> appen, som numera ligger arkiverad i <code>arkiv/v1-app.txt</code>. Nya InVisionTid har sina tester i <code>test/</code> och körs med <code>node --test</code>.</p>
+<div id="out">Laddar arkiv/v1-app.txt…</div>
 
 <script>
 (async function(){
@@ -27,9 +27,9 @@
 
   let M;
   try{
-    const src=await (await fetch('index.html')).text();
+    const src=await (await fetch('arkiv/v1-app.txt')).text();
     const m=src.match(/\/\* PURE-START \*\/([\s\S]*?)\/\* PURE-END \*\//);
-    if(!m) throw new Error('Hittade inte PURE-START/PURE-END i index.html');
+    if(!m) throw new Error('Hittade inte PURE-START/PURE-END i arkiv/v1-app.txt');
     const exports='gid,fmtH,today,localDateStr,getWeekDates,weekLabel,getRate,hasSessionPrice,isFixedPrice,getActivePeriod,getSessionCount,getSessionRevenue,calcRevenue,calcFixedMonthly,getFixedWeeklyAmount,calcWeekRevenue,weekSummary,getDefaultTripKm,hasTripOn,suggestTrip,addDays,missingTrips,lastActivityDate,daysBetween,staleStatus,lastActivityLabel,recentProjectIds,lastEntryFor,projectMonthSummary,clientMonthSummaries,pricingModel,hasFixedPeriod';
     M=new Function(m[1]+`;return{${exports}};`)();
   }catch(e){
