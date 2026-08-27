@@ -61,6 +61,10 @@ export function jamforKontrollsummor(fore, efter) {
   return avvikelser;
 }
 
+/** Sant när uppdraget har ett avtalat fast pris i stället för ett timpris. */
+const arFastprisuppdrag = projekt =>
+  (projekt?.pricingPeriods || []).some(p => p.type === 'fixed');
+
 /** Artiklar som ska härledas för ett projekt, utifrån vad v1 faktiskt innehåller. */
 function harledArtiklar(projekt, data) {
   const artiklar = [];
@@ -83,6 +87,21 @@ function harledArtiklar(projekt, data) {
       type: 'session',
       unitPriceOre: kronorTillOre(projekt.sessionPrice),
       sortOrder: 10,
+    }));
+  } else if (arFastprisuppdrag(projekt)) {
+    // Tid på ett fastprisuppdrag är UPPFÖLJNING, inte en fakturarad.
+    //
+    // Priset är avtalat. Att göra timmarna fakturerbara hade lagt tid ovanpå
+    // ett fast pris och gett en faktura på för mycket. Timpriset finns inte
+    // heller — det som fanns i v1 var en periodfördelning, inte ett à-pris.
+    artiklar.push(skapaArtikel({
+      ...gemensamt,
+      id: artikelId(projekt.id, 'trackingOnly'),
+      name: 'Nedlagd tid',
+      type: 'trackingOnly',
+      unitPriceOre: 0,
+      sortOrder: 80,
+      reviewNote: 'Uppdraget har fast pris. Tiden loggas för uppföljning och blir aldrig en fakturarad.',
     }));
   } else {
     artiklar.push(skapaArtikel({
@@ -126,9 +145,9 @@ function harledArtiklar(projekt, data) {
 
 /** Artikeln en tidspost ska peka på: tillfälle om projektet har det, annars tid. */
 function artikelForPost(projekt) {
-  return projekt.sessionPrice > 0
-    ? artikelId(projekt.id, 'session')
-    : artikelId(projekt.id, 'hourly');
+  if (projekt.sessionPrice > 0) return artikelId(projekt.id, 'session');
+  if (arFastprisuppdrag(projekt)) return artikelId(projekt.id, 'trackingOnly');
+  return artikelId(projekt.id, 'hourly');
 }
 
 /**

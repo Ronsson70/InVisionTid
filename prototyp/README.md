@@ -30,7 +30,7 @@ Knappen **Börja om** i den orange listen återställer testdatat.
 ```
 prototyp/index.html    utseende och start
 prototyp/ui.mjs        vyer och händelser, ingen beräkning
-prototyp/logik.mjs     gruppering och besked på svenska
+src/app/logik.mjs      gruppering och besked på svenska
         ↓
 src/domain/            pengar, moms, artiklar, leveranser, underlag
 ```
@@ -74,7 +74,7 @@ beloppsformat och veckomål samt 13 för låsning av underlag.
 
 ## Var räknas siffrorna
 
-`sammanstallning()` i `prototyp/logik.mjs` är den enda källan för periodens tal,
+`sammanstallning()` i `src/app/logik.mjs` är den enda källan för periodens tal,
 och både Vecka och Uppföljning använder den. Tre ekonomiska begrepp hålls isär:
 
 | | |

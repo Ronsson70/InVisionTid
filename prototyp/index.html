@@ -197,6 +197,16 @@ pre.underlag{background:var(--warm);border:1px solid var(--border);border-radius
 .ulnamn{font-size:16px;font-weight:600}
 .ulunder{font-size:13px;color:var(--text-muted);grid-column:1}
 .ulbelopp{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;grid-row:1;grid-column:2;white-space:nowrap}
+
+.sparlist{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;
+  background:var(--sage-ghost);color:var(--text-muted);flex-wrap:wrap}
+.sparlist .sparprick{width:9px;height:9px;border-radius:50%;background:var(--sage);flex-shrink:0}
+.sparlist.sparar .sparprick{background:var(--sage-light,#8FA594)}
+.sparlist.osparat .sparprick,.sparlist.offline .sparprick{background:#C4A55A}
+.sparlist.konflikt,.sparlist.fel{background:var(--accent-ljus);color:#7A3A22}
+.sparlist.konflikt .sparprick,.sparlist.fel .sparprick{background:var(--accent)}
+.sparlist .sparbesked{flex:1;min-width:150px}
+.sparlist button{background:var(--accent);color:#fff;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600}
 </style>
 </head>
 <body>

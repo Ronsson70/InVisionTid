@@ -17,3 +17,4 @@ export * from './underlag.mjs';
 export * from './fakturareferens.mjs';
 export * from './migrering.mjs';
 export * from './resor.mjs';
+export * from './nystart.mjs';

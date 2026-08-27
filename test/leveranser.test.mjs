@@ -14,7 +14,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-import * as L from '../prototyp/logik.mjs';
+import * as L from '../src/app/logik.mjs';
 import { skapaTestdata } from '../prototyp/testdata.mjs';
 
 const IDAG = new Date('2026-08-27T12:00:00');
@@ -294,7 +294,7 @@ test('beskedet säger att beloppet upparbetas, inte att det läggs på veckan', 
 
 // ── Inga återvändsgränder i gränssnittet ────────────────────────────────────
 
-const ui = readFileSync(fileURLToPath(new URL('../prototyp/ui.mjs', import.meta.url)), 'utf8');
+const ui = readFileSync(fileURLToPath(new URL('../src/app/ui.mjs', import.meta.url)), 'utf8');
 const utanKommentarer = ui
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/(^|[^:])\/\/.*$/gm, '$1');

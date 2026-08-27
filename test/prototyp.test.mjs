@@ -1,6 +1,6 @@
 // Etapp 5A: reglerna bakom användarflödena i testversionen.
 //
-// Testerna körs mot prototyp/logik.mjs, som i sin tur använder den testade
+// Testerna körs mot src/app/logik.mjs, som i sin tur använder den testade
 // domänen i src/domain. Ingen beräkning görs om i gränssnittet, och det är
 // därför de här testerna räcker för att låsa fast beteendet.
 //
@@ -12,7 +12,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join, extname } from 'node:path';
 
-import * as L from '../prototyp/logik.mjs';
+import * as L from '../src/app/logik.mjs';
 import { skapaTestdata } from '../prototyp/testdata.mjs';
 
 const IDAG = new Date('2026-08-27T12:00:00');
@@ -312,8 +312,11 @@ test('uppföljning: tid och kronor hålls isär i EN sammanställning', () => {
 // ── Gränssnittets språk ─────────────────────────────────────────────────────
 
 function samlaProtofiler() {
-  const rot = fileURLToPath(new URL('../prototyp/', import.meta.url));
-  return readdirSync(rot).map(n => join(rot, n))
+  const kataloger = [
+    fileURLToPath(new URL('../prototyp/', import.meta.url)),
+    fileURLToPath(new URL('../src/app/', import.meta.url)),
+  ];
+  return kataloger.flatMap(rot => readdirSync(rot).map(n => join(rot, n)))
     .filter(f => statSync(f).isFile() && ['.mjs', '.html'].includes(extname(f)));
 }
 
@@ -335,11 +338,11 @@ test('gränssnittet visar inga tekniska begrepp för användaren', () => {
 });
 
 test('gränssnittet räknar inte om belopp på egen hand', () => {
-  const ui = readFileSync(fileURLToPath(new URL('../prototyp/ui.mjs', import.meta.url)), 'utf8');
+  const ui = readFileSync(fileURLToPath(new URL('../src/app/ui.mjs', import.meta.url)), 'utf8');
   // Ingen egen moms- eller prisaritmetik i vylagret.
   assert.ok(!/\*\s*0\.25|\*\s*1\.25|vatRate\s*\/\s*100\s*\*/.test(ui), 'moms får inte räknas i gränssnittet');
   assert.ok(!/unitPriceOre\s*\*/.test(ui), 'radbelopp får inte räknas i gränssnittet');
-  assert.ok(ui.includes("from './logik.mjs'"), 'gränssnittet ska använda den gemensamma logiken');
+  assert.ok(ui.includes("logik.mjs'"), 'gränssnittet ska använda den gemensamma logiken');
 });
 
 test('testversionen rör aldrig produktionsappens lagringsnyckel', () => {

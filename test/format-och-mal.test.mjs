@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { oreTillText, oreTillKortText } from '../src/domain/index.mjs';
-import * as L from '../prototyp/logik.mjs';
+import * as L from '../src/app/logik.mjs';
 import { skapaTestdata } from '../prototyp/testdata.mjs';
 
 const IDAG = new Date('2026-08-27T12:00:00');
@@ -52,7 +52,7 @@ test('prototypen använder kortformen som sitt beloppsformat', () => {
   assert.equal(platt(L.belopp(5000000)), '50 000 kr');
 });
 
-const ui = readFileSync(fileURLToPath(new URL('../prototyp/ui.mjs', import.meta.url)), 'utf8');
+const ui = readFileSync(fileURLToPath(new URL('../src/app/ui.mjs', import.meta.url)), 'utf8');
 
 test('gränssnittet formaterar belopp på ett enda ställe', () => {
   assert.match(ui, /const kr = ore => L\.belopp\(ore\)/);

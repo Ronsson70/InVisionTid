@@ -15,7 +15,7 @@ import {
   periodDagar, periodKontroll, dagsandelOre, periodandelOre, periodensDatum,
   harAvtalsperiod, arGenomford, byggUnderlag,
 } from '../src/domain/index.mjs';
-import * as L from '../prototyp/logik.mjs';
+import * as L from '../src/app/logik.mjs';
 import { skapaTestdata } from '../prototyp/testdata.mjs';
 
 const IDAG = new Date('2026-08-27T12:00:00');

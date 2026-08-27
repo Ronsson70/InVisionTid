@@ -305,10 +305,10 @@ test('gräns: src/integrations får röra nätverk och filsystem, men bara läsa
   }
 });
 
-test('gräns: appens Graph-sökväg i adaptern stämmer med den i index.html', () => {
-  const html = readFileSync(join(repoRot, 'index.html'), 'utf8');
-  const url = innehallsUrl('invisiontid-data.json');
-  const iApp = html.includes('me/drive/root:/InVisionTid/${ONEDRIVE_FILENAME}:/content');
-  assert.ok(iApp, 'index.html ska använda den sökväg adaptern härletts ur');
-  assert.match(url, /me\/drive\/root:\/InVisionTid\/invisiontid-data\.json:\/content$/);
+test('gräns: adapterns Graph-sökväg stämmer med den gamla appens', () => {
+  const gammal = readFileSync(join(repoRot, 'arkiv', 'v1-app.txt'), 'utf8');
+  assert.ok(gammal.includes('me/drive/root:/InVisionTid/${ONEDRIVE_FILENAME}:/content'),
+    'sökvägen är härledd ur den gamla appen, inte gissad');
+  assert.match(innehallsUrl('invisiontid-data.json'),
+    /me\/drive\/root:\/InVisionTid\/invisiontid-data\.json:\/content$/);
 });

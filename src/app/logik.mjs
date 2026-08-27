@@ -11,7 +11,7 @@ import {
   momsAnvandbar, MILLI,
   harAvtalsperiod, periodKontroll, periodandelOre, arGenomford,
   oreTillKortText,
-} from '../src/domain/index.mjs';
+} from '../domain/index.mjs';
 
 export { harAvtalsperiod, periodKontroll, periodandelOre, arGenomford };
 
@@ -435,10 +435,49 @@ export function underlagsgrupper(s) {
     .sort((a, b) => a.kundnamn.localeCompare(b.kundnamn, 'sv') || a.period.localeCompare(b.period));
 }
 
+/**
+ * EN sanningskälla för om ett underlag är klart i Lundify: klarmarkeradAt.
+ *
+ * Domänens gamla femstegsstatus läses bara som legacydata. Den får aldrig
+ * parallellt styra vyn, för då kan användarläget få två olika svar.
+ */
+export const arKlartILundify = referens => !!referens?.klarmarkeradAt;
+
+/** Legacystatusar som i gammal data betydde "överfört till Lundify". */
+const LEGACY_KLART = ['lundifyDraft', 'lundifySent', 'lundifyPaid'];
+
+/**
+ * Minsta möjliga kompatibilitet vid inläsning av gammal data.
+ *
+ * Saknas klarmarkeradAt men en gammal status säger att underlaget var överfört
+ * härleds ett datum EN gång, och statusfältet läggs undan som legacy. Efter
+ * det finns bara ett fält som styr.
+ */
+export function normaliseraReferens(referens) {
+  if (!referens) return referens;
+  const { status, ...rest } = referens;
+  if (referens.klarmarkeradAt) return { ...rest, legacyStatus: status ?? null };
+  if (status && LEGACY_KLART.includes(status)) {
+    return {
+      ...rest,
+      klarmarkeradAt: referens.invoiceDate ?? referens.paidDate ?? referens.createdAt ?? 'okänt datum',
+      legacyStatus: status,
+      harledd: true,
+    };
+  }
+  return { ...rest, legacyStatus: status ?? null };
+}
+
+/** Normaliserar alla fakturareferenser i ett inläst tillstånd. */
+export function normaliseraTillstand(s) {
+  if (!s?.invoiceRecords?.length) return s;
+  return { ...s, invoiceRecords: s.invoiceRecords.map(normaliseraReferens) };
+}
+
 /** Underlag som är klara i Lundify, nyast först. */
 export function klaraUnderlag(s) {
   return (s.invoiceRecords || [])
-    .filter(r => r.klarmarkeradAt)
+    .filter(arKlartILundify)
     .map(r => ({ ...r, kundnamn: kundFor(s, r.clientId)?.name ?? '' }))
     .sort((a, b) => String(b.klarmarkeradAt).localeCompare(String(a.klarmarkeradAt)));
 }
@@ -588,8 +627,9 @@ export function markeraKlart(s, referensId, { datum }) {
     ok: true,
     state: {
       ...s,
+      // Bara klarmarkeradAt sätts. Ingen parallell status som kan säga emot.
       invoiceRecords: s.invoiceRecords.map(r => r.id === referensId
-        ? { ...r, klarmarkeradAt: datum, status: 'lundifyDraft' } : r),
+        ? { ...r, klarmarkeradAt: datum } : r),
     },
   };
 }

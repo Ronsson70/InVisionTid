@@ -24,10 +24,10 @@ let cache = null;
 /** Returnerar { fns, kalla } där fns är de rena v1-funktionerna. */
 export function laddaPureV1() {
   if (cache) return cache;
-  const sokvag = new URL('../../index.html', import.meta.url);
+  const sokvag = new URL('../../arkiv/v1-app.txt', import.meta.url);
   const src = readFileSync(sokvag, 'utf8');
   const m = src.match(/\/\* PURE-START \*\/([\s\S]*?)\/\* PURE-END \*\//);
-  if (!m) throw new Error('Hittade inte PURE-START/PURE-END i index.html');
+  if (!m) throw new Error('Hittade inte PURE-START/PURE-END i arkiv/v1-app.txt');
   const fns = new Function(`${m[1]}\nreturn {${EXPORTS.join(',')}};`)();
   cache = { fns, kalla: m[1] };
   return cache;
@@ -40,9 +40,9 @@ export function laddaPureV1() {
  * Loadern finns här enbart för att kunna mäta baslinjen.
  */
 export function laddaMigrateV1() {
-  const src = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../../arkiv/v1-app.txt', import.meta.url), 'utf8');
   const m = src.match(/const SCHEMA_VERSION=\d+;[\s\S]*?\nfunction migrate\(d\)\{[\s\S]*?\n\}/);
-  if (!m) throw new Error('Hittade inte migrate() i index.html');
+  if (!m) throw new Error('Hittade inte migrate() i arkiv/v1-app.txt');
   return new Function(`${m[0]}\nreturn migrate;`)();
 }
 
@@ -52,16 +52,16 @@ export function laddaMigrateV1() {
  * i test.html, trots att de avgör om data överlever en synk.
  */
 export function laddaSyncV1() {
-  const src = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../../arkiv/v1-app.txt', import.meta.url), 'utf8');
   const migrateBlock = src.match(/const SCHEMA_VERSION=\d+;[\s\S]*?\nfunction migrate\(d\)\{[\s\S]*?\n\}/);
   const mergeBlock = src.match(/function mergeData\(local,remote\)\{[\s\S]*?\n\}/);
-  if (!migrateBlock || !mergeBlock) throw new Error('Hittade inte migrate()/mergeData() i index.html');
+  if (!migrateBlock || !mergeBlock) throw new Error('Hittade inte migrate()/mergeData() i arkiv/v1-app.txt');
   return new Function(`${migrateBlock[0]}\n${mergeBlock[0]}\nreturn {migrate, mergeData};`)();
 }
 
 /** Läser hela index.html som text, för språk- och innehållskontroller. */
 export function laddaIndexHtml() {
-  return readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+  return readFileSync(new URL('../../arkiv/v1-app.txt', import.meta.url), 'utf8');
 }
 
 /** Läser den syntetiska v1-fixturen. */
