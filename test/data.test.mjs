@@ -361,8 +361,14 @@ function samlaKallfiler(katalog, ut = []) {
   return ut;
 }
 
-test('krav 7 och 8: src/ rör varken OneDrive, localStorage, nätverk eller filsystem', () => {
-  const filer = samlaKallfiler(join(repoRot, 'src'));
+// Gränsen går vid src/integrations. Domänen och datalagret ska aldrig känna till
+// ett lagringslager. Integrationslagret är den enda platsen där nätverk och
+// filsystem får förekomma, och att det bara läser bevisas i lasadapter.test.mjs.
+test('krav 7 och 8: src/domain och src/data rör varken lagring, nätverk eller filsystem', () => {
+  const filer = [
+    ...samlaKallfiler(join(repoRot, 'src', 'domain')),
+    ...samlaKallfiler(join(repoRot, 'src', 'data')),
+  ];
   assert.ok(filer.length > 0);
   const forbjudet = /localStorage|sessionStorage|indexedDB|graph\.microsoft\.com|\bfetch\s*\(|XMLHttpRequest|node:fs|readFileSync|writeFileSync/;
   for (const fil of filer) {
@@ -371,21 +377,26 @@ test('krav 7 och 8: src/ rör varken OneDrive, localStorage, nätverk eller fils
   }
 });
 
-test('krav 7: inga verkliga datafiler används i testerna', () => {
+test('krav 7: ingen sökväg till verklig data förekommer i domänen, datalagret eller testerna', () => {
   const filer = [
     ...samlaKallfiler(join(repoRot, 'test')),
-    ...samlaKallfiler(join(repoRot, 'src')),
+    ...samlaKallfiler(join(repoRot, 'src', 'domain')),
+    ...samlaKallfiler(join(repoRot, 'src', 'data')),
   ];
-  // Enda tillåtna datafilen är den syntetiska fixturen. Mönstret letar efter
-  // SÖKVÄGAR och FILNAMN, inte efter produktnamn — "OneDrive" i en testrubrik är
-  // prosa, medan "me/drive/root" är en verklig adress. Delarna sätts ihop så att
-  // den här filen inte flaggar sig själv.
+  // Enda tillåtna datafilen är den syntetiska fixturen.
+  //
+  // Mönstret letar efter SÖKVÄGAR som skulle nå verklig data, inte efter
+  // konstanter. Filnamnet 'invisiontid-data.json' är ett legitimt värde i en
+  // Graph-URL, och 'OneDrive' i en testrubrik är prosa. Det som aldrig får
+  // förekomma är en hemkatalog eller en synkad OneDrive-mapp.
+  //
+  // Delarna sätts ihop så att den här filen inte flaggar sig själv.
   const misstankt = new RegExp([
-    'invisiontid' + '-data',
-    'me/drive' + '/root',
+    'C:\\Users', 'C:/' + 'Users', '/Users/' + 'ronne',
+    'One' + 'Drive -',
     'IN ' + 'VISION',
     'Produkter/' + 'InVisionTid',
-  ].join('|'));
+  ].join('|'), 'i');
   for (const fil of filer) {
     const rel = fil.slice(repoRot.length).replaceAll('\\', '/');
     const text = utanKommentarer(readFileSync(fil, 'utf8'));
@@ -393,8 +404,11 @@ test('krav 7: inga verkliga datafiler används i testerna', () => {
   }
 });
 
-test('krav 8: index.html och test.html är oberörda av den nya koden', () => {
-  const filer = samlaKallfiler(join(repoRot, 'src'));
+test('krav 8: index.html och test.html är oberörda av domänen och datalagret', () => {
+  const filer = [
+    ...samlaKallfiler(join(repoRot, 'src', 'domain')),
+    ...samlaKallfiler(join(repoRot, 'src', 'data')),
+  ];
   for (const fil of filer) {
     assert.ok(!utanKommentarer(readFileSync(fil, 'utf8')).includes('index.html'), `${fil} refererar till index.html`);
   }
