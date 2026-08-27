@@ -1,0 +1,52 @@
+{
+  "_kommentar": "Syntetisk v1-fil i exakt det format index.html producerar idag. Inga produktionsdata, inga personuppgifter. Används av T9 (migrering utan dataförlust) och T10 (opålitlig gammal fakturamarkering). Speglar de kombinationer som faktiskt förekommer: projekt med timpris, projekt med fastprisperiod, projekt utan kund, poster från kalenderimport, poster utan updatedAt, resor utan utlägg samt tombstones.",
+  "clients": [
+    { "id": "c-a", "name": "Kund A", "contact": "", "phone": "", "email": "", "orgNr": "", "address": "", "status": "active" },
+    { "id": "c-b", "name": "Kund B", "contact": "", "phone": "", "email": "", "orgNr": "", "address": "", "status": "active" },
+    { "id": "c-d", "name": "Kund D", "contact": "", "phone": "", "email": "", "orgNr": "", "address": "", "status": "active" },
+    { "id": "c-e", "name": "Kund E", "contact": "", "phone": "", "email": "", "orgNr": "", "address": "", "status": "paused" }
+  ],
+  "projects": [
+    { "id": "p-a", "name": "Uppdrag A", "clientId": "c-a", "sessionPrice": 2400, "defaultTripKm": 23 },
+    { "id": "p-b", "name": "Uppdrag B", "clientId": "c-b", "hourlyRate": 850 },
+    { "id": "p-d", "name": "Uppdrag D", "clientId": "c-d", "pricingPeriods": [
+      { "id": "pp-d1", "startDate": "2026-03-01", "endDate": "2026-06-30", "type": "fixed", "amount": 100000 }
+    ] },
+    { "id": "p-e", "name": "Uppdrag E", "clientId": "c-e", "pricingPeriods": [
+      { "id": "pp-e1", "startDate": "2026-04-01", "type": "fixed", "amount": 15000 }
+    ] },
+    { "id": "p-x", "name": "Uppdrag utan kund", "hourlyRate": 350 }
+  ],
+  "entries": [
+    { "id": "e-1", "projectId": "p-a", "moment": "Behandlingspass", "seconds": 5400, "date": "2026-03-03", "createdAt": "2026-03-03T17:02:00.000Z" },
+    { "id": "e-2", "projectId": "p-a", "moment": "Enskilt samtal", "seconds": 3600, "date": "2026-03-03", "createdAt": "2026-03-03T18:10:00.000Z", "note": "Samma dag som passet" },
+    { "id": "e-3", "projectId": "p-b", "moment": "Lektion", "seconds": 7200, "date": "2026-03-05", "startTime": "09:00", "endTime": "11:00", "createdAt": "2026-03-05T11:05:00.000Z" },
+    { "id": "e-4", "projectId": "p-b", "moment": "Gruppaktivitet", "seconds": 5400, "date": "2026-03-12", "createdAt": "2026-03-12T15:00:00.000Z", "calEventId": "cal-abc-1" },
+    { "id": "e-5", "projectId": "p-d", "moment": "Verkstad", "seconds": 21600, "date": "2026-03-18", "createdAt": "2026-03-18T19:00:00.000Z", "calEventId": "cal-abc-2" },
+    { "id": "e-6", "projectId": "p-e", "moment": "Förstudiearbete", "seconds": 10800, "date": "2026-04-02", "createdAt": "2026-04-02T16:30:00.000Z" },
+    { "id": "e-7", "projectId": "p-x", "moment": "Administration", "seconds": 3600, "date": "2026-04-02", "createdAt": "2026-04-02T20:00:00.000Z", "updatedAt": "2026-04-03T08:00:00.000Z" }
+  ],
+  "expenses": [
+    { "id": "x-1", "projectId": "p-b", "amount": 480, "description": "Material", "date": "2026-03-05", "createdAt": "2026-03-05T11:06:00.000Z" },
+    { "id": "x-2", "projectId": "p-x", "amount": 1250, "description": "", "date": "2026-04-02", "createdAt": "2026-04-02T20:01:00.000Z" }
+  ],
+  "trips": [
+    { "id": "t-1", "projectId": "p-a", "km": 23, "description": "Tur och retur", "date": "2026-03-03", "createdAt": "2026-03-03T18:11:00.000Z" },
+    { "id": "t-2", "projectId": "p-b", "km": 67, "description": "Resa", "date": "2026-03-05", "createdAt": "2026-03-05T11:07:00.000Z" }
+  ],
+  "invoices": [
+    { "projectId": "p-a", "month": "2026-03", "invoicedAt": "2026-04-02" },
+    { "projectId": "p-b", "month": "2026-03", "invoicedAt": "2026-04-02" },
+    { "projectId": "p-d", "month": "2026-03", "invoicedAt": "2026-04-05" }
+  ],
+  "deletedIds": {
+    "e-borttagen": "2026-03-20T10:00:00.000Z",
+    "t-borttagen": "2026-03-21T10:00:00.000Z"
+  },
+  "hourlyRate": 850,
+  "kmRate": 5.5,
+  "weeklyGoal": 0,
+  "settings": { "staleWarningDays": 7 },
+  "schemaVersion": 1,
+  "lastSync": "2026-04-05T09:00:00.000Z"
+}

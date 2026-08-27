@@ -14,11 +14,29 @@ Personlig single-file PWA för tidsregistrering. Byggd för eget bruk i In Visio
 
 ## Tester
 
-`test.html` återanvänder de rena funktionerna direkt ur `index.html`
-(koden mellan `/* PURE-START */` och `/* PURE-END */` — ingen dubblering,
-ingen byggprocess). Kör via en lokal server och öppna `/test.html`
+**I webbläsaren:** `test.html` återanvänder de rena funktionerna direkt ur
+`index.html` (koden mellan `/* PURE-START */` och `/* PURE-END */` — ingen
+dubblering, ingen byggprocess). Kör via en lokal server och öppna `/test.html`
 (t.ex. `npx serve` eller `python -m http.server`); `fetch` fungerar inte
 på `file://`.
+
+**I Node**, utan beroenden:
+
+```
+node --test test/*.test.mjs     kör allt
+node test/rapport.mjs           acceptansbaslinje mot nuvarande kod
+```
+
+Se `test/README.md`.
+
+## Vidareutveckling till v2
+
+Appen byggs ut till en arbets- och faktureringsassistent med artiklar, moms i
+heltalsöre, fasta leveranser, låsta faktureringsunderlag och en Lundify-referens
+som aldrig påstår mer än vad Lundify faktiskt säger.
+
+Analys, arkitekturbeslut, datamodell, migreringsstrategi, genomförandeplan,
+Lundify-förstudie och öppna frågor ligger i [docs/](docs/).
 
 ## Datamodell
 

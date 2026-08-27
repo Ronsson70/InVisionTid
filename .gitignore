@@ -3,9 +3,21 @@ invisiontid-data.json
 invisiontid-backup-*.json
 invisiontid-manual.docx
 
+# Privata fixtures och kundmappning — anonymiserad eller verklig produktionsdata
+# som används vid utveckling. Repot är publikt, ingenting härifrån får committas.
+test-fixtures/privat/
+*.local.md
+*.local.json
+
+# Migreringsbackuper
+migrering-backup-*.json
+
 # Wrangler / Cloudflare
 .wrangler/
 .deploy-tmp/
+
+# Node
+node_modules/
 
 # OS
 .DS_Store
