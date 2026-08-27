@@ -83,6 +83,39 @@ efter migreringen, annars räknas de som fakturerbara i uppföljningen.
 
 ---
 
+## 5b. Fastprisuppdraget med två perioder ⚠ kräver avstämning
+
+Ett av uppdragen har **två fastprisperioder à 100 000 kr**: april–juni och
+juli–september. Fakturamarkerat är mars, maj, juni och juli. April saknar
+markering.
+
+**De loggade tidsposterna på uppdraget är inte fakturerbara tidsrader.** Priset
+är fast, tiden är `trackingOnly` och påverkar inte beloppet. Att beskriva de
+11 aprilposterna som "ofakturerad tid" vore fel.
+
+**Frågan är inte hur stor en beräknad "aprildel" är.** Ett fast pris för en
+period är inte en summa som appen ska dela upp per månad — det var precis den
+konstruktionen i v1 som gjorde intäkten synlig i fel period. Frågan är:
+
+> Har den avtalade leveransen eller betalningsperioden fakturerats, helt eller
+> delvis?
+
+Det kan bara avgöras mot **avtalet** och **Lundify**. Appen ska varken räkna
+fram ett belopp eller gissa vilken del som återstår.
+
+Två saker till som inte går att lösa ur datan:
+
+- **Mars är fakturamarkerat men ligger före den första periodens start.** Det
+  finns antingen ett tidigare avtal som inte är registrerat, eller så avser
+  markeringen något annat.
+- **Augusti och september i den andra perioden** har varken poster eller
+  markering. Om perioden faktureras i förskott eller vid periodens slut går
+  inte att läsa ur datan.
+
+**Behöver stämmas av mot avtal och Lundify innan uppdraget förs över till v2.**
+
+---
+
 ## 5. Vad betyder de befintliga fastprisperioderna?
 
 Fyra av sju projekt i den inspekterade ögonblicksbilden har `pricingPeriods` av

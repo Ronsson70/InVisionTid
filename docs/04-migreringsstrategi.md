@@ -264,6 +264,34 @@ Backupen raderas aldrig automatiskt.
 
 ---
 
+## v1-arkivet ska vara tekniskt skrivskyddat
+
+När v2 tas i drift blir v1-filen ett historiskt arkiv. Ett arkiv som fortfarande
+kan skrivas till är inte ett arkiv.
+
+**Den gamla appen får inte pekas mot arkivfilen så länge den kan skriva.**
+`index.html` gör en `PUT` mot samma sökväg den läser, och den skriver dessutom
+automatiskt vid varje ändring. Öppnar man den gamla appen mot arkivet räcker det
+med ett oavsiktligt tryck för att historiken ska skrivas om.
+
+Skyddet ska vara tekniskt, inte en överenskommelse:
+
+1. **Flytta arkivfilen** till en egen mapp med ett eget namn, till exempel
+   `InVisionTid/arkiv/invisiontid-arkiv-v1-<datum>.json`. Den gamla appens
+   hårdkodade sökväg pekar då inte på den.
+2. **Sätt filen som skrivskyddad** i OneDrive, och behåll en kopia utanför
+   OneDrive-synk.
+3. **Avveckla den gamla deploymenten.** Så länge `invisiontid.pages.dev` kör v1
+   mot `me/drive/root:/InVisionTid/invisiontid-data.json` ska den filen antingen
+   vara borta eller ersatt av v2.
+4. **Om historiken ska gå att läsa** byggs en läsvy in i v2, eller så används en
+   variant av den gamla appen där `oneDriveWrite` och den automatiska
+   sparningen är borttagna. En sådan variant ska vara en egen fil, inte samma
+   `index.html` med en flagga.
+
+Punkt 4 är viktig: att stänga av skrivningen med en konfigurationsflagga i
+samma app är inte skrivskydd. Koden som kan skriva ska inte finnas i den kopian.
+
 ## Samexistens under övergången
 
 Under en period kan samma OneDrive-fil nås av både v1 (`index.html`) och v2. Det är

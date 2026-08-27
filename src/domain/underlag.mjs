@@ -33,6 +33,7 @@ function radFranPost(post, artikel) {
     sourceId: post.id ?? null,
     projectId: artikel.projectId,
     articleId: artikel.id,
+    datum: post.date ?? null,          // vilken dag raden avser, för fakturatexten
     beskrivning: post.beskrivning || post.description || artikel.name,
     qtyMilli: post.qtyMilli,
     unit: post.priceSnapshot?.unit ?? artikel.unit,
@@ -50,6 +51,7 @@ function radFranLeverans(leverans) {
     sourceId: leverans.id,
     projectId: leverans.projectId ?? null,
     articleId: null,
+    datum: leverans.completedAt ?? null,
     beskrivning: leverans.name,
     qtyMilli: MILLI,
     unit: 'st',

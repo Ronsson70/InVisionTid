@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>In Vision Tid – testversion</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sage:#5E7368;--sage-dark:#3A4B3E;--sage-deep:#1F2F22;--sage-pale:#E8E3D4;--sage-ghost:#EFEADD;
+  --warm:#F1EBDE;--text:#1A1816;--text-muted:#6F6959;--accent:#BA5E3C;--accent-ljus:#F0D9CB;
+  --border:#E5DFD1;--kort:#FDFBF7;--radie:16px;
+}
+body{font-family:'Outfit',system-ui,-apple-system,sans-serif;background:var(--warm);color:var(--text);
+  -webkit-tap-highlight-color:transparent;line-height:1.5}
+#app{max-width:560px;margin:0 auto;padding:0}
+/* Fast utrymme under innehållet så den fasta menyn aldrig täcker ett kort,
+   en knapp eller ett belopp. Räknat på menyns höjd plus marginal. */
+.navutrymme{height:calc(104px + env(safe-area-inset-bottom))}
+@media(min-width:768px){
+  #app{max-width:900px;padding:0 12px}
+  .knapprad{grid-template-columns:repeat(3,1fr);gap:16px}
+  .storknapp{min-height:104px;font-size:17px}
+  .kortrad{display:grid;grid-template-columns:1fr 1fr;gap:0 14px;align-items:start}
+  nav{max-width:900px;border-radius:14px 14px 0 0}
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+button:active{transform:scale(.98)}
+input,select{font-family:inherit;font-size:17px;padding:14px 16px;border:1.5px solid var(--border);
+  border-radius:12px;background:var(--kort);color:var(--text);width:100%}
+input:focus,select:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 3px rgba(94,115,104,.15)}
+
+.testbanner{background:var(--accent);color:#fff;padding:10px 16px;font-size:13px;font-weight:600;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.testbanner button{background:rgba(255,255,255,.22);color:#fff;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:600}
+
+header{padding:20px 16px 8px}
+h1{font-size:22px;font-weight:700;color:var(--sage-deep);letter-spacing:-.3px}
+.datum{font-size:14px;color:var(--text-muted);margin-top:2px}
+
+.kort{background:var(--kort);border:1px solid var(--border);border-radius:var(--radie);
+  padding:16px;margin:0 16px 14px;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.rubrik{font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--text-muted);margin-bottom:12px}
+
+.knapprad{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin:0 16px 14px}
+.storknapp{background:var(--sage-deep);color:#fff;border-radius:var(--radie);padding:22px 8px;
+  font-size:16px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:8px;min-height:92px;justify-content:center}
+.storknapp .ikon{font-size:26px;line-height:1}
+.merknapp{margin:0 16px 14px;width:calc(100% - 32px);padding:14px;border-radius:12px;
+  background:transparent;border:1.5px dashed var(--sage-light,#8FA594);color:var(--sage-dark);font-size:15px;font-weight:600}
+
+.postrad{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--sage-ghost)}
+.postrad:last-child{border-bottom:none}
+.postrad .txt{flex:1;min-width:0}
+.postrad .namn{font-size:16px;font-weight:600}
+.postrad .under{font-size:13px;color:var(--text-muted)}
+.postrad .belopp{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.postrad .ejfakt{font-size:13px;color:var(--text-muted);font-style:italic;white-space:nowrap}
+.prick{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+
+.summa{display:flex;justify-content:space-between;align-items:baseline;padding-top:14px;margin-top:4px;
+  border-top:2px solid var(--sage-deep)}
+.summa .etikett{font-size:14px;font-weight:600}
+.summa .varde{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.exmoms{font-size:12px;color:var(--text-muted);font-weight:500;margin-top:2px;text-align:right}
+
+.forslag{background:var(--sage-ghost);border-radius:12px;padding:14px;margin-top:12px;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.forslag .txt{flex:1;font-size:15px;min-width:150px}
+.forslag button{background:var(--sage-deep);color:#fff;padding:12px 18px;border-radius:10px;font-size:15px;font-weight:600}
+.forslag .neka{background:transparent;color:var(--text-muted);padding:12px 10px;font-size:14px}
+
+.varning{background:var(--accent-ljus);border-left:4px solid var(--accent);border-radius:10px;
+  padding:14px;margin-top:12px;font-size:15px;color:#7A3A22}
+.varning strong{display:block;margin-bottom:4px}
+
+.dag{margin-bottom:18px}
+.dagrubrik{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.dagnamn{font-size:15px;font-weight:700}
+.dagsumma{font-size:14px;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.idagmark{color:var(--sage);font-size:12px;font-weight:600;margin-left:6px}
+
+.veckonav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 16px 14px}
+.veckonav button{background:var(--kort);border:1px solid var(--border);border-radius:12px;padding:12px 18px;font-size:18px}
+.veckonav .mitt{text-align:center;flex:1}
+.veckonav .mitt .p{font-size:16px;font-weight:600}
+
+.kundkort{margin-bottom:14px}
+.kundnamn{font-size:18px;font-weight:700;color:var(--sage-deep)}
+.uppdragnamn{font-size:14px;font-weight:600;color:var(--text-muted);margin:12px 0 4px}
+.primar{background:var(--sage-deep);color:#fff;width:100%;padding:16px;border-radius:12px;
+  font-size:16px;font-weight:600;margin-top:14px}
+.sekundar{background:var(--sage-ghost);color:var(--sage-dark);width:100%;padding:14px;border-radius:12px;
+  font-size:15px;font-weight:600;margin-top:8px}
+.statusbricka{display:inline-block;background:var(--sage-pale);color:var(--sage-deep);
+  padding:5px 12px;border-radius:20px;font-size:13px;font-weight:600}
+
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--kort);border-top:1px solid var(--border);
+  display:flex;max-width:560px;margin:0 auto;padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;padding:12px 4px 14px;display:flex;flex-direction:column;align-items:center;gap:4px;
+  font-size:12px;color:var(--text-muted);border-top:3px solid transparent}
+nav button.aktiv{color:var(--sage-deep);font-weight:700;border-top-color:var(--sage-deep)}
+nav .ikon{font-size:20px}
+
+.ark{position:fixed;inset:0;background:rgba(31,47,34,.45);display:flex;align-items:flex-end;
+  justify-content:center;z-index:50}
+.arkinne{background:var(--kort);border-radius:22px 22px 0 0;width:100%;max-width:560px;
+  max-height:92vh;overflow-y:auto;padding:20px 16px calc(24px + env(safe-area-inset-bottom))}
+@media(min-width:600px){.ark{align-items:center}.arkinne{border-radius:22px;max-height:88vh}}
+.arkrubrik{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.arkrubrik h2{font-size:20px;font-weight:700}
+.arkrubrik button{font-size:26px;color:var(--text-muted);padding:0 8px;line-height:1}
+.faltrubrik{font-size:13px;font-weight:700;color:var(--text-muted);margin:16px 0 8px}
+.val{display:flex;flex-direction:column;gap:8px}
+.val button{text-align:left;padding:16px;border-radius:12px;background:var(--warm);
+  border:1.5px solid var(--border);font-size:16px;font-weight:600}
+.val button.vald{background:var(--sage-deep);color:#fff;border-color:var(--sage-deep)}
+.val button .kund{display:block;font-size:13px;font-weight:400;opacity:.75;margin-top:2px}
+.antal{display:flex;align-items:center;justify-content:center;gap:20px;margin:8px 0}
+.antal button{width:64px;height:64px;border-radius:50%;background:var(--sage-ghost);
+  color:var(--sage-deep);font-size:30px;font-weight:700}
+.antal .varde{font-size:36px;font-weight:700;min-width:70px;text-align:center;font-variant-numeric:tabular-nums}
+.snabbval{display:flex;gap:8px;flex-wrap:wrap}
+.snabbval button{padding:14px 18px;border-radius:12px;background:var(--warm);
+  border:1.5px solid var(--border);font-size:16px;font-weight:600;flex:1;min-width:74px}
+.snabbval button.vald{background:var(--sage-deep);color:#fff;border-color:var(--sage-deep)}
+.tvakol{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.spara{background:var(--sage-deep);color:#fff;width:100%;padding:18px;border-radius:14px;
+  font-size:17px;font-weight:700;margin-top:22px}
+.spara:disabled{opacity:.4}
+.tabort{background:transparent;color:var(--accent);width:100%;padding:14px;font-size:15px;font-weight:600;margin-top:8px}
+.beloppforhand{text-align:center;font-size:28px;font-weight:700;margin-top:18px;font-variant-numeric:tabular-nums}
+.beloppforhand small{display:block;font-size:13px;font-weight:500;color:var(--text-muted);margin-top:2px}
+.tom{text-align:center;color:var(--text-muted);font-size:15px;padding:28px 16px}
+pre.underlag{background:var(--warm);border:1px solid var(--border);border-radius:12px;padding:14px;
+  font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;overflow-x:auto;white-space:pre;margin-top:12px}
+.notis{font-size:13px;color:var(--text-muted);margin-top:10px}
+.uppfrad{display:flex;justify-content:space-between;align-items:baseline;gap:14px;padding:12px 0;border-bottom:1px solid var(--sage-ghost)}
+.uppfrad:last-child{border-bottom:none}
+.uppfrad .v{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* Belopp får aldrig stå ensamt utan att säga om momsen ingår. */
+.markning{font-size:12px;color:var(--text-muted);font-weight:500;margin-top:2px}
+.belopp small{display:block;font-size:11px;font-weight:500;color:var(--text-muted)}
+.summa .hoger{text-align:right}
+.ejfakt.stor{font-size:16px;font-weight:600;font-style:normal;color:var(--text-muted)}
+
+.beloppblock{margin-top:14px;padding-top:12px;border-top:1px solid var(--sage-ghost)}
+.brad{display:flex;justify-content:space-between;gap:14px;padding:7px 0;font-size:15px;font-variant-numeric:tabular-nums}
+.brad.stark{font-weight:700;font-size:17px;border-top:2px solid var(--sage-deep);margin-top:6px;padding-top:11px}
+
+/* Veckans ekonomiska mål */
+.malbelopp{font-size:34px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.malbelopp small{display:block;font-size:13px;font-weight:500;color:var(--text-muted);margin-top:4px}
+.matare{height:14px;background:var(--sage-ghost);border-radius:7px;overflow:hidden;margin:14px 0 10px}
+.matarfyll{height:100%;background:var(--sage-deep);border-radius:7px;transition:width .5s ease}
+.maltext{font-size:15px;line-height:1.45;margin-bottom:12px}
+.malrader{border-top:1px solid var(--sage-ghost);padding-top:8px}
+.malrader.avskild{margin-top:10px}
+
+/* Statusetiketter ska se ut som etiketter, inte som knappar. */
+.statusrad{display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;
+  padding:14px 0;border-bottom:1px solid var(--sage-ghost)}
+.statusrad:last-of-type{border-bottom:none}
+.statustxt{flex:1;min-width:190px}
+.statustxt .under{font-size:13px;color:var(--text-muted);margin-top:2px}
+.kundnamn.liten{font-size:16px}
+.etikettbricka{display:inline-block;background:var(--sage-pale);color:var(--sage-deep);
+  padding:2px 10px;border-radius:6px;font-size:13px;font-weight:600;cursor:default}
+.statusknappar{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.sekundar.liten{width:auto;padding:10px 14px;font-size:14px;margin-top:0}
+.lankknapp{color:var(--accent);font-size:14px;font-weight:600;padding:8px 0;text-decoration:underline}
+
+.valjknapp{background:var(--sage-deep);color:#fff;padding:12px 16px;border-radius:10px;
+  font-size:14px;font-weight:600;white-space:normal;text-align:center;flex-shrink:0;max-width:180px}
+.neutral{background:var(--sage-ghost);border-radius:12px;padding:14px;margin-top:14px;
+  font-size:15px;color:var(--text-muted)}
+.avbryt{width:100%;padding:14px;font-size:15px;font-weight:600;color:var(--text-muted);margin-top:6px}
+.forklaring{background:var(--sage-ghost);border-radius:10px;padding:12px;margin-top:14px}
+
+.underlagrader{margin-top:6px}
+.ulrad{display:grid;grid-template-columns:1fr auto;gap:2px 14px;padding:12px 0;border-bottom:1px solid var(--sage-ghost)}
+.ulnamn{font-size:16px;font-weight:600}
+.ulunder{font-size:13px;color:var(--text-muted);grid-column:1}
+.ulbelopp{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;grid-row:1;grid-column:2;white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="./ui.mjs"></script>
+<noscript><p style="padding:20px">Testversionen kräver JavaScript.</p></noscript>
+</body>
+</html>
