@@ -4,10 +4,11 @@ Två sviter som mäter olika saker. Inga beroenden, ingen `package.json`, ingen
 byggprocess. Node 18 eller senare.
 
 ```
-IVT_MAL=v2 node --test test/*.test.mjs    kör allt mot v2      61/61 gröna
-node --test test/*.test.mjs               kör allt mot v1      49/61, se nedan
+IVT_MAL=v2 node --test test/*.test.mjs    kör allt mot v2      92/92 gröna
+node --test test/*.test.mjs               kör allt mot v1      80/92, se nedan
 node test/rapport.mjs v2                  acceptanstabell, v2
 node test/rapport.mjs                     acceptanstabell, v1
+node test/migreringsdemo.mjs              hela migreringsflödet i minnet
 ```
 
 Ingen `package.json` läggs i roten. Cloudflare Pages autodetekterar den och kan
@@ -30,6 +31,17 @@ Blir den röd har något i datalagret gått sönder. Det är den viktigaste sign
 hela repot.
 
 ---
+
+## `data.test.mjs` — ska alltid vara grön
+
+31 tester för backup, migreringsförhandsgranskning och återställning, ett per
+delkrav i etapp 4A. Allt körs mot en källa i minnet (`lib/minneskalla.mjs`) och
+den syntetiska fixturen. Två tester skannar `src/` och `test/` och ser till att
+ingen kod någonsin refererar till `localStorage`, en Graph-adress, `node:fs`
+eller en verklig datafil.
+
+`node test/migreringsdemo.mjs` visar hela flödet: förhandsgranskning, avbrott
+utan godkännande, genomförande och återställning med återkommande checksumma.
 
 ## `domain.test.mjs` — ska alltid vara grön
 
@@ -67,6 +79,15 @@ domänen provades, och varje gång fångades felet:
 | Prissnapshot ignorerades | T11 föll |
 | Migreringen gissade 25 % moms | T9 föll |
 
+Detsamma gjordes för etapp 4A:
+
+| Mutation | Utfall |
+|---|---|
+| Backupen sparade tolkat objekt i stället för råtext | 12 fall föll |
+| Skrivning skedde före backupen | 2 fall föll |
+| Godkännandet släpptes igenom | 1 fall föll |
+| Återställning verifierade inte backupen | 1 fall föll |
+
 ---
 
 ## Så hänger det ihop
@@ -79,7 +100,7 @@ test-fixtures/v1-legacy.json     syntetisk v1-fil för migreringstesterna
 test/acceptance-checks.mjs       T1–T13 mot v2-kontraktet, adapteroberoende
         │
         ├── test/adapters/v1.mjs   svarar med koden i index.html idag
-        └── test/adapters/v2.mjs   läggs till i etapp 3
+        └── test/adapters/v2.mjs   svarar med domänen i src/domain
         │
         ├── test/acceptance.test.mjs   grind
         └── test/rapport.mjs           läsbar tabell

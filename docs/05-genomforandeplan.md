@@ -69,15 +69,31 @@ kan skriva.
 
 ---
 
-## Etapp 4 — Backup, förhandsgranskning och återställning
+## Etapp 4A — Backup, förhandsgranskning och återställning ✔ klar
 
-Bygger `src/data/backup.mjs` och en migreringsvy som visar före/efter-antal och
-kontrollsummor. Skrivningen ligger bakom ett uttryckligt godkännande.
+**Levererat:** `src/data/` med `backup.mjs`, `forhandsgranskning.mjs`,
+`migreringskorning.mjs` och `index.mjs`. Samt `test/data.test.mjs`,
+`test/lib/minneskalla.mjs` och `test/migreringsdemo.mjs`.
 
-**Klar när:** en migrering kan köras mot en kopia av rådata, visas, godkännas,
-skrivas och återställas — och kontrollsummorna stämmer.
+**Resultat:** 31 nya tester, ett per delkrav. `IVT_MAL=v2 node --test test/*.test.mjs`
+→ **92 av 92 gröna**.
+
+**Frikopplat från all lagring.** Läsning och skrivning skickas in som funktioner.
+`src/` innehåller inget `localStorage`, ingen `fetch`, ingen Graph-adress och
+inget `node:fs` — det kontrolleras av ett test, inte av en regel någon ska minnas.
+
+**Verifierat att testerna biter:** fyra mutationer, alla fångade — backup som
+sparar tolkat objekt (12 fall föll), skrivning före backup (2), godkännande utan
+kontroll (1), återställning utan verifiering (1).
+
+**Rörde inte:** `index.html`, `test.html`, localStorage, OneDrive, produktionsdata.
+Den aktiva filen från 11 augusti har varken lästs, kopierats eller använts.
 
 ### ⛔ Stoppunkt 2 — före första skrivningen mot produktionsdata
+
+Nästa steg, **etapp 4B**, är det första som kopplar in ett verkligt lager. Innan
+den aktiva OneDrive-filen ens används för en förhandsgranskning krävs ett
+uttryckligt godkännande.
 
 Detta är den enda punkt där oåterkallelig skada kan uppstå. Krav innan skrivning:
 
