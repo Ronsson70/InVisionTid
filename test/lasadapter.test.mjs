@@ -151,6 +151,30 @@ test('krav 5: rapporten kan inte bära innehåll ur källan', () => {
   }
 });
 
+test('rapportering: momsgranskningarna ligger UTANFÖR granskningskön', () => {
+  const f = forhandsgranskaMigrering(readFileSync(FIXTUR, 'utf8'), { nu: '2026-08-27T10:00:00.000Z' });
+
+  // Granskningskön är poster i reviewQueue. Momsflaggan sitter på artikeln.
+  // Ingen artikel får förekomma som ref i kön, annars vore antalen överlappande
+  // och summan nedan skulle dubbelräkna.
+  const kon = f.resultat.reviewQueue || [];
+  const artiklar = f.resultat.articles || [];
+  const ogranskade = artiklar.filter(a => a.vatStatus === 'needsReview');
+  assert.ok(kon.length > 0 && ogranskade.length > 0);
+  assert.ok(!kon.some(k => artiklar.some(a => a.id === k.ref)), 'ingen artikel ligger i granskningskön');
+  assert.ok(!kon.some(k => /moms/i.test(k.typ)), 'ingen kötyp handlar om moms');
+
+  const r = saneradRapport(f, {});
+  assert.equal(r.beslut.iGranskningskon, kon.length);
+  assert.equal(r.beslut.momsUtanforGranskningskon, ogranskade.length);
+  assert.equal(r.beslut.totalt, kon.length + ogranskade.length);
+
+  const text = rapportText(r);
+  assert.match(text, /moms, UTANFÖR granskningskön/);
+  assert.match(text, /SUMMA beslut/);
+  assert.match(text, /Momsflaggan sitter på artikeln, inte i granskningskön/);
+});
+
 test('krav 5: rapporten bär inga belopp ur källan', () => {
   const kalla = readFileSync(FIXTUR, 'utf8');
   const f = forhandsgranskaMigrering(kalla, { nu: '2026-08-27T10:00:00.000Z' });

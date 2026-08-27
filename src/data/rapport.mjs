@@ -68,6 +68,18 @@ export function saneradRapport(f, kalla = {}) {
     fakturareferenserUtanNummer: referenser.filter(r => r.invoiceNumber === null).length,
     granskningsposterPerTyp,
 
+    // Momsen ligger INTE i granskningskön.
+    //
+    // Granskningskön är poster i reviewQueue. Momsflaggan sitter på ARTIKELN,
+    // som vatStatus 'needsReview'. Att lägga ihop dem vore fel, och att bara
+    // rapportera det ena antalet ger intrycket att färre beslut återstår än det
+    // faktiskt gör. Därför redovisas båda, och summan.
+    beslut: {
+      iGranskningskon: Number(f?.skapade?.granskningsposter ?? 0),
+      momsUtanforGranskningskon: Number(f?.ogranskadMomsAntal ?? 0),
+      totalt: Number(f?.skapade?.granskningsposter ?? 0) + Number(f?.ogranskadMomsAntal ?? 0),
+    },
+
     idempotent: f?.idempotent === true,
     redanMigrerad: f?.redanMigrerad === true,
     giltig: f?.giltig === true,
@@ -120,12 +132,18 @@ export function rapportText(r) {
   ut.push(rad('granskningsposter', r.skapade.granskningsposter));
 
   ut.push('');
-  ut.push('Kräver ett mänskligt beslut');
-  ut.push(rad('artiklar med ogranskad moms', `${r.ogranskadMomsAntal} av ${r.skapade.artiklar}`));
+  ut.push('Kvarstående beslut');
+  ut.push(rad('i granskningskön', r.beslut.iGranskningskon));
+  for (const [typ, n] of Object.entries(r.granskningsposterPerTyp)) ut.push(rad('  ' + typ, n));
+  ut.push(rad('moms, UTANFÖR granskningskön', `${r.beslut.momsUtanforGranskningskon} artiklar med vatStatus needsReview`));
+  ut.push(rad('SUMMA beslut', `${r.beslut.totalt}   (${r.beslut.iGranskningskon} + ${r.beslut.momsUtanforGranskningskon})`));
+  ut.push('');
+  ut.push('  Momsflaggan sitter på artikeln, inte i granskningskön. De två');
+  ut.push('  antalen överlappar alltså inte och ska inte förväxlas.');
+  ut.push('');
   ut.push(rad('bevarade fastprisperioder', r.bevaradeFastprisperioderAntal));
   ut.push(rad('osäkra fakturareferenser', r.osakraFakturareferenserAntal));
   ut.push(rad('därav utan fakturanummer', r.fakturareferenserUtanNummer));
-  for (const [typ, n] of Object.entries(r.granskningsposterPerTyp)) ut.push(rad(typ, n));
 
   ut.push('');
   ut.push('Kontroller');
