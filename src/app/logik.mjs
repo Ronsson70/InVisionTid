@@ -9,7 +9,7 @@ import {
   radbeloppOre, oreTillText, kvantitetTillText,
   foreslaResor, hittaArtikel, arFakturerbar,
   momsAnvandbar, MILLI,
-  harAvtalsperiod, periodKontroll, periodandelOre, arGenomford,
+  harAvtalsperiod, periodDagar, periodKontroll, periodandelOre, arGenomford,
   oreTillKortText, oreTillAvrundadKronaText, kronorTillOre,
 } from '../domain/index.mjs';
 import {
@@ -821,6 +821,7 @@ export function jobbatIn(s, datumLista) {
   // beloppet ovanpå en vecka — den styr bara om leveransen får faktureras.
   // Därför kan samma belopp inte räknas både som periodandel och som leverans.
   let fastPrisAndelOre = 0;
+  const fastPrisDetaljer = [];
   const ofullstandigaPerioder = [];
 
   for (const l of s.deliverables || []) {
@@ -830,7 +831,25 @@ export function jobbatIn(s, datumLista) {
       ofullstandigaPerioder.push({ id: l.id, namn: l.name, orsak: kontroll.orsak });
       continue;                                      // gissa inte, räkna inte med
     }
-    fastPrisAndelOre += periodandelOre(l, datumLista);
+    const andelOre = periodandelOre(l, datumLista);
+    fastPrisAndelOre += andelOre;
+    if (andelOre > 0) {
+      const uppdrag = uppdragFor(s, l.projectId);
+      fastPrisDetaljer.push({
+        id: l.id,
+        namn: l.name,
+        projectId: l.projectId,
+        uppdragsnamn: uppdrag?.name ?? 'Utan uppdrag',
+        kundnamn: kundFor(s, uppdrag?.clientId)?.name ?? 'Utan kund',
+        uppdragAktivt: uppdrag?.active !== false,
+        amountOre: l.amountOre,
+        startDate: l.startDate,
+        endDate: l.endDate,
+        periodDagar: periodDagar(l.startDate, l.endDate),
+        overlappandeDagar: datumLista.filter(d => d >= l.startDate && d <= l.endDate).length,
+        andelOre,
+      });
+    }
   }
 
   const jobbatInOre = timarbeteOre + tillfallenOre + styckOre + fastPrisAndelOre;
@@ -838,6 +857,7 @@ export function jobbatIn(s, datumLista) {
   return {
     jobbatInOre,
     delar: { timarbeteOre, tillfallenOre, styckOre, fastPrisAndelOre },
+    fastPrisDetaljer,
     resorOre,
     utlaggOre,
     // Fakturaunderlaget innehåller det som faktiskt blir fakturarader.
@@ -886,6 +906,7 @@ export function sammanstallning(s, datumLista, { malOre = null } = {}) {
     // Jobbat in
     jobbatInOre: summa.jobbatInOre,
     delar: summa.delar,
+    fastPrisDetaljer: summa.fastPrisDetaljer,
 
     // Fakturaunderlag och Lundify — skilda begrepp, skilda tal
     fakturaunderlagOre,

@@ -238,6 +238,43 @@ test('klickflöde: priser och en felregistrering kan rättas', async () => {
   assert.equal(rattad.seconds, 7200);
 });
 
+test('klickflöde: ett vilande uppdrag kan granskas och rättas utan att aktiveras', async () => {
+  const sparade = [];
+  const grund = skapaTestdata();
+  const tillstand = {
+    ...grund,
+    clients: grund.clients.map(c => c.id === 'k-d' ? { ...c, status: 'paused' } : c),
+    projects: grund.projects.map(p => p.id === 'u-avtal'
+      ? { ...p, active: false, archivedAt: '2026-07-31' } : p),
+    deliverables: grund.deliverables.filter(l => l.id !== 'lev-ofullstandig'),
+  };
+  startaApp({
+    lagring: { async spara(s) { sparade.push(structuredClone(s)); } },
+    tillstand,
+  });
+
+  klicka({ oppna: 'uppdrag' });
+  assert.match(html, /Vilande uppdrag/);
+  assert.match(html, /data-redigerauppdrag="u-avtal"/);
+  assert.match(html, /Granska priser och perioder/);
+  assert.match(html, /data-aktiverabefintligt="u-avtal"/);
+
+  klicka({ redigerauppdrag: 'u-avtal' });
+  assert.match(html, /Vilande uppdrag\./);
+  assert.match(html, /utan att aktivera uppdraget/);
+  assert.match(html, /Fast pris – Löpande avtal, kvartal/);
+  assert.match(html, /data-falt="leveranspris_lev-avtal"/);
+
+  fyll('leveranspris_lev-avtal', '101 000');
+  klicka({ sparauppdrag: 'u-avtal' });
+  await tom();
+
+  const sparat = sparade.at(-1);
+  assert.equal(sparat.projects.find(p => p.id === 'u-avtal').active, false,
+    'granskning och rättning får inte återaktivera uppdraget');
+  assert.equal(sparat.deliverables.find(l => l.id === 'lev-avtal').amountOre, 10100000);
+});
+
 test('klickflöde: ett Sauna-pass ger 2 400 kr och tre arbetstimmar', async () => {
   const sparade = [];
   startaApp({

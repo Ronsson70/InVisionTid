@@ -92,6 +92,10 @@ const kortDatum = d => {
   const o = new Date(d + 'T12:00:00');
   return `${DAGAR[o.getDay()].slice(0, 3)} ${o.getDate()}/${o.getMonth() + 1}`;
 };
+const periodDatum = d => {
+  const o = new Date(d + 'T12:00:00');
+  return `${o.getDate()} ${MANADER[o.getMonth()].slice(0, 3)} ${o.getFullYear()}`;
+};
 const manadMedOffset = (offset = 0) => {
   const d = new Date();
   d.setDate(1);
@@ -242,6 +246,17 @@ function vyVecka() {
       ${v.delar.tillfallenOre ? `<div class="brad under"><span>Behandlingstillfällen</span><span>${esc(kr(v.delar.tillfallenOre))}</span></div>` : ''}
       ${v.delar.styckOre ? `<div class="brad under"><span>Styckprisat arbete</span><span>${esc(kr(v.delar.styckOre))}</span></div>` : ''}
       ${v.delar.fastPrisAndelOre ? `<div class="brad under"><span>Fast pris, veckans andel</span><span>${esc(kr(v.delar.fastPrisAndelOre))}</span></div>` : ''}
+      ${v.fastPrisDetaljer.map(p => `<div class="fastprisrad">
+        <div class="fastprishuvud">
+          <span>${esc(p.uppdragsnamn)} · ${esc(p.namn)}</span>
+          <span>${esc(kr(p.andelOre))}</span>
+        </div>
+        <div class="fastprisunder">
+          ${esc(p.kundnamn)} · ${p.overlappandeDagar} av ${p.periodDagar} dagar ·
+          ${esc(periodDatum(p.startDate))}–${esc(periodDatum(p.endDate))} · totalt ${esc(kr(p.amountOre))}
+          ${p.uppdragAktivt ? '' : ' · vilande uppdrag'}
+        </div>
+      </div>`).join('')}
       <div class="brad avstand"><span>Resor att fakturera</span><span>${esc(kr(v.resorOre))}</span></div>
       <div class="brad"><span>Utlägg att ersätta</span><span>${esc(kr(v.utlaggOre))}</span></div>
       <div class="brad stark"><span>Totalt fakturaunderlag</span><span>${esc(kr(v.totaltUnderlagOre))}</span></div>
@@ -575,10 +590,11 @@ function arkUppdrag() {
       <div class="faltrubrik">Vilande uppdrag</div>
       <p class="notis">Historiken finns kvar. Aktivera bara om du ska registrera nytt arbete på uppdraget.</p>
       <div class="val">${vilande.map(p => `
-        <button data-aktiverabefintligt="${esc(p.id)}">
+        <button data-redigerauppdrag="${esc(p.id)}">
           ${esc(p.name)}
-          <span class="kund">${esc(L.kundNamnForUppdrag(s, p.id))} · Aktivera igen</span>
-        </button>`).join('')}</div>` : ''}
+          <span class="kund">${esc(L.kundNamnForUppdrag(s, p.id))} · Vilande · Granska priser och perioder</span>
+        </button>
+        <button class="sekundar" data-aktiverabefintligt="${esc(p.id)}">Aktivera ${esc(p.name)} igen</button>`).join('')}</div>` : ''}
     ${tidigareUppdrag.filter(p => !(s.projects || []).some(x => x.id === p.id)).length ? `
       <div class="faltrubrik">Tidigare uppdrag</div>
       <p class="notis">Aktivera ett uppdrag om du ska börja arbeta med det igen. Historiken hanteras separat under Hela historiken.</p>
@@ -661,6 +677,7 @@ function arkRedigeraUppdrag() {
   const leveranser = (s.deliverables || []).filter(l => l.projectId === p.id && (l.startDate || l.endDate));
   const valt = (nyckel, reserv) => ark[nyckel] ?? reserv;
   return `
+    ${p.active === false ? `<div class="notis vilandenotis"><strong>Vilande uppdrag.</strong> Du kan granska och rätta priser, moms och fastprisperioder utan att aktivera uppdraget.</div>` : ''}
     <p class="notis">Rätta uppgifter som blivit fel. Registreringar som redan ligger i ett klart Lundify-underlag behåller sitt låsta pris.</p>
     <div class="faltrubrik">Kund</div>
     <div class="val">${(s.clients || []).map(c => `

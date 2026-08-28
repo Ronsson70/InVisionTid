@@ -114,7 +114,12 @@ test('rendering: veckomålet går att ändra i ett riktigt formulär', () => {
 
 test('rendering: Vecka visar fastprisets veckoandel som en egen rad', () => {
   klicka({ vy: 'vecka' });
+  const text = html.replace(/[\u00a0\u202f]/g, ' ');
   assert.match(html, /Fast pris, veckans andel/);
+  assert.match(html, /Verkstadsserie · Verkstad 1, genomförd/);
+  assert.match(html, /Löpande avtal · Löpande avtal, kvartal/);
+  assert.match(html, /7 av 28 dagar/);
+  assert.match(text, /totalt 50 000 kr/);
   assert.match(html, /tjänas in över sin upparbetningsperiod/);
 });
 

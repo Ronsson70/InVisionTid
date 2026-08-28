@@ -163,6 +163,36 @@ test('veckans jobbat in innehåller fastprisets veckoandel', () => {
   assert.ok(!('leveransOre' in v.delar), 'det finns ingen klumpsumma längre');
 });
 
+test('veckans fastprisandel redovisas per uppdrag och summerar till huvudraden', () => {
+  const v = L.veckoSammanstallning(nyState(), 0, IDAG);
+  assert.deepEqual(v.fastPrisDetaljer.map(x => x.id), ['lev-verkstad-1', 'lev-avtal']);
+  assert.equal(v.fastPrisDetaljer.reduce((summa, x) => summa + x.andelOre, 0),
+    v.delar.fastPrisAndelOre);
+
+  const verkstad = v.fastPrisDetaljer.find(x => x.id === 'lev-verkstad-1');
+  assert.equal(verkstad.uppdragsnamn, 'Verkstadsserie');
+  assert.equal(verkstad.kundnamn, 'Kund C');
+  assert.equal(verkstad.overlappandeDagar, 7);
+  assert.equal(verkstad.periodDagar, 28);
+  assert.equal(verkstad.amountOre, 5000000);
+  assert.equal(verkstad.uppdragAktivt, true);
+});
+
+test('en fastprisandel från ett vilande uppdrag märks som vilande men räknas oförändrat', () => {
+  const s = nyState();
+  const vilande = {
+    ...s,
+    projects: s.projects.map(p => p.id === 'u-avtal' ? { ...p, active: false } : p),
+  };
+  const fore = L.veckoSammanstallning(s, 0, IDAG);
+  const efter = L.veckoSammanstallning(vilande, 0, IDAG);
+  const detalj = efter.fastPrisDetaljer.find(x => x.id === 'lev-avtal');
+
+  assert.equal(efter.jobbatInOre, fore.jobbatInOre,
+    'uppdragets aktivitetsläge ändrar inte avtalsperiodens upparbetning');
+  assert.equal(detalj.uppdragAktivt, false);
+});
+
 test('fastprisandelen ingår ALDRIG i fakturaunderlaget', () => {
   const v = L.veckoSammanstallning(nyState(), 0, IDAG);
   assert.ok(v.delar.fastPrisAndelOre > 0);
