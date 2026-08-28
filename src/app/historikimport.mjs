@@ -89,6 +89,28 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
     ...ignorerade,
   ]);
   const markeringar = new Set(lista(v1data?.invoices).map(i => `${i.projectId}|${i.month}`));
+  const gammalPerId = new Map(lista(gammalt.poster).map(p => [p.id, p]));
+
+  // Den första liveversionen kunde hinna lägga augustiposter i ett underlag
+  // innan datumgränsen 31 juli tillämpades. Åtgärden körs exakt en gång. Bara
+  // underlag för augusti eller senare, utan någon länkad äldre post, öppnas.
+  // Därefter sparas gränsen så framtida riktiga underlag aldrig påverkas.
+  const gransRedanTillampad = tillstand?.historikimport?.openInvoiceFrom === OPPEN_FAKTURERING_FRAN;
+  const referenserSomOppnas = new Set();
+  if (!gransRedanTillampad) {
+    for (const referens of lista(tillstand?.invoiceRecords)) {
+      const lastaPoster = lista(tillstand?.poster).filter(p => p.invoiceRecordId === referens.id);
+      const lastaLeveranser = lista(tillstand?.deliverables).filter(l => l.invoiceRecordId === referens.id);
+      const harLastInnehall = lastaPoster.length || lastaLeveranser.length;
+      const period = String(referens.period ?? '');
+      const periodFranAugusti = /^\d{4}-\d{2}$/.test(period)
+        && period >= OPPEN_FAKTURERING_FRAN.slice(0, 7);
+      const allaPosterFranAugusti = lastaPoster.every(p => String(p.date ?? '') >= OPPEN_FAKTURERING_FRAN);
+      if (harLastInnehall && periodFranAugusti && allaPosterFranAugusti) {
+        referenserSomOppnas.add(referens.id);
+      }
+    }
+  }
 
   const nyaPoster = lista(gammalt.poster)
     .filter(p => !befintligaPoster.has(p.id))
@@ -111,20 +133,28 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
   // Poster som följde med redan vid nystarten kommer också från v1. De får
   // samma slutläge, men användarens eventuella ändringar av antal och datum
   // bevaras. Låsta poster lämnas helt orörda.
-  const gammalPerId = new Map(lista(gammalt.poster).map(p => [p.id, p]));
   let uppdateradePoster = 0;
   const nuvarandePoster = lista(tillstand?.poster).map(p => {
     const original = gammalPerId.get(p.id);
-    if (!original || p.invoiceRecordId) return p;
+    const oppnaUnderlag = p.invoiceRecordId && referenserSomOppnas.has(p.invoiceRecordId);
+    if (!original && !oppnaUnderlag) return p;
+    if (p.invoiceRecordId && !oppnaUnderlag) return p;
+    const friPost = oppnaUnderlag
+      ? { ...p, status: 'open', invoiceRecordId: null, priceSnapshot: null }
+      : p;
+    if (!original) {
+      uppdateradePoster += 1;
+      return friPost;
+    }
     const slutlage = slutlageForHistorik(gammalt, original);
-    const redanKlar = p.legacySource === HISTORIK_KALLA
-      && p.legacyReviewStatus === slutlage.legacyReviewStatus
-      && p.status === slutlage.status;
-    if (redanKlar) return p;
+    const redanKlar = friPost.legacySource === HISTORIK_KALLA
+      && friPost.legacyReviewStatus === slutlage.legacyReviewStatus
+      && friPost.status === slutlage.status;
+    if (redanKlar && !oppnaUnderlag) return friPost;
     uppdateradePoster += 1;
     const manad = String(original.date ?? '').slice(0, 7);
     return {
-      ...p,
+      ...friPost,
       ...slutlage,
       legacySource: HISTORIK_KALLA,
       legacyInvoiceMarked: markeringar.has(`${original.projectId}|${manad}`),
@@ -146,7 +176,12 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
   // fastprisregeln. Signaturen hindrar dubbelräkning även om samma period
   // redan lagts upp manuellt med ett annat id.
   let uppdateradeFastprisperioder = 0;
+  let oppnadeLeveranser = 0;
   const befintligaLeveranser = lista(tillstand?.deliverables).map(l => {
+    if (l.invoiceRecordId && referenserSomOppnas.has(l.invoiceRecordId)) {
+      oppnadeLeveranser += 1;
+      return { ...l, status: 'open', invoiceRecordId: null, priceSnapshot: null };
+    }
     const skaOppnas = l.legacySource === HISTORIK_KALLA
       && !l.invoiceRecordId
       && l.status === 'invoiced'
@@ -182,9 +217,12 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
     articles,
     poster: [...nuvarandePoster, ...nyaPoster],
     deliverables: [...befintligaLeveranser, ...nyaFastprisperioder],
+    invoiceRecords: lista(tillstand?.invoiceRecords)
+      .filter(r => !referenserSomOppnas.has(r.id)),
     historikimport: {
       ...(tillstand?.historikimport || {}),
       source: HISTORIK_KALLA,
+      openInvoiceFrom: OPPEN_FAKTURERING_FRAN,
       importedAt: tillstand?.historikimport?.importedAt ?? nu,
       lastCompletedAt: nu,
       knownIds: [...new Set([
@@ -209,7 +247,10 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
       uppdaterade: uppdateradePoster,
       fastprisperioder: nyaFastprisperioder.length,
       uppdateradeFastprisperioder,
-      totalt: nyaPoster.length + uppdateradePoster + nyaFastprisperioder.length + uppdateradeFastprisperioder,
+      oppnadeUnderlag: referenserSomOppnas.size,
+      oppnadeLeveranser,
+      totalt: nyaPoster.length + uppdateradePoster + nyaFastprisperioder.length
+        + uppdateradeFastprisperioder + referenserSomOppnas.size + oppnadeLeveranser,
       gamlaFakturamarkeringar: nyaPoster.filter(p => p.legacyInvoiceMarked).length,
       kunder: nyttTillstand.clients.length - lista(tillstand?.clients).length,
       uppdrag: nyttTillstand.projects.length - lista(tillstand?.projects).length,

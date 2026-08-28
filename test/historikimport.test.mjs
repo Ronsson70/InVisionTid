@@ -36,7 +36,7 @@ test('hela v1-historiken planeras för v2 utan att en rad försvinner', () => {
   const plan = planeraHistorikimport(v1(), tomt(), { nu: NU });
   assert.deepEqual(plan.antal, {
     poster: 2, resor: 1, utlagg: 1, uppdaterade: 0, fastprisperioder: 1,
-    uppdateradeFastprisperioder: 0, totalt: 5,
+    uppdateradeFastprisperioder: 0, oppnadeUnderlag: 0, oppnadeLeveranser: 0, totalt: 5,
     gamlaFakturamarkeringar: 3, kunder: 2, uppdrag: 2,
   });
   assert.deepEqual(new Set(plan.tillstand.poster.map(p => p.id)), new Set(['e1', 'e2', 't1', 'x1']));
@@ -81,6 +81,64 @@ test('en post som tidigare låstes från 1 augusti öppnas igen', () => {
   const plan = planeraHistorikimport(data, felaktigtLast, { nu: NU });
   assert.equal(plan.tillstand.poster.find(p => p.id === 'augusti').status, 'open');
   assert.equal(plan.antal.uppdaterade, 1);
+});
+
+test('ett felaktigt klart augustiunderlag flyttas tillbaka i sin helhet exakt en gång', () => {
+  const data = v1();
+  data.entries = [
+    { id: 'aug-1', projectId: 'p1', date: '2026-08-10', moment: 'Augusti', seconds: 3600 },
+    { id: 'aug-2', projectId: 'p1', date: '2026-08-12', moment: 'Augusti', seconds: 7200 },
+  ];
+  data.trips = [];
+  data.expenses = [];
+  const migrerad = planeraHistorikimport(data, tomt(), { nu: NU }).tillstand;
+  const { openInvoiceFrom, ...gammalHistorikmarkering } = migrerad.historikimport;
+  const felaktigtLast = {
+    ...migrerad,
+    historikimport: gammalHistorikmarkering,
+    poster: migrerad.poster.map(p => ({
+      ...p, status: 'included', invoiceRecordId: 'und-augusti',
+      priceSnapshot: { unitPriceOre: 90000, vatRate: 2500 },
+    })),
+    invoiceRecords: [{
+      id: 'und-augusti', clientId: 'c1', period: '2026-08',
+      nettoOre: 270000, klarmarkeradAt: '2026-08-20',
+    }],
+  };
+
+  const plan = planeraHistorikimport(data, felaktigtLast, { nu: NU });
+  assert.equal(plan.antal.oppnadeUnderlag, 1);
+  assert.equal(plan.tillstand.invoiceRecords.length, 0);
+  assert.ok(plan.tillstand.poster.every(p => p.status === 'open'
+    && p.invoiceRecordId === null && p.priceSnapshot === null));
+  assert.ok(L.underlagsgrupper(plan.tillstand).some(g => g.period === '2026-08' && g.rader.length === 2));
+  assert.equal(plan.tillstand.historikimport.openInvoiceFrom, OPPEN_FAKTURERING_FRAN);
+
+  const igen = planeraHistorikimport(data, plan.tillstand, { nu: NU });
+  assert.equal(igen.antal.oppnadeUnderlag, 0);
+  assert.equal(igen.antal.totalt, 0);
+});
+
+test('ett blandat underlag med en julipost öppnas aldrig automatiskt', () => {
+  const data = v1();
+  data.entries = [
+    { id: 'jul', projectId: 'p1', date: '2026-07-31', moment: 'Juli', seconds: 3600 },
+    { id: 'aug', projectId: 'p1', date: '2026-08-01', moment: 'Augusti', seconds: 3600 },
+  ];
+  data.trips = [];
+  data.expenses = [];
+  const migrerad = planeraHistorikimport(data, tomt(), { nu: NU }).tillstand;
+  const { openInvoiceFrom, ...gammalHistorikmarkering } = migrerad.historikimport;
+  const felaktigtLast = {
+    ...migrerad,
+    historikimport: gammalHistorikmarkering,
+    poster: migrerad.poster.map(p => ({ ...p, status: 'included', invoiceRecordId: 'blandat' })),
+    invoiceRecords: [{ id: 'blandat', clientId: 'c1', period: '2026-08', klarmarkeradAt: '2026-08-20' }],
+  };
+  const plan = planeraHistorikimport(data, felaktigtLast, { nu: NU });
+  assert.equal(plan.antal.oppnadeUnderlag, 0);
+  assert.equal(plan.tillstand.invoiceRecords.length, 1);
+  assert.ok(plan.tillstand.poster.every(p => p.invoiceRecordId === 'blandat'));
 });
 
 test('fastpris som slutar efter gränsen är öppet för upparbetning men inte automatiskt genomfört', () => {

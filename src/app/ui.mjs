@@ -442,6 +442,8 @@ function arkHistorik() {
     <div class="uppfrad"><span>Resor</span><span class="v">${forslag.resor}</span></div>
     <div class="uppfrad"><span>Utlägg</span><span class="v">${forslag.utlagg}</span></div>
     ${forslag.uppdaterade ? `<div class="uppfrad"><span>Befintliga poster som får rätt status</span><span class="v">${forslag.uppdaterade}</span></div>` : ''}
+    ${forslag.oppnadeUnderlag ? `<div class="uppfrad"><span>Augustiunderlag som flyttas tillbaka</span><span class="v">${forslag.oppnadeUnderlag}</span></div>` : ''}
+    ${forslag.oppnadeLeveranser ? `<div class="uppfrad"><span>Låsta leveranser som öppnas</span><span class="v">${forslag.oppnadeLeveranser}</span></div>` : ''}
     ${forslag.fastprisperioder ? `<div class="uppfrad"><span>Fastprisperioder</span><span class="v">${forslag.fastprisperioder}</span></div>` : ''}
     ${forslag.uppdateradeFastprisperioder ? `<div class="uppfrad"><span>Fastprisperioder som öppnas igen</span><span class="v">${forslag.uppdateradeFastprisperioder}</span></div>` : ''}
     <div class="uppfrad"><span>Tidigare uppdrag</span><span class="v">${forslag.uppdrag}</span></div>
