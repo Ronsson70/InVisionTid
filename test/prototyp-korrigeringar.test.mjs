@@ -167,6 +167,8 @@ test('ångra flyttar tillbaka underlaget till Redo för Lundify', () => {
 
   const angrat = L.angraOverforing(fore, referens.id);
   assert.equal(angrat.ok, true);
+  assert.equal(angrat.antalPoster, 4);
+  assert.equal(angrat.antalLeveranser, 0);
   const s = angrat.state;
 
   const grupp = L.underlagsgrupper(s).find(g => g.clientId === 'k-a');
@@ -189,7 +191,9 @@ test('ångra tar bort även ett antecknat fakturanummer', () => {
 
 test('ångra frigör även valda leveranser', () => {
   const { s: fore, referens } = medUnderlag('k-c', ['lev-verkstad-1']);
-  const s = L.angraOverforing(fore, referens.id).state;
+  const resultat = L.angraOverforing(fore, referens.id);
+  assert.equal(resultat.antalLeveranser, 1);
+  const s = resultat.state;
   const lev = s.deliverables.find(l => l.id === 'lev-verkstad-1');
   assert.equal(lev.status, 'open');
   assert.equal(lev.invoiceRecordId, null);

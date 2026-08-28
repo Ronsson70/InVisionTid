@@ -97,6 +97,45 @@ test('klickflöde: veckomål sparas och kontoåtgärder fungerar', async () => {
   assert.equal(utloggningar, 1);
 });
 
+test('klickflöde: ett klart Lundify-underlag kan öppnas för rättning', async () => {
+  const sparade = [];
+  const id = 'underlag-att-oppna';
+  const grund = skapaTestdata();
+  const tillstand = {
+    ...grund,
+    poster: grund.poster.map(p => p.id === 'p-1'
+      ? { ...p, status: 'included', invoiceRecordId: id, priceSnapshot: { unitPriceOre: 240000 } }
+      : p),
+    invoiceRecords: [{
+      id, clientId: 'k-a', period: '2026-08', nettoOre: 480000,
+      momsOre: 0, attBetalaOre: 480000, klarmarkeradAt: '2026-08-27',
+    }],
+  };
+  startaApp({
+    lagring: { async spara(s) { sparade.push(structuredClone(s)); } },
+    tillstand,
+  });
+
+  klicka({ vy: 'fakturera' });
+  assert.match(html, /Öppna för rättning/);
+  assert.match(html, /Ingenting ändras i Lundify/);
+  assert.ok(!/>Ångra</.test(html), 'knappen ska säga vad den faktiskt gör');
+
+  klicka({ vy: 'vecka' });
+  klicka({ post: 'p-1' });
+  assert.match(html, /data-angra="underlag-att-oppna"/,
+    'den låsta raden har en direkt väg till att öppna hela underlaget');
+  klicka({ angra: id });
+  await tom();
+
+  const sparat = sparade.at(-1);
+  const post = sparat.poster.find(p => p.id === 'p-1');
+  assert.equal(post.status, 'open');
+  assert.equal(post.invoiceRecordId, null);
+  assert.equal(post.priceSnapshot, null);
+  assert.ok(!sparat.invoiceRecords.some(r => r.id === id));
+});
+
 test('klickflöde: hela historiken läggs in som redan klar och förblir redigerbar', async () => {
   const sparade = [];
   const tillstand = skapaTestdata();

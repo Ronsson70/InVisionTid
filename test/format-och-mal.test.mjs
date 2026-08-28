@@ -16,6 +16,40 @@ import { skapaTestdata } from '../prototyp/testdata.mjs';
 
 const IDAG = new Date('2026-08-27T12:00:00');
 const nyState = () => skapaTestdata(IDAG);
+
+const granskningsdata = () => ({
+  installningar: { veckomalOre: 1200000, manadsmalOre: 4000000 },
+  clients: [{ id: 'kund', name: 'Kontrollkund' }],
+  projects: [{ id: 'uppdrag', clientId: 'kund', name: 'Kontrolluppdrag', kind: 'billable', active: true }],
+  articles: [
+    { id: 'timme', projectId: 'uppdrag', name: 'Timarbete', type: 'hourly', unit: 'tim',
+      unitPriceOre: 100000, vatRate: 2500, vatStatus: 'reviewed', billable: true, active: true },
+    { id: 'pass', projectId: 'uppdrag', name: 'Tillfälle', type: 'session', unit: 'pass',
+      unitPriceOre: 240000, vatRate: 0, vatStatus: 'reviewed', billable: true, active: true },
+    { id: 'resa', projectId: 'uppdrag', name: 'Resa', type: 'travel', unit: 'km',
+      unitPriceOre: 550, vatRate: 2500, vatStatus: 'reviewed', billable: true, active: true },
+    { id: 'fasttid', projectId: 'uppdrag', name: 'Nedlagd tid', type: 'trackingOnly', unit: 'tim',
+      unitPriceOre: 0, vatRate: 2500, vatStatus: 'reviewed', billable: false, active: true },
+  ],
+  poster: [
+    { id: 'tva-timmar', projectId: 'uppdrag', articleId: 'timme', date: '2026-08-24',
+      qtyMilli: 2000, seconds: 7200, status: 'open', invoiceRecordId: null },
+    { id: 'ett-pass', projectId: 'uppdrag', articleId: 'pass', date: '2026-08-25',
+      qtyMilli: 1000, seconds: 10800, status: 'open', invoiceRecordId: null },
+    { id: 'resa-23', projectId: 'uppdrag', articleId: 'resa', date: '2026-08-25',
+      qtyMilli: 23000, seconds: null, status: 'open', invoiceRecordId: null },
+    { id: 'fast-tid', projectId: 'uppdrag', articleId: 'fasttid', date: '2026-08-26',
+      qtyMilli: 3000, seconds: 10800, status: 'open', invoiceRecordId: null },
+    { id: 'annan-vecka', projectId: 'uppdrag', articleId: 'timme', date: '2026-08-10',
+      qtyMilli: 1000, seconds: 3600, status: 'open', invoiceRecordId: null },
+  ],
+  deliverables: [{
+    id: 'fast-augusti', projectId: 'uppdrag', name: 'Fast augusti', amountOre: 3100000,
+    startDate: '2026-08-01', endDate: '2026-08-31', status: 'open', completedAt: null,
+    vatRate: 2500, vatStatus: 'reviewed', invoiceRecordId: null,
+  }],
+  invoiceRecords: [],
+});
 /** sv-SE använder hårt blanksteg som tusentalsavgränsare. */
 const platt = t => String(t).replace(/\s/g, ' ');
 
@@ -212,6 +246,63 @@ test('månadsmålet använder samma enkla regler som veckomålet', () => {
   assert.match(L.maltext(manad, 'månadens'), /av månadens mål/);
   assert.equal(L.taBortManadsmal(medMal).installningar.manadsmalOre, null);
   assert.deepEqual(medMal.poster, fore.poster, 'registreringarna påverkas inte');
+});
+
+test('kontrollräkning: vecko- och månadsmål använder exakt samma Jobbat in-regler', () => {
+  const s = granskningsdata();
+  const vecka = L.veckoSammanstallning(s, 0, IDAG); // 24–30 augusti
+  const manad = L.manadsSammanstallning(s, '2026-08');
+
+  assert.deepEqual(vecka.delar, {
+    timarbeteOre: 200000,
+    tillfallenOre: 240000,
+    styckOre: 0,
+    fastPrisAndelOre: 700000,
+  });
+  assert.equal(vecka.jobbatInOre, 1140000);
+  assert.equal(vecka.resorOre, 12650, 'resan visas separat och ingår inte i Jobbat in');
+  assert.equal(vecka.malOre, 1200000);
+  assert.equal(vecka.kvarOre, 60000);
+
+  assert.equal(manad.delar.timarbeteOre, 300000);
+  assert.equal(manad.delar.tillfallenOre, 240000);
+  assert.equal(manad.delar.fastPrisAndelOre, 3100000);
+  assert.equal(manad.jobbatInOre, 3640000);
+  assert.equal(manad.malOre, 4000000);
+  assert.equal(manad.kvarOre, 360000);
+
+  const dagssumma = L.manadensDatum(s, '2026-08')
+    .reduce((summa, datum) => summa + L.sammanstallning(s, [datum]).jobbatInOre, 0);
+  assert.equal(dagssumma, manad.jobbatInOre,
+    'månadens summa är exakt summan av dagarna, inklusive hela fastprisperioden');
+});
+
+test('att öppna ett Lundify-underlag ändrar inte vecko- eller månadsmålet', () => {
+  const grund = granskningsdata();
+  const last = {
+    ...grund,
+    poster: grund.poster.map(p => p.id === 'ett-pass'
+      ? { ...p, status: 'included', invoiceRecordId: 'underlag-1', priceSnapshot: { unitPriceOre: 240000 } }
+      : p),
+    invoiceRecords: [{
+      id: 'underlag-1', clientId: 'kund', period: '2026-08', nettoOre: 240000,
+      klarmarkeradAt: '2026-08-27',
+    }],
+  };
+  const foreVecka = L.veckoSammanstallning(last, 0, IDAG);
+  const foreManad = L.manadsSammanstallning(last, '2026-08');
+  const oppnad = L.angraOverforing(last, 'underlag-1').state;
+  const efterVecka = L.veckoSammanstallning(oppnad, 0, IDAG);
+  const efterManad = L.manadsSammanstallning(oppnad, '2026-08');
+
+  for (const falt of ['jobbatInOre', 'malOre', 'kvarOre', 'overskjutandeOre', 'procent']) {
+    assert.equal(efterVecka[falt], foreVecka[falt], `veckans ${falt} är oförändrat`);
+    assert.equal(efterManad[falt], foreManad[falt], `månadens ${falt} är oförändrat`);
+  }
+  assert.equal(foreVecka.klartILundifyOre, 240000);
+  assert.equal(efterVecka.klartILundifyOre, 0);
+  assert.equal(efterVecka.redoForLundifyOre - foreVecka.redoForLundifyOre, 240000,
+    'bara fakturastatusen flyttas tillbaka');
 });
 
 test('månadens datum innehåller varje kalenderdag även utan registreringar', () => {

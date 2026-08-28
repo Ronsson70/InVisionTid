@@ -741,8 +741,12 @@ export function antecknaFakturanummer(s, referensId, nummer) {
 export function angraOverforing(s, referensId) {
   const referens = (s.invoiceRecords || []).find(r => r.id === referensId);
   if (!referens) return { ok: false, besked: 'Underlaget finns inte längre.' };
+  const antalPoster = s.poster.filter(p => p.invoiceRecordId === referensId).length;
+  const antalLeveranser = (s.deliverables || []).filter(l => l.invoiceRecordId === referensId).length;
   return {
     ok: true,
+    antalPoster,
+    antalLeveranser,
     state: {
       ...s,
       poster: s.poster.map(p => p.invoiceRecordId === referensId

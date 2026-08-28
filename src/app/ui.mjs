@@ -316,9 +316,10 @@ function klartkort(r) {
       <div class="kundnamn liten">${esc(r.kundnamn)}</div>
       <div class="under">${esc(MANADSNAMN(r.period))} · ${esc(kr(r.nettoOre))} exklusive moms</div>
       <div class="under">Klart ${esc(r.klarmarkeradAt)}${r.invoiceNumber ? ` · faktura ${esc(r.invoiceNumber)}` : ''}</div>
+      <div class="notis">Öppnar registreringarna i InVisionTid. Ingenting ändras i Lundify.</div>
     </div>
     <div class="statusknappar">
-      <button class="lankknapp" data-angra="${esc(r.id)}">Ångra</button>
+      <button class="lankknapp" data-angra="${esc(r.id)}">Öppna för rättning</button>
     </div>
   </div>`;
 }
@@ -762,7 +763,8 @@ function arkAndraLeverans() {
     <input type="date" data-falt="datum" value="${esc(l.completedAt ?? idag())}" ${last ? 'disabled' : ''}>
     ${last
       ? `<div class="varning"><strong>Leveransen ligger i ett underlag som är klart i Lundify.</strong>
-           Flytta tillbaka underlaget till Redo för Lundify om du behöver ändra.</div>
+           Öppna underlaget för rättning om du behöver ändra.</div>
+         <button class="primar" data-angra="${esc(l.invoiceRecordId)}">Öppna underlaget för rättning</button>
          <button class="avbryt" data-stang="knapp">Stäng</button>`
       : `<button class="spara" data-sparaleveransdatum="${esc(l.id)}">Spara datum</button>
          <button class="tabort" data-angragenomford="${esc(l.id)}">Ångra genomförandet</button>
@@ -877,7 +879,9 @@ function arkAndra() {
     <input type="number" inputmode="decimal" step="0.5" data-falt="mangd" value="${esc(p.qtyMilli / L.MILLI)}">
     <div class="faltrubrik">Vilken dag?</div>
     <input type="date" data-falt="datum" value="${esc(p.date)}">
-    ${p.invoiceRecordId ? '<div class="varning"><strong>Posten hör till ett underlag som är klart i Lundify och kan inte ändras.</strong>Flytta tillbaka underlaget till Redo för Lundify först.</div>' : `
+    ${p.invoiceRecordId ? `<div class="varning"><strong>Posten hör till ett underlag som är klart i Lundify och kan inte ändras.</strong>Öppna hela underlaget för rättning först. Ingenting ändras i Lundify.</div>
+      <button class="primar" data-angra="${esc(p.invoiceRecordId)}">Öppna underlaget för rättning</button>
+      <button class="avbryt" data-stang="knapp">Avbryt</button>` : `
       <button class="spara" data-sparaandring="${esc(p.id)}">Spara ändring</button>
       ${behoverBeslut ? `
         ${L.historikpostKanFaktureras(s, p) ? `
@@ -1409,10 +1413,15 @@ function sparaNummer(id) {
 }
 
 function angraOverforing(id) {
+  const referens = (s.invoiceRecords || []).find(r => r.id === id);
+  const kund = L.kundFor(s, referens?.clientId)?.name ?? 'kunden';
+  if (!window.confirm(
+    `Öppna underlaget för ${kund} för rättning? Registreringarna blir redigerbara igen. Ingenting ändras i Lundify.`)) return;
   const res = L.angraOverforing(s, id);
   if (!res.ok) return visa(res.besked);
   s = res.state; spara(); ark = null;
-  visa('Underlaget är tillbaka under Redo för Lundify.');
+  const antal = res.antalPoster + res.antalLeveranser;
+  visa(`${antal} ${antal === 1 ? 'rad är' : 'rader är'} öppna för rättning. Ingenting har ändrats i Lundify.`);
 }
 
 // ── Start ───────────────────────────────────────────────────────────────────
