@@ -118,12 +118,12 @@ test('klickflöde: hela historiken läggs in som redan klar och förblir rediger
 
   klicka({ oppna: 'mer' });
   klicka({ oppna: 'historik' });
-  assert.match(html, /Tillämpa gränsen 1 augusti/);
+  assert.match(html, /Tillämpa gränsen 31 juli/);
   assert.match(html, /Tidsposter<\/span><span class="v">2/);
   klicka({ importerahistorik: '1' });
   await tom();
 
-  assert.match(html, /före 1 augusti är den klar i Lundify/i);
+  assert.match(html, /till och med 31 juli är den klar i Lundify/i);
   assert.equal(sparade.at(-1).poster.filter(p => p.legacySource === 'v1-full-history').length, 3);
   assert.ok(sparade.at(-1).poster.every(p => p.legacySource !== 'v1-full-history' || p.status === 'handled'));
 

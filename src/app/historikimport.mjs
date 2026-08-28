@@ -33,7 +33,7 @@ const fastprisSignatur = leverans => [
 ].join('|');
 
 /**
- * Allt före 1 augusti 2026 är enligt användaren redan fakturerat och klart.
+ * Allt till och med 31 juli 2026 är enligt användaren redan fakturerat och klart.
  * Fakturerbara poster från och med 1 augusti förblir öppna. Tid som ingår i
  * fast pris, internt eller ideellt arbete behålls alltid bara som historik.
  */
@@ -63,7 +63,7 @@ function fastprisFranV1(project, period, index, nu) {
     needsReview: true,
     reviewNote: redanKlar
       ? 'Historiskt fastpris. Redan fakturerat och klart i Lundify.'
-      : 'Fastpris från eller efter 1 augusti 2026. Kontrollera moms och markera leveransen klar när den ska faktureras.',
+      : 'Fastpris som slutar efter 31 juli 2026. Kontrollera moms och markera leveransen klar när den ska faktureras.',
     order: index + 1,
     status: redanKlar ? 'invoiced' : 'planned',
     completedAt: redanKlar ? period.endDate : null,
@@ -157,7 +157,7 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
       ...l,
       status: 'planned',
       completedAt: null,
-      reviewNote: 'Fastpris från eller efter 1 augusti 2026. Kontrollera moms och markera leveransen klar när den ska faktureras.',
+      reviewNote: 'Fastpris som slutar efter 31 juli 2026. Kontrollera moms och markera leveransen klar när den ska faktureras.',
     };
   });
   const leveransIdn = new Set(befintligaLeveranser.map(l => l.id));

@@ -47,7 +47,7 @@ test('hela v1-historiken planeras för v2 utan att en rad försvinner', () => {
   assert.equal(plan.tillstand.deliverables[0].amountOre, 5000000);
 });
 
-test('1 augusti är en skarp gräns mellan redan klart och öppet för fakturering', () => {
+test('31 juli är sista låsta dagen och 1 augusti är öppet för fakturering', () => {
   const data = v1();
   data.entries = [
     { id: 'juli', projectId: 'p1', date: '2026-07-31', moment: 'Juli', seconds: 3600 },
@@ -67,7 +67,7 @@ test('1 augusti är en skarp gräns mellan redan klart och öppet för faktureri
   assert.ok(!L.underlagsgrupper(s).some(g => g.rader.some(r => r.post.id === 'juli')));
 });
 
-test('en post som tidigare låstes efter 1 augusti öppnas igen', () => {
+test('en post som tidigare låstes från 1 augusti öppnas igen', () => {
   const data = v1();
   data.entries = [{ id: 'augusti', projectId: 'p1', date: '2026-08-10', moment: 'Augusti', seconds: 3600 }];
   data.trips = [];

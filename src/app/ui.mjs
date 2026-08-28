@@ -416,7 +416,7 @@ function arkMer() {
     <button data-oppna="leverans">Leverans klar<span class="kund">Markera en avtalad leverans som genomförd</span></button>
     <button data-oppna="uppdrag">Mina uppdrag<span class="kund">Visa, återaktivera eller lägg till uppdrag</span></button>
     <button data-oppna="kunder">Mina kunder<span class="kund">Visa och redigera kunduppgifter</span></button>
-    <button data-oppna="historik">Hela historiken<span class="kund">Klart före 1 augusti, öppet därefter</span></button>
+    <button data-oppna="historik">Hela historiken<span class="kund">Klart till och med 31 juli, öppet från 1 augusti</span></button>
     <button data-oppna="konto">Konto och synk<span class="kund">OneDrive, synkstatus och utloggning</span></button>
   </div>`;
 }
@@ -437,7 +437,7 @@ function arkHistorik() {
 
   const forslag = historikForslag?.antal;
   if (forslag?.totalt) return `
-    <div class="notis"><strong>Datumgräns 1 augusti 2026.</strong> Poster före datumet markeras som redan klara i Lundify. Fakturerbara poster från och med 1 augusti lämnas öppna och visas i Fakturera. Dubbletter skapas inte.</div>
+    <div class="notis"><strong>Datumgräns 31 juli 2026.</strong> Poster till och med 31 juli markeras som redan klara i Lundify. Fakturerbara poster från och med 1 augusti lämnas öppna och visas i Fakturera. Dubbletter skapas inte.</div>
     <div class="uppfrad"><span>Tidsposter</span><span class="v">${forslag.poster}</span></div>
     <div class="uppfrad"><span>Resor</span><span class="v">${forslag.resor}</span></div>
     <div class="uppfrad"><span>Utlägg</span><span class="v">${forslag.utlagg}</span></div>
@@ -446,13 +446,13 @@ function arkHistorik() {
     ${forslag.uppdateradeFastprisperioder ? `<div class="uppfrad"><span>Fastprisperioder som öppnas igen</span><span class="v">${forslag.uppdateradeFastprisperioder}</span></div>` : ''}
     <div class="uppfrad"><span>Tidigare uppdrag</span><span class="v">${forslag.uppdrag}</span></div>
     <p class="notis">Gamla behandlingstillfällen räknas som ett pass per registrering och kan rättas i efterhand. Tid på fastprisuppdrag visas som historik; själva fastpriset fördelas över avtalets start- och slutdatum.</p>
-    <button class="primar" data-importerahistorik="1">Tillämpa gränsen 1 augusti</button>
+    <button class="primar" data-importerahistorik="1">Tillämpa gränsen 31 juli</button>
     <button class="avbryt" data-stang="knapp">Avbryt</button>`;
 
   const ogranskade = L.historikposterAttGranska(s);
   if (!ogranskade.length) return `
     <p class="notis">${s.historikimport
-      ? 'Hela historiken finns i appen. Före 1 augusti är den klar i Lundify; fakturerbart arbete därefter är öppet.'
+      ? 'Hela historiken finns i appen. Till och med 31 juli är den klar i Lundify; fakturerbart arbete från 1 augusti är öppet.'
       : 'Ingen äldre historik finns att lägga in i den här versionen.'}</p>
     ${s.historikimport ? '<p class="notis">Du hittar posterna på sina ursprungliga datum i Vecka. Tryck på en rad om du vill rätta datum eller antal.</p>' : ''}
     <button class="avbryt" data-stang="knapp">Stäng</button>`;
@@ -1266,7 +1266,7 @@ function importeraHelaHistoriken() {
   historikForslag = null;
   spara();
   ark = { typ: 'historik', manadsindex: 0 };
-  visa(`${antal} historikposter och fastprisperioder har fått rätt status vid gränsen 1 augusti.`);
+  visa(`${antal} historikposter och fastprisperioder har fått rätt status vid gränsen 31 juli.`);
 }
 
 function sparaHistorikbeslut(varde) {
