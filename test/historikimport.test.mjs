@@ -36,7 +36,8 @@ test('hela v1-historiken planeras för v2 utan att en rad försvinner', () => {
   const plan = planeraHistorikimport(v1(), tomt(), { nu: NU });
   assert.deepEqual(plan.antal, {
     poster: 2, resor: 1, utlagg: 1, uppdaterade: 0, fastprisperioder: 1,
-    uppdateradeFastprisperioder: 0, oppnadeUnderlag: 0, oppnadeLeveranser: 0, totalt: 5,
+    uppdateradeFastprisperioder: 0, oppnadeUnderlag: 0, oppnadeLeveranser: 0,
+    borttagnaFelaktigaFastprisperioder: 0, totalt: 5,
     gamlaFakturamarkeringar: 3, kunder: 2, uppdrag: 2,
   });
   assert.deepEqual(new Set(plan.tillstand.poster.map(p => p.id)), new Set(['e1', 'e2', 't1', 'x1']));
@@ -45,6 +46,37 @@ test('hela v1-historiken planeras för v2 utan att en rad försvinner', () => {
   assert.ok(plan.tillstand.poster.filter(p => ['e1', 't1', 'x1'].includes(p.id)).every(p => p.status === 'handled'));
   assert.equal(plan.tillstand.deliverables[0].status, 'invoiced');
   assert.equal(plan.tillstand.deliverables[0].amountOre, 5000000);
+});
+
+test('tillfällespris vinner över en gammal fastprisperiod på samma uppdrag', () => {
+  const data = v1();
+  data.projects[1] = {
+    ...data.projects[1],
+    sessionPrice: 2400,
+    pricingPeriods: [{ id: 'fel-period', type: 'fixed', amount: 5000,
+      startDate: '2026-10-01', endDate: '2026-10-31' }],
+  };
+
+  const forsta = planeraHistorikimport(data, tomt(), { nu: NU });
+  assert.equal(forsta.tillstand.deliverables.length, 0,
+    'Sauna-liknande tillfällesuppdrag får ingen periodiserad fastprispost');
+  assert.equal(L.manadsSammanstallning(forsta.tillstand, '2026-10').delar.fastPrisAndelOre, 0);
+
+  const medGammaltFel = {
+    ...forsta.tillstand,
+    deliverables: [{
+      id: 'historik-fastpris-p2-fel-period', projectId: 'p2', name: 'Felaktig period',
+      amountOre: 500000, startDate: '2026-10-01', endDate: '2026-10-31',
+      status: 'planned', legacySource: 'v1-full-history',
+    }],
+  };
+  const rattelse = planeraHistorikimport(data, medGammaltFel, { nu: NU });
+  assert.equal(rattelse.antal.borttagnaFelaktigaFastprisperioder, 1);
+  assert.equal(rattelse.antal.totalt, 1);
+  assert.equal(rattelse.tillstand.deliverables.length, 0);
+
+  const igen = planeraHistorikimport(data, rattelse.tillstand, { nu: NU });
+  assert.equal(igen.antal.totalt, 0, 'rättelsen är idempotent');
 });
 
 test('31 juli är sista låsta dagen och 1 augusti är öppet för fakturering', () => {

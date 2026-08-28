@@ -20,7 +20,10 @@ const nyState = () => skapaTestdata(IDAG);
 const granskningsdata = () => ({
   installningar: { veckomalOre: 1200000, manadsmalOre: 4000000 },
   clients: [{ id: 'kund', name: 'Kontrollkund' }],
-  projects: [{ id: 'uppdrag', clientId: 'kund', name: 'Kontrolluppdrag', kind: 'billable', active: true }],
+  projects: [
+    { id: 'uppdrag', clientId: 'kund', name: 'Kontrolluppdrag', kind: 'billable', active: true },
+    { id: 'fastuppdrag', clientId: 'kund', name: 'Fast kontrolluppdrag', kind: 'billable', active: true },
+  ],
   articles: [
     { id: 'timme', projectId: 'uppdrag', name: 'Timarbete', type: 'hourly', unit: 'tim',
       unitPriceOre: 100000, vatRate: 2500, vatStatus: 'reviewed', billable: true, active: true },
@@ -28,7 +31,7 @@ const granskningsdata = () => ({
       unitPriceOre: 240000, vatRate: 0, vatStatus: 'reviewed', billable: true, active: true },
     { id: 'resa', projectId: 'uppdrag', name: 'Resa', type: 'travel', unit: 'km',
       unitPriceOre: 550, vatRate: 2500, vatStatus: 'reviewed', billable: true, active: true },
-    { id: 'fasttid', projectId: 'uppdrag', name: 'Nedlagd tid', type: 'trackingOnly', unit: 'tim',
+    { id: 'fasttid', projectId: 'fastuppdrag', name: 'Nedlagd tid', type: 'trackingOnly', unit: 'tim',
       unitPriceOre: 0, vatRate: 2500, vatStatus: 'reviewed', billable: false, active: true },
   ],
   poster: [
@@ -38,13 +41,13 @@ const granskningsdata = () => ({
       qtyMilli: 1000, seconds: 10800, status: 'open', invoiceRecordId: null },
     { id: 'resa-23', projectId: 'uppdrag', articleId: 'resa', date: '2026-08-25',
       qtyMilli: 23000, seconds: null, status: 'open', invoiceRecordId: null },
-    { id: 'fast-tid', projectId: 'uppdrag', articleId: 'fasttid', date: '2026-08-26',
+    { id: 'fast-tid', projectId: 'fastuppdrag', articleId: 'fasttid', date: '2026-08-26',
       qtyMilli: 3000, seconds: 10800, status: 'open', invoiceRecordId: null },
     { id: 'annan-vecka', projectId: 'uppdrag', articleId: 'timme', date: '2026-08-10',
       qtyMilli: 1000, seconds: 3600, status: 'open', invoiceRecordId: null },
   ],
   deliverables: [{
-    id: 'fast-augusti', projectId: 'uppdrag', name: 'Fast augusti', amountOre: 3100000,
+    id: 'fast-augusti', projectId: 'fastuppdrag', name: 'Fast augusti', amountOre: 3100000,
     startDate: '2026-08-01', endDate: '2026-08-31', status: 'open', completedAt: null,
     vatRate: 2500, vatStatus: 'reviewed', invoiceRecordId: null,
   }],

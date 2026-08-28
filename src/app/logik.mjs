@@ -315,6 +315,19 @@ export function saknadeResorForDag(s, datum) {
 // Samma ekonomiska åtagande får aldrig vara båda. Det kontrolleras i koden.
 
 /**
+ * Sant när uppdragets ekonomiska modell är pris per tillfälle.
+ * Äldre v1-data kan innehålla både tillfällespris och en gammal fastprisperiod.
+ * Tillfällespriset är då sanningskällan: varje pass räknas på passets datum.
+ */
+export const uppdragHarTillfallespris = (s, projectId) =>
+  (s.articles || []).some(a => a.projectId === projectId
+    && a.type === 'session' && a.billable !== false && a.unitPriceOre > 0);
+
+/** En fastprispost är giltig bara när uppdraget inte debiteras per tillfälle. */
+export const arGiltigFastprispost = (s, leverans) =>
+  !!leverans && !uppdragHarTillfallespris(s, leverans.projectId);
+
+/**
  * Leveranser som går att markera genomförda.
  *
  * Alla fasta ersättningar har en upparbetningsperiod. Genomförandet handlar
@@ -323,6 +336,7 @@ export function saknadeResorForDag(s, datum) {
  */
 export function enstakaLeveranser(s, { endastEjGenomforda = false } = {}) {
   return (s.deliverables || [])
+    .filter(l => arGiltigFastprispost(s, l))
     .filter(l => uppdragArFakturerbart(uppdragFor(s, l.projectId)))
     .filter(l => !endastEjGenomforda || !arGenomford(l))
     .map(l => ({ ...l, uppdragnamn: uppdragFor(s, l.projectId)?.name ?? '' }))
@@ -336,6 +350,7 @@ export function enstakaLeveranser(s, { endastEjGenomforda = false } = {}) {
  */
 export function genomfordaLeveranserForDag(s, datum) {
   return (s.deliverables || [])
+    .filter(l => arGiltigFastprispost(s, l))
     .filter(l => arGenomford(l) && l.completedAt === datum)
     .map(l => ({ ...l, uppdragnamn: uppdragFor(s, l.projectId)?.name ?? '' }));
 }
@@ -357,6 +372,9 @@ export function genomforandebesked(leverans) {
 export function markeraGenomford(s, leveransId, datum) {
   const leverans = (s.deliverables || []).find(l => l.id === leveransId);
   if (!leverans) return { ok: false, besked: 'Leveransen finns inte längre.' };
+  if (!arGiltigFastprispost(s, leverans)) {
+    return { ok: false, besked: 'Uppdraget debiteras per tillfälle. Registrera passet under Tillfälle i stället.' };
+  }
   if (leveransArLast(leverans)) {
     return { ok: false, besked: 'Leveransen ligger i ett underlag som är klart i Lundify. Flytta tillbaka underlaget först.' };
   }
@@ -376,6 +394,9 @@ export function markeraGenomford(s, leveransId, datum) {
 export function andraGenomforandedatum(s, leveransId, datum) {
   const leverans = (s.deliverables || []).find(l => l.id === leveransId);
   if (!leverans) return { ok: false, besked: 'Leveransen finns inte längre.' };
+  if (!arGiltigFastprispost(s, leverans)) {
+    return { ok: false, besked: 'Uppdraget debiteras per tillfälle och har ingen fastprisperiod.' };
+  }
   if (leveransArLast(leverans)) {
     return { ok: false, besked: 'Leveransen ligger i ett underlag som är klart i Lundify. Flytta tillbaka underlaget först.' };
   }
@@ -390,6 +411,9 @@ export function andraGenomforandedatum(s, leveransId, datum) {
 export function angraGenomford(s, leveransId) {
   const leverans = (s.deliverables || []).find(l => l.id === leveransId);
   if (!leverans) return { ok: false, besked: 'Leveransen finns inte längre.' };
+  if (!arGiltigFastprispost(s, leverans)) {
+    return { ok: false, besked: 'Uppdraget debiteras per tillfälle och har ingen fastprisperiod.' };
+  }
   if (leveransArLast(leverans)) {
     return { ok: false, besked: 'Leveransen ligger i ett underlag som är klart i Lundify. Flytta tillbaka underlaget först.' };
   }
@@ -480,6 +504,7 @@ export function underlagsgrupper(s) {
   }
 
   for (const l of s.deliverables || []) {
+    if (!arGiltigFastprispost(s, l)) continue;
     if (l.status !== 'open' || l.invoiceRecordId) continue;
     if (!arGenomford(l)) continue;                        // ej genomförd kan inte faktureras
     const u = uppdragFor(s, l.projectId);
@@ -825,6 +850,7 @@ export function jobbatIn(s, datumLista) {
   const ofullstandigaPerioder = [];
 
   for (const l of s.deliverables || []) {
+    if (!arGiltigFastprispost(s, l)) continue;
     if (!uppdragArFakturerbart(uppdragFor(s, l.projectId))) continue;
     const kontroll = periodKontroll(l);
     if (!kontroll.giltig) {
@@ -979,6 +1005,7 @@ export function perKund(s, datumLista) {
   }
 
   for (const l of s.deliverables || []) {
+    if (!arGiltigFastprispost(s, l)) continue;
     if (!uppdragArFakturerbart(uppdragFor(s, l.projectId))) continue;
     if (!periodKontroll(l).giltig) continue;
     const andel = periodandelOre(l, datumLista);

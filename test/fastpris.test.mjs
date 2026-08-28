@@ -178,6 +178,32 @@ test('veckans fastprisandel redovisas per uppdrag och summerar till huvudraden',
   assert.equal(verkstad.uppdragAktivt, true);
 });
 
+test('ett tillfällesuppdrag räknar pass per datum och ignorerar en gammal fastprisperiod', () => {
+  const s = nyState();
+  const felaktigPeriod = {
+    id: 'gammal-sauna-period', projectId: 'u-behandling', name: 'Gammal period',
+    amountOre: 500000, startDate: '2026-08-01', endDate: '2026-08-31',
+    status: 'planned', completedAt: null,
+  };
+  const medFel = { ...s, deliverables: [...s.deliverables, felaktigPeriod] };
+  const vecka = L.veckoSammanstallning(medFel, 0, IDAG);
+  const manad = L.manadsSammanstallning(medFel, '2026-08');
+
+  assert.equal(L.uppdragHarTillfallespris(medFel, 'u-behandling'), true);
+  assert.ok(vecka.delar.tillfallenOre > 0, 'passen räknas på registreringsdatumen');
+  assert.ok(!vecka.fastPrisDetaljer.some(x => x.id === felaktigPeriod.id));
+  assert.equal(vecka.delar.fastPrisAndelOre,
+    L.veckoSammanstallning(s, 0, IDAG).delar.fastPrisAndelOre);
+  assert.equal(manad.delar.fastPrisAndelOre,
+    L.manadsSammanstallning(s, '2026-08').delar.fastPrisAndelOre);
+  assert.ok(!L.enstakaLeveranser(medFel).some(x => x.id === felaktigPeriod.id));
+  assert.ok(!L.underlagsgrupper({
+    ...medFel,
+    deliverables: medFel.deliverables.map(l => l.id === felaktigPeriod.id
+      ? { ...l, status: 'open', completedAt: IDAG } : l),
+  }).some(g => g.leveranser.some(l => l.id === felaktigPeriod.id)));
+});
+
 test('en fastprisandel från ett vilande uppdrag märks som vilande men räknas oförändrat', () => {
   const s = nyState();
   const vilande = {

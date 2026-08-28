@@ -90,6 +90,9 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
   ]);
   const markeringar = new Set(lista(v1data?.invoices).map(i => `${i.projectId}|${i.month}`));
   const gammalPerId = new Map(lista(gammalt.poster).map(p => [p.id, p]));
+  const tillfallesProjekt = new Set(lista(v1data?.projects)
+    .filter(p => Number(p.sessionPrice) > 0)
+    .map(p => p.id));
 
   // Den första liveversionen kunde hinna lägga augustiposter i ett underlag
   // innan datumgränsen 31 juli tillämpades. Åtgärden körs exakt en gång. Bara
@@ -177,28 +180,37 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
   // redan lagts upp manuellt med ett annat id.
   let uppdateradeFastprisperioder = 0;
   let oppnadeLeveranser = 0;
-  const befintligaLeveranser = lista(tillstand?.deliverables).map(l => {
-    if (l.invoiceRecordId && referenserSomOppnas.has(l.invoiceRecordId)) {
-      oppnadeLeveranser += 1;
-      return { ...l, status: 'open', invoiceRecordId: null, priceSnapshot: null };
-    }
-    const skaOppnas = l.legacySource === HISTORIK_KALLA
-      && !l.invoiceRecordId
-      && l.status === 'invoiced'
-      && String(l.endDate ?? '') >= OPPEN_FAKTURERING_FRAN;
-    if (!skaOppnas) return l;
-    uppdateradeFastprisperioder += 1;
-    return {
-      ...l,
-      status: 'planned',
-      completedAt: null,
-      reviewNote: 'Fastpris som slutar efter 31 juli 2026. Kontrollera moms och markera leveransen klar när den ska faktureras.',
-    };
-  });
+  const felaktigaTillfallesperioder = lista(tillstand?.deliverables)
+    .filter(l => l.legacySource === HISTORIK_KALLA && tillfallesProjekt.has(l.projectId));
+  const felaktigaTillfallesperiodIdn = new Set(felaktigaTillfallesperioder.map(l => l.id));
+  const befintligaLeveranser = lista(tillstand?.deliverables)
+    .filter(l => !felaktigaTillfallesperiodIdn.has(l.id))
+    .map(l => {
+      if (l.invoiceRecordId && referenserSomOppnas.has(l.invoiceRecordId)) {
+        oppnadeLeveranser += 1;
+        return { ...l, status: 'open', invoiceRecordId: null, priceSnapshot: null };
+      }
+      const skaOppnas = l.legacySource === HISTORIK_KALLA
+        && !l.invoiceRecordId
+        && l.status === 'invoiced'
+        && String(l.endDate ?? '') >= OPPEN_FAKTURERING_FRAN;
+      if (!skaOppnas) return l;
+      uppdateradeFastprisperioder += 1;
+      return {
+        ...l,
+        status: 'planned',
+        completedAt: null,
+        reviewNote: 'Fastpris som slutar efter 31 juli 2026. Kontrollera moms och markera leveransen klar när den ska faktureras.',
+      };
+    });
   const leveransIdn = new Set(befintligaLeveranser.map(l => l.id));
   const leveransSignaturer = new Set(befintligaLeveranser.map(fastprisSignatur));
   const nyaFastprisperioder = [];
   for (const project of lista(v1data?.projects)) {
+    // V1 kan bära både sessionPrice och gamla pricingPeriods. För ett
+    // tillfällesuppdrag är sessionPrice sanningskällan: varje pass räknas på
+    // sitt datum och någon periodiserad fastprispost ska inte skapas.
+    if (tillfallesProjekt.has(project.id)) continue;
     lista(project.pricingPeriods).forEach((period, index) => {
       const leverans = fastprisFranV1(project, period, index, nu);
       if (!leverans || leveransIdn.has(leverans.id)) return;
@@ -249,8 +261,10 @@ export function planeraHistorikimport(v1data, tillstand, { nu = new Date().toISO
       uppdateradeFastprisperioder,
       oppnadeUnderlag: referenserSomOppnas.size,
       oppnadeLeveranser,
+      borttagnaFelaktigaFastprisperioder: felaktigaTillfallesperioder.length,
       totalt: nyaPoster.length + uppdateradePoster + nyaFastprisperioder.length
-        + uppdateradeFastprisperioder + referenserSomOppnas.size + oppnadeLeveranser,
+        + uppdateradeFastprisperioder + referenserSomOppnas.size + oppnadeLeveranser
+        + felaktigaTillfallesperioder.length,
       gamlaFakturamarkeringar: nyaPoster.filter(p => p.legacyInvoiceMarked).length,
       kunder: nyttTillstand.clients.length - lista(tillstand?.clients).length,
       uppdrag: nyttTillstand.projects.length - lista(tillstand?.projects).length,

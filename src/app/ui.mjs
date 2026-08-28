@@ -462,9 +462,10 @@ function arkHistorik() {
     ${forslag.oppnadeLeveranser ? `<div class="uppfrad"><span>Låsta leveranser som öppnas</span><span class="v">${forslag.oppnadeLeveranser}</span></div>` : ''}
     ${forslag.fastprisperioder ? `<div class="uppfrad"><span>Fastprisperioder</span><span class="v">${forslag.fastprisperioder}</span></div>` : ''}
     ${forslag.uppdateradeFastprisperioder ? `<div class="uppfrad"><span>Fastprisperioder som öppnas igen</span><span class="v">${forslag.uppdateradeFastprisperioder}</span></div>` : ''}
+    ${forslag.borttagnaFelaktigaFastprisperioder ? `<div class="uppfrad"><span>Felaktiga fastprisperioder på tillfällesuppdrag som tas bort</span><span class="v">${forslag.borttagnaFelaktigaFastprisperioder}</span></div>` : ''}
     <div class="uppfrad"><span>Tidigare uppdrag</span><span class="v">${forslag.uppdrag}</span></div>
     <p class="notis">Gamla behandlingstillfällen räknas som ett pass per registrering och kan rättas i efterhand. Tid på fastprisuppdrag visas som historik; själva fastpriset fördelas över avtalets start- och slutdatum.</p>
-    <button class="primar" data-importerahistorik="1">Tillämpa gränsen 31 juli</button>
+    <button class="primar" data-importerahistorik="1">Tillämpa gränsen 31 juli och historikrättelser</button>
     <button class="avbryt" data-stang="knapp">Avbryt</button>`;
 
   const ogranskade = L.historikposterAttGranska(s);
@@ -674,7 +675,8 @@ function arkRedigeraUppdrag() {
   if (!p) return '<div class="tom">Uppdraget finns inte längre.</div>';
   const artiklar = (s.articles || []).filter(a => a.projectId === p.id);
   const prisartiklar = artiklar.filter(a => a.type !== 'trackingOnly' && a.billable !== false);
-  const leveranser = (s.deliverables || []).filter(l => l.projectId === p.id && (l.startDate || l.endDate));
+  const leveranser = (s.deliverables || []).filter(l => l.projectId === p.id
+    && L.arGiltigFastprispost(s, l) && (l.startDate || l.endDate));
   const valt = (nyckel, reserv) => ark[nyckel] ?? reserv;
   return `
     ${p.active === false ? `<div class="notis vilandenotis"><strong>Vilande uppdrag.</strong> Du kan granska och rätta priser, moms och fastprisperioder utan att aktivera uppdraget.</div>` : ''}
@@ -1304,12 +1306,16 @@ function uppdateraFranAndringsformular(id) {
 
 function importeraHelaHistoriken() {
   if (!historikForslag?.antal?.totalt) return visa('Det finns ingen saknad historik att lägga in.');
+  const borttagnaFelaktigaFastprisperioder =
+    historikForslag.antal.borttagnaFelaktigaFastprisperioder || 0;
   s = L.normaliseraTillstand(historikForslag.tillstand);
   const antal = historikForslag.antal.totalt;
   historikForslag = null;
   spara();
   ark = { typ: 'historik', manadsindex: 0 };
-  visa(`${antal} historikposter och fastprisperioder har fått rätt status vid gränsen 31 juli.`);
+  visa(borttagnaFelaktigaFastprisperioder
+    ? `Historiken är rättad. ${borttagnaFelaktigaFastprisperioder} felaktig fastprisperiod på ett tillfällesuppdrag har tagits bort.`
+    : `${antal} historikposter och fastprisperioder har fått rätt status vid gränsen 31 juli.`);
 }
 
 function sparaHistorikbeslut(varde) {
