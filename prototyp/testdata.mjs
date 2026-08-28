@@ -84,7 +84,7 @@ export function skapaTestdata(idag = new Date()) {
       // Kund A — granskad moms, går att fakturera
       { id: 'a-tillfalle', projectId: 'u-behandling', name: 'Behandlingstillfälle',
         type: 'session', unit: 'pass', unitPriceOre: 240000, vatRate: 0, vatStatus: 'reviewed',
-        billable: true, active: true, sortOrder: 10 },
+        workSecondsPerUnit: 10800, billable: true, active: true, sortOrder: 10 },
       { id: 'a-samtal', projectId: 'u-behandling', name: 'Samtal',
         type: 'hourly', unit: 'tim', unitPriceOre: 85000, vatRate: 2500, vatStatus: 'reviewed',
         billable: true, active: true, sortOrder: 20 },

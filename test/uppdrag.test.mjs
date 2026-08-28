@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import * as L from '../src/app/logik.mjs';
-import { franAppTillstand } from '../src/app/tillstand.mjs';
+import { franAppTillstand, tillAppTillstand } from '../src/app/tillstand.mjs';
 import { tidigareUppdragFranV1, aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag, uppdateraKund, uppdateraUppdrag }
   from '../src/app/uppdrag.mjs';
 
@@ -120,12 +120,16 @@ test('nytt timuppdrag får kund, artikel, pris, moms och valfri resa', () => {
 test('ny kund skapas tillsammans med uppdraget', () => {
   const ut = skapaNyttUppdrag(grund(), {
     clientId: 'ny', kundnamn: 'Ny kund', namn: 'Nytt uppdrag',
-    debitering: 'session', pris: '2400', vatRate: 0,
+    debitering: 'session', pris: '2400', vatRate: 0, arbetstidTimmar: '3',
     standardresaKm: '', resepris: '',
   });
   const p = ut.projects.find(x => x.name === 'Nytt uppdrag');
   assert.equal(ut.clients.find(c => c.id === p.clientId).name, 'Ny kund');
-  assert.equal(ut.articles.find(a => a.projectId === p.id).vatRate, 0);
+  const a = ut.articles.find(a => a.projectId === p.id);
+  assert.equal(a.vatRate, 0);
+  assert.equal(a.workSecondsPerUnit, 10800);
+  assert.equal(L.arbetstidSekunderForArtikel(a, L.MILLI), 10800);
+  assert.equal(L.arbetstidSekunderForArtikel(a, 2 * L.MILLI), 21600);
 });
 
 test('fastpris skapar uppföljningstid och en leverans över angiven period', () => {
@@ -152,6 +156,9 @@ test('ekonomiska uppgifter gissas aldrig för ett nytt uppdrag', () => {
   assert.throws(() => skapaNyttUppdrag(grund(), {
     clientId: 'k1', namn: 'Utan pris', debitering: 'session', pris: '', vatRate: 2500,
   }), /belopp/);
+  assert.throws(() => skapaNyttUppdrag(grund(), {
+    clientId: 'k1', namn: 'Utan arbetstid', debitering: 'session', pris: '2400', vatRate: 2500,
+  }), /Arbetstiden per tillfälle/);
   assert.throws(() => skapaNyttUppdrag(grund(), {
     clientId: 'k1', namn: 'Halv resa', debitering: 'hourly', pris: '850', vatRate: 2500,
     standardresaKm: '20', resepris: '',
@@ -230,6 +237,52 @@ test('ett låst fastpris kan inte rättas förrän underlaget flyttats tillbaka'
     leveranser: [{ id: 'l1', pris: '60000', vatRate: 2500, startDate: '2026-09-01', endDate: '2026-09-30' }],
   }), /Flytta tillbaka/);
   assert.equal(JSON.stringify(s), fore, 'indata får inte delvis ändras när valideringen stoppar');
+});
+
+test('arbetstid per tillfälle rättar öppna pass men ändrar inte fakturakvantiteten', () => {
+  const session = { ...artikel('a-pass', 'u1', 'session', 'pass'), unitPriceOre: 240000 };
+  const s = {
+    ...grund(),
+    articles: [...grund().articles, session],
+    poster: [
+      { id: 'oppet', projectId: 'u1', articleId: 'a-pass', date: '2026-08-20',
+        qtyMilli: 1000, seconds: null, status: 'open', invoiceRecordId: null },
+      { id: 'klart', projectId: 'u1', articleId: 'a-pass', date: '2026-07-20',
+        qtyMilli: 1000, seconds: 5400, status: 'handled', invoiceRecordId: null },
+    ],
+  };
+  const ut = uppdateraUppdrag(s, 'u1', {
+    name: 'Uppdrag A', clientId: 'k1', defaultTripKm: '',
+    artiklar: [{ id: 'a-pass', pris: '2400', vatRate: 2500, arbetstidTimmar: '3' }],
+    leveranser: [],
+  });
+  assert.equal(ut.articles.find(a => a.id === 'a-pass').workSecondsPerUnit, 10800);
+  assert.equal(ut.poster.find(p => p.id === 'oppet').seconds, 10800);
+  assert.equal(ut.poster.find(p => p.id === 'oppet').qtyMilli, 1000);
+  assert.equal(ut.poster.find(p => p.id === 'klart').seconds, 5400);
+  assert.equal(L.fakturerbartOre(ut, [ut.poster.find(p => p.id === 'oppet')]), 240000);
+});
+
+test('tid på fastpris kan få en anteckning utan att bli fakturerbar', () => {
+  const s = {
+    ...grund(),
+    articles: [...grund().articles, artikel('a-fasttid', 'u1', 'trackingOnly', 'tim')],
+    poster: [{ id: 'fasttid', projectId: 'u1', articleId: 'a-fasttid', sourceType: 'entry',
+      date: '2026-08-27', qtyMilli: 2000, seconds: 7200, status: 'open', invoiceRecordId: null }],
+  };
+  const ut = L.andraPost(s, 'fasttid', { qtyMilli: 3000, anteckning: 'Förberedelse inför verkstad' });
+  const p = ut.poster.find(x => x.id === 'fasttid');
+  assert.equal(p.seconds, 10800);
+  assert.equal(p.anteckning, 'Förberedelse inför verkstad');
+  assert.equal(L.kanIngaIFakturaunderlag(ut, p), false);
+  assert.equal(L.arbetadTidSekunder([p]), 10800);
+
+  const sparadFil = franAppTillstand(ut);
+  assert.equal(sparadFil.entries.find(x => x.id === 'fasttid').anteckning,
+    'Förberedelse inför verkstad');
+  const inlastIgen = tillAppTillstand(sparadFil).tillstand;
+  assert.equal(inlastIgen.poster.find(x => x.id === 'fasttid').anteckning,
+    'Förberedelse inför verkstad');
 });
 
 test('en registrering kan flyttas till rätt uppdrag och arbetstyp', () => {

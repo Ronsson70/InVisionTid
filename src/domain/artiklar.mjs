@@ -46,6 +46,7 @@ export function skapaArtikel(indata) {
     reviewNote = null,
     lundifyArticleId = null,
     lundifyArticleNumber = null,
+    workSecondsPerUnit = null,
   } = indata;
 
   if (!ARTIKELTYPER.includes(type)) {
@@ -60,6 +61,10 @@ export function skapaArtikel(indata) {
   if (vatRate !== null && !Number.isInteger(vatRate)) {
     throw new TypeError('Momssatsen anges i hundradels procent som heltal, 25 % = 2500.');
   }
+  if (workSecondsPerUnit !== null
+      && (type !== 'session' || !Number.isInteger(workSecondsPerUnit) || workSecondsPerUnit <= 0)) {
+    throw new TypeError('Arbetstid per tillfälle anges som ett positivt heltal sekunder på en tillfällesartikel.');
+  }
 
   return {
     id, projectId, name, type, unit,
@@ -68,6 +73,7 @@ export function skapaArtikel(indata) {
     billable, active, sortOrder,
     needsReview, reviewNote,
     lundifyArticleId, lundifyArticleNumber,
+    ...(workSecondsPerUnit !== null ? { workSecondsPerUnit } : {}),
   };
 }
 

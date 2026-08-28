@@ -16,11 +16,12 @@ import {
   arImporteradHistorik, historikBehoverGranskas, beslutaHistorikpost,
   aterstallHistorikbeslut, HISTORIK_FAKTURERA, HISTORIK_KLAR_I_LUNDIFY, HISTORIK_ENDAST,
 } from './historikimport.mjs';
+import { arbetstidSekunderForArtikel } from './uppdrag.mjs';
 
 export {
   DEBITERINGSTYPER, KUNDSTATUSAR, tidigareUppdragFranV1,
   aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag,
-  uppdateraKund, uppdateraUppdrag,
+  uppdateraKund, uppdateraUppdrag, arbetstidSekunderForArtikel,
 } from './uppdrag.mjs';
 
 export { harAvtalsperiod, periodKontroll, periodandelOre, arGenomford };
@@ -1027,7 +1028,10 @@ export function andraPost(s, id, andringar) {
     date,
     sourceType: befintligKalltyp,
     beskrivning: artikel.name,
-    seconds: artikel.unit === 'tim' ? Math.round(qtyMilli / MILLI * 3600) : null,
+    anteckning: Object.hasOwn(andringar, 'anteckning')
+      ? String(andringar.anteckning ?? '').trim() || null
+      : befintlig.anteckning ?? null,
+    seconds: arbetstidSekunderForArtikel(artikel, qtyMilli, { reserv: befintlig.seconds ?? null }),
     priceSnapshot: null,
   };
   return {

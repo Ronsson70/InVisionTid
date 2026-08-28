@@ -214,6 +214,9 @@ test('rendering: tidsarket erbjuder både snabbval och klockslag', () => {
   assert.match(html, /Hur länge\?/);
   assert.match(html, /data-timmar="1"/);
   assert.match(html, /type="time"/);
+  assert.match(html, /Anteckning, valfritt/);
+  assert.match(html, /data-falt="anteckning"/);
+  assert.match(html, /Verkstadsserie/, 'fastprisuppdrag kan väljas för tidsregistrering');
 });
 
 test('rendering: researket föreslår uppdragets standardavstånd', () => {
@@ -263,6 +266,8 @@ test('rendering: ett befintligt uppdrag kan få priser och villkor rättade', ()
   assert.match(html, /data-falt="uppdragsnamn"/);
   assert.match(html, /Timpris|Pris per tillfälle/);
   assert.match(html, /Pris per kilometer/);
+  assert.match(html, /Arbetstid per tillfälle/);
+  assert.match(html, /data-falt="artikelarbete_a-tillfalle"/);
   assert.match(html, /data-valjuppdragsmoms=/);
   assert.match(html, /Standardresa i kilometer/);
   assert.match(html, /data-sparauppdrag="u-behandling"/);
@@ -302,6 +307,18 @@ test('rendering: Nytt uppdrag frågar efter kund, namn och debitering', () => {
   assert.match(html, /Fast pris/);
   assert.match(html, /Endast tidsuppföljning/);
   assert.match(html, /Spara uppdraget/);
+
+  klicka({ valjdebitering: 'session' });
+  assert.match(html, /Arbetstid per tillfälle/);
+  assert.match(html, /data-falt="arbetstidTimmar"/);
+  assert.match(html, /Påverkar bara arbetad tid/);
+});
+
+test('rendering: tid på fastpris kan redigeras med anteckning', () => {
+  klicka({ post: 'p-4' });
+  assert.match(html, /Anteckning, valfritt/);
+  assert.match(html, /data-falt="anteckning"/);
+  assert.match(html, /data-sparaandring="p-4"/);
 });
 
 test('rendering: Leverans klar öppnar ett formulär, inte en platshållare', () => {

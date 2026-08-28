@@ -4,7 +4,7 @@
 // enbart kunden, uppdraget och dess artiklar till v2. Ingen arbetshistorik och
 // inga gamla fakturamarkeringar följer med.
 
-import { skapaArtikel, kronorTillOre, migreraTillV2 } from '../domain/index.mjs';
+import { skapaArtikel, kronorTillOre, migreraTillV2, MILLI } from '../domain/index.mjs';
 
 export const DEBITERINGSTYPER = Object.freeze([
   { id: 'hourly', etikett: 'Per timme' },
@@ -36,6 +36,26 @@ function heltal(varde, falt, { tillatTomt = false } = {}) {
   const tal = Number(text(varde).replace(',', '.'));
   if (!Number.isFinite(tal) || tal <= 0) throw new Error(`${falt} måste vara större än noll.`);
   return tal;
+}
+
+function arbetstidPerTillfalle(varde, { tillatTomt = false } = {}) {
+  if (tillatTomt && text(varde) === '') return null;
+  const timmar = Number(text(varde).replace(',', '.'));
+  if (!Number.isFinite(timmar) || timmar <= 0 || timmar > 24) {
+    throw new Error('Arbetstiden per tillfälle måste vara mellan 0 och 24 timmar.');
+  }
+  return Math.round(timmar * 3600);
+}
+
+/** En källa för hur fakturakvantitet blir arbetad tid. */
+export function arbetstidSekunderForArtikel(artikel, qtyMilli, { reserv = null } = {}) {
+  if (!artikel || !Number.isInteger(qtyMilli) || qtyMilli <= 0) return reserv;
+  if (artikel.unit === 'tim') return Math.round(qtyMilli / MILLI * 3600);
+  if (artikel.type === 'session' && Number.isInteger(artikel.workSecondsPerUnit)
+      && artikel.workSecondsPerUnit > 0) {
+    return Math.round(qtyMilli / MILLI * artikel.workSecondsPerUnit);
+  }
+  return reserv;
 }
 
 const uniktId = (prefix, lista) => {
@@ -104,9 +124,13 @@ export function uppdateraUppdrag(tillstand, projectId, indata) {
     if (a.type === 'trackingOnly' || a.billable === false) return a;
     const vatRate = Number(andring.vatRate);
     if (!GILTIGA_MOMSSATSER.includes(vatRate)) throw new Error(`Välj moms för ${a.name}.`);
+    const workSecondsPerUnit = a.type === 'session'
+      ? arbetstidPerTillfalle(andring.arbetstidTimmar, { tillatTomt: true })
+      : a.workSecondsPerUnit;
     return {
       ...a,
       unitPriceOre: pengarOre(andring.pris, `Priset för ${a.name}`),
+      ...(a.type === 'session' ? { workSecondsPerUnit } : {}),
       vatRate,
       vatStatus: 'reviewed',
       needsReview: false,
@@ -144,11 +168,20 @@ export function uppdateraUppdrag(tillstand, projectId, indata) {
     ? heltal(indata?.defaultTripKm, 'Standardresan', { tillatTomt: true })
     : befintligt.defaultTripKm ?? null;
 
+  const artiklarPerId = new Map(articles.map(a => [a.id, a]));
+  const poster = (tillstand.poster || []).map(p => {
+    const artikel = artiklarPerId.get(p.articleId);
+    if (p.invoiceRecordId || p.status !== 'open' || artikel?.type !== 'session'
+        || !artikel.workSecondsPerUnit) return p;
+    return { ...p, seconds: arbetstidSekunderForArtikel(artikel, p.qtyMilli, { reserv: p.seconds ?? null }) };
+  });
+
   return {
     ...tillstand,
     projects: (tillstand.projects || []).map(p => p.id === projectId
       ? { ...p, name, clientId, defaultTripKm } : p),
     articles,
+    poster,
     deliverables,
   };
 }
@@ -272,7 +305,8 @@ export function skapaNyttUppdrag(tillstand, indata) {
       type: 'hourly', unitPriceOre: pengarOre(indata?.pris, 'Timpriset'), sortOrder: 10 }));
   } else if (debitering === 'session') {
     articles.push(skapaArtikel({ ...gemensamt, id: `art-${projectId}-session`, name: 'Tillfälle',
-      type: 'session', unitPriceOre: pengarOre(indata?.pris, 'Priset per tillfälle'), sortOrder: 10 }));
+      type: 'session', unitPriceOre: pengarOre(indata?.pris, 'Priset per tillfälle'),
+      workSecondsPerUnit: arbetstidPerTillfalle(indata?.arbetstidTimmar), sortOrder: 10 }));
   } else {
     articles.push(skapaArtikel({ ...gemensamt, id: `art-${projectId}-trackingOnly`,
       name: debitering === 'internal' ? 'Internt arbete' : 'Nedlagd tid',

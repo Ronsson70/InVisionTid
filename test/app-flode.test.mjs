@@ -198,3 +198,54 @@ test('klickflöde: priser och en felregistrering kan rättas', async () => {
   assert.equal(rattad.date, '2026-08-20');
   assert.equal(rattad.seconds, 7200);
 });
+
+test('klickflöde: ett Sauna-pass ger 2 400 kr och tre arbetstimmar', async () => {
+  const sparade = [];
+  startaApp({
+    lagring: { async spara(s) { sparade.push(structuredClone(s)); } },
+    tillstand: skapaTestdata(),
+  });
+
+  klicka({ oppna: 'uppdrag' });
+  klicka({ redigerauppdrag: 'u-behandling' });
+  fyll('artikelarbete_a-tillfalle', '3');
+  klicka({ sparauppdrag: 'u-behandling' });
+  await tom();
+
+  klicka({ oppna: 'tillfalle' });
+  klicka({ valjuppdrag: 'u-behandling' });
+  klicka({ spara: '1' });
+  await tom();
+
+  const senast = sparade.at(-1);
+  const post = senast.poster.at(-1);
+  const artikel = senast.articles.find(a => a.id === post.articleId);
+  assert.equal(post.projectId, 'u-behandling');
+  assert.equal(post.qtyMilli, 1000, 'fakturakvantiteten är fortfarande ett pass');
+  assert.equal(post.seconds, 10800, 'ett pass räknas som tre arbetstimmar');
+  assert.equal(artikel.unitPriceOre, 240000, 'priset är fortfarande 2 400 kr');
+});
+
+test('klickflöde: fastprisarbete kan tidsloggas med anteckning utan fakturarad', async () => {
+  const sparade = [];
+  startaApp({
+    lagring: { async spara(s) { sparade.push(structuredClone(s)); } },
+    tillstand: skapaTestdata(),
+  });
+
+  klicka({ oppna: 'tid' });
+  klicka({ valjuppdrag: 'u-verkstad' });
+  klicka({ timmar: '3' });
+  fyll('anteckning', 'Förberedelse inför verkstad');
+  klicka({ spara: '1' });
+  await tom();
+
+  const senast = sparade.at(-1);
+  const post = senast.poster.at(-1);
+  const artikel = senast.articles.find(a => a.id === post.articleId);
+  assert.equal(post.projectId, 'u-verkstad');
+  assert.equal(post.seconds, 10800);
+  assert.equal(post.anteckning, 'Förberedelse inför verkstad');
+  assert.equal(artikel.type, 'trackingOnly');
+  assert.equal(artikel.billable, false);
+});

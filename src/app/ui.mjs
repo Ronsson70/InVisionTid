@@ -122,7 +122,7 @@ function postrad(p, { klickbar = true } = {}) {
     <span class="prick" style="background:${farg(p.projectId)}"></span>
     <span class="txt">
       <span class="namn">${esc(L.radrubrik(s, p))}</span>
-      <span class="under">${esc(historikkund)}${esc(mangd)}${last ? ' · klart i Lundify' : ''}${historiklage ? ' · ' + esc(historiklage) : ''}</span>
+      <span class="under">${p.anteckning ? `${esc(p.anteckning)} · ` : ''}${esc(historikkund)}${esc(mangd)}${last ? ' · klart i Lundify' : ''}${historiklage ? ' · ' + esc(historiklage) : ''}</span>
     </span>
     ${p.legacyReviewStatus === 'needsReview' || p.legacyReviewStatus === 'historyOnly'
       ? `<span class="ejfakt">${esc(historiklage)}</span>`
@@ -619,6 +619,11 @@ function arkNyttUppdrag() {
       <div class="faltrubrik">${esc(prisetikett)}</div>
       <input type="text" inputmode="decimal" data-falt="pris" value="${esc(ark.pris ?? '')}" placeholder="kronor">
 
+      ${debitering === 'session' ? `
+        <div class="faltrubrik">Arbetstid per tillfälle</div>
+        <input type="number" inputmode="decimal" step="0.5" data-falt="arbetstidTimmar" value="${esc(ark.arbetstidTimmar ?? '')}" placeholder="timmar, exempelvis 3">
+        <p class="notis">Påverkar bara arbetad tid. Fakturan är fortfarande ett tillfälle till avtalat pris.</p>` : ''}
+
       <div class="faltrubrik">Moms på arbete och eventuell resa</div>
       <div class="snabbval">${L.MOMSSATSER.map(m => `
         <button class="${ark.vatRate === m.sats ? 'vald' : ''}" data-valjnyvat="${m.sats}">${esc(m.etikett)}</button>`).join('')}</div>
@@ -669,6 +674,10 @@ function arkRedigeraUppdrag() {
       return `<div class="avskild">
         <div class="faltrubrik">${esc(artikelPrisrubrik(a))} exklusive moms</div>
         <input type="text" inputmode="decimal" data-falt="${esc(prisnyckel)}" value="${esc(valt(prisnyckel, prisvarde(a.unitPriceOre)))}">
+        ${a.type === 'session' ? `
+          <div class="faltrubrik">Arbetstid per tillfälle</div>
+          <input type="number" inputmode="decimal" step="0.5" data-falt="artikelarbete_${esc(a.id)}" value="${esc(valt(`artikelarbete_${a.id}`, a.workSecondsPerUnit ? a.workSecondsPerUnit / 3600 : ''))}" placeholder="timmar, exempelvis 3">
+          <p class="notis">Ett pass faktureras fortfarande som ett tillfälle. Här anger du hur många arbetstimmar det ska räknas som.</p>` : ''}
         <div class="faltrubrik">Moms – ${esc(a.name)}</div>
         <div class="snabbval">${L.MOMSSATSER.map(m => `
           <button class="${moms === m.sats ? 'vald' : ''}" data-valjuppdragsmoms="${esc(a.id)}|${m.sats}">${esc(m.etikett)}</button>`).join('')}</div>
@@ -789,7 +798,9 @@ function arkRegistrering() {
       <div class="tvakol">
         <input type="time" data-falt="start" value="${esc(ark.start ?? '')}" aria-label="Från">
         <input type="time" data-falt="slut" value="${esc(ark.slut ?? '')}" aria-label="Till">
-      </div>`;
+      </div>
+      <div class="faltrubrik">Anteckning, valfritt</div>
+      <input type="text" data-falt="anteckning" value="${esc(ark.anteckning ?? '')}" placeholder="Till exempel förberedelse eller möte">`;
   } else if (ark.typ === 'resa') {
     const std = L.uppdragFor(s, valt)?.defaultTripKm;
     mangdVal = `<div class="faltrubrik">Hur långt?</div>
@@ -859,6 +870,9 @@ function arkAndra() {
         ${esc(L.kundNamnForUppdrag(s, artikel.projectId))} · ${esc(L.uppdragFor(s, artikel.projectId)?.name ?? '')}
         <span class="kund">${esc(artikel.name)}</span>
       </button>`).join('')}</div>
+    ${['hourly', 'trackingOnly'].includes(a?.type) ? `
+      <div class="faltrubrik">Anteckning, valfritt</div>
+      <input type="text" data-falt="anteckning" value="${esc(p.anteckning ?? '')}" placeholder="Till exempel förberedelse eller möte">` : ''}
     <div class="faltrubrik">Antal ${esc(a?.unit ?? '')}</div>
     <input type="number" inputmode="decimal" step="0.5" data-falt="mangd" value="${esc(p.qtyMilli / L.MILLI)}">
     <div class="faltrubrik">Vilken dag?</div>
@@ -1174,6 +1188,9 @@ function sparaUppdrag(id) {
       id: a.id,
       pris: ark[`artikelpris_${a.id}`] ?? prisvarde(a.unitPriceOre),
       vatRate: ark[`artikelmoms_${a.id}`] ?? a.vatRate,
+      arbetstidTimmar: a.type === 'session'
+        ? ark[`artikelarbete_${a.id}`] ?? (a.workSecondsPerUnit ? a.workSecondsPerUnit / 3600 : '')
+        : null,
     }));
   const leveranser = (s.deliverables || [])
     .filter(l => l.projectId === id && (l.startDate || l.endDate))
@@ -1220,7 +1237,8 @@ function sparaNy() {
   s = L.laggTillPost(s, {
     id: L.nyttId(), projectId, articleId: artikel.id,
     date: ark.datum || idag(), beskrivning: artikel.name, qtyMilli: qty,
-    seconds: artikel.unit === 'tim' ? Math.round(qty / L.MILLI * 3600) : null,
+    anteckning: String(ark.anteckning ?? '').trim() || null,
+    seconds: L.arbetstidSekunderForArtikel(artikel, qty),
     sourceType: ark.typ === 'resa' ? 'trip' : 'entry',
     status: 'open', invoiceRecordId: null, priceSnapshot: null,
   });
@@ -1239,6 +1257,7 @@ function sparaAndring(id) {
     s = L.andraPost(s, id, {
       projectId: a.projectId, articleId: a.id,
       qtyMilli: qty, date: datum || p.date,
+      anteckning: document.querySelector('[data-falt="anteckning"]')?.value ?? p.anteckning ?? '',
     });
     spara(); ark = null; visa('Ändringen är sparad.');
   } catch (e) { visa(e.message); }
@@ -1258,6 +1277,7 @@ function uppdateraFranAndringsformular(id) {
     articleId: a.id,
     qtyMilli: qty,
     date: datumFalt?.value || p.date,
+    anteckning: document.querySelector('[data-falt="anteckning"]')?.value ?? p.anteckning ?? '',
   });
 }
 
