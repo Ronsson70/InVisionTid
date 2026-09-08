@@ -688,8 +688,12 @@ function nyArtikelBlock(p, artiklar) {
 
   const typ = lediga.some(t => t.id === ark.nyartikeltyp) ? ark.nyartikeltyp : null;
   if (!ark.nyartikel && !typ) {
+    // Full bredd och egen yta. Som understruken länk längst ned, efter alla
+    // kund- och momsknappar, var den i praktiken osynlig.
     return `<div class="avskild">
-      <button class="lankknapp" data-valjnyartikeltyp="oppna">+ Lägg till artikel</button>
+      <button class="sekundar" data-valjnyartikeltyp="oppna">+ Lägg till artikel</button>
+      <p class="notis">Till exempel samtal per timme på ett uppdrag som annars debiteras
+        per tillfälle. Uppdraget dyker då upp under rätt registreringsknapp.</p>
     </div>`;
   }
 
