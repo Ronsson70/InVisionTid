@@ -13,6 +13,18 @@ export const DEBITERINGSTYPER = Object.freeze([
   { id: 'internal', etikett: 'Endast tidsuppföljning' },
 ]);
 
+/**
+ * Artikeltyper som går att lägga till på ett uppdrag i efterhand.
+ *
+ * Bara typer som har en registreringsknapp i appen. Att kunna skapa en artikel
+ * som ingenting kan registreras på vore en återvändsgränd.
+ */
+export const ARTIKELTYPER_ATT_VALJA = Object.freeze([
+  { id: 'hourly', etikett: 'Per timme', standardnamn: 'Arbetad tid', prisrubrik: 'Timpris', sortOrder: 10 },
+  { id: 'session', etikett: 'Per tillfälle', standardnamn: 'Tillfälle', prisrubrik: 'Pris per tillfälle', sortOrder: 10 },
+  { id: 'travel', etikett: 'Per kilometer', standardnamn: 'Resa', prisrubrik: 'Pris per kilometer', sortOrder: 90 },
+]);
+
 export const KUNDSTATUSAR = Object.freeze([
   { id: 'active', etikett: 'Aktiv' },
   { id: 'paused', etikett: 'Vilande' },
@@ -345,5 +357,68 @@ export function skapaNyttUppdrag(tillstand, indata) {
     projects: [...(tillstand.projects || []), project],
     articles: [...(tillstand.articles || []), ...articles],
     deliverables,
+  };
+}
+
+/**
+ * Lägger till en artikel på ett uppdrag som redan finns.
+ *
+ * Priset sitter på artikeln och inte på uppdraget, men artiklarna skapades bara
+ * när uppdraget skapades. Ett uppdrag som visar sig ha två prissatta delar, till
+ * exempel behandlingspass per tillfälle och samtal per timme, gick därför inte
+ * att beskriva färdigt. Registreringsknappen Tid letar efter en timartikel, så
+ * uppdraget syntes inte där alls.
+ *
+ * En artikel per typ och uppdrag. artikelForUppdrag() tar den första aktiva av
+ * rätt typ, så en andra artikel av samma typ skulle tyst göra valet åt
+ * användaren. Priset på en befintlig artikel rättas i stället med
+ * uppdateraUppdrag().
+ */
+export function laggTillArtikel(tillstand, projectId, indata) {
+  const project = (tillstand.projects || []).find(p => p.id === projectId);
+  if (!project) throw new Error('Uppdraget finns inte längre.');
+  if (project.kind === 'internal') {
+    throw new Error('Ett internt uppdrag följs bara upp med tid och har inga priser.');
+  }
+
+  const mall = ARTIKELTYPER_ATT_VALJA.find(t => t.id === text(indata?.type));
+  if (!mall) throw new Error('Välj vad artikeln ska räknas som.');
+
+  const befintliga = (tillstand.articles || []).filter(a => a.projectId === projectId);
+  if (befintliga.some(a => a.type === mall.id && a.active)) {
+    throw new Error(`Uppdraget har redan en artikel som räknas ${mall.etikett.toLowerCase()}. `
+      + 'Rätta priset på den i stället.');
+  }
+
+  const vatRate = indata?.vatRate === null || indata?.vatRate === undefined || indata?.vatRate === ''
+    ? null : Number(indata.vatRate);
+  if (![0, 600, 1200, 2500].includes(vatRate)) throw new Error('Välj momssats.');
+
+  const artikel = skapaArtikel({
+    id: uniktId('art', tillstand.articles || []),
+    projectId,
+    name: text(indata?.namn) || mall.standardnamn,
+    type: mall.id,
+    unitPriceOre: pengarOre(indata?.pris, mall.prisrubrik),
+    vatRate,
+    vatStatus: 'reviewed',
+    needsReview: false,
+    sortOrder: mall.sortOrder,
+    workSecondsPerUnit: mall.id === 'session'
+      ? arbetstidPerTillfalle(indata?.arbetstidTimmar, { tillatTomt: true })
+      : null,
+  });
+
+  // Resformulärets snabbval bygger på uppdragets standardresa, inte på artikeln.
+  // Den får därför sättas samtidigt, men bara när den saknas sedan tidigare.
+  const standardresaKm = mall.id === 'travel' && project.defaultTripKm == null
+    ? heltal(indata?.standardresaKm, 'Standardresan', { tillatTomt: true })
+    : null;
+
+  return {
+    ...tillstand,
+    projects: standardresaKm === null ? tillstand.projects
+      : tillstand.projects.map(p => p.id === projectId ? { ...p, defaultTripKm: standardresaKm } : p),
+    articles: [...(tillstand.articles || []), artikel],
   };
 }

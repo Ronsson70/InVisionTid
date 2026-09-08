@@ -670,6 +670,53 @@ const artikelPrisrubrik = a => a.type === 'hourly' ? 'Timpris'
     : a.type === 'travel' ? 'Pris per kilometer'
       : a.type === 'piece' ? 'Pris per styck' : a.name;
 
+/**
+ * Lägg till en artikel på ett uppdrag som redan finns.
+ *
+ * Ett uppdrag kan visa sig ha två prissatta delar, till exempel behandlingspass
+ * per tillfälle och samtal per timme. Priset sitter på artikeln, men det fanns
+ * ingen väg att skapa en artikel i efterhand, så uppdraget kunde inte beskrivas
+ * färdigt och syntes inte under rätt registreringsknapp.
+ *
+ * Visas bara för de typer uppdraget saknar. Har det redan en av varje slag finns
+ * ingenting att lägga till, och då visas ingen knapp.
+ */
+function nyArtikelBlock(p, artiklar) {
+  if (p.kind === 'internal') return '';
+  const lediga = L.ARTIKELTYPER_ATT_VALJA.filter(t => !artiklar.some(a => a.type === t.id && a.active));
+  if (!lediga.length) return '';
+
+  const typ = lediga.some(t => t.id === ark.nyartikeltyp) ? ark.nyartikeltyp : null;
+  if (!ark.nyartikel && !typ) {
+    return `<div class="avskild">
+      <button class="lankknapp" data-valjnyartikeltyp="oppna">+ Lägg till artikel</button>
+    </div>`;
+  }
+
+  const vald = lediga.find(t => t.id === typ) || null;
+  const moms = ark.nyartikelmoms ?? null;
+  return `<div class="avskild">
+    <div class="faltrubrik">Vad ska den nya artikeln räknas som?</div>
+    <div class="val">${lediga.map(t => `
+      <button class="${typ === t.id ? 'vald' : ''}" data-valjnyartikeltyp="${esc(t.id)}">${esc(t.etikett)}</button>`).join('')}</div>
+    ${vald ? `
+      <div class="faltrubrik">Vad heter artikeln?</div>
+      <input type="text" data-falt="nyartikelnamn" value="${esc(ark.nyartikelnamn ?? vald.standardnamn)}">
+      <div class="faltrubrik">${esc(vald.prisrubrik)} exklusive moms</div>
+      <input type="text" inputmode="decimal" data-falt="nyartikelpris" value="${esc(ark.nyartikelpris ?? '')}">
+      ${typ === 'session' ? `
+        <div class="faltrubrik">Arbetstid per tillfälle, valfritt</div>
+        <input type="number" inputmode="decimal" step="0.5" data-falt="nyartikelarbete" value="${esc(ark.nyartikelarbete ?? '')}" placeholder="timmar, exempelvis 3">` : ''}
+      ${typ === 'travel' && p.defaultTripKm == null ? `
+        <div class="faltrubrik">Standardresa i kilometer, valfritt</div>
+        <input type="number" inputmode="decimal" data-falt="nyartikelresa" value="${esc(ark.nyartikelresa ?? '')}">` : ''}
+      <div class="faltrubrik">Moms</div>
+      <div class="snabbval">${L.MOMSSATSER.map(m => `
+        <button class="${moms === m.sats ? 'vald' : ''}" data-valjnyartikelmoms="${m.sats}">${esc(m.etikett)}</button>`).join('')}</div>
+      <button class="spara" data-sparanyartikel="${esc(p.id)}">Lägg till artikeln</button>` : ''}
+  </div>`;
+}
+
 function arkRedigeraUppdrag() {
   const p = L.uppdragFor(s, ark.projectId);
   if (!p) return '<div class="tom">Uppdraget finns inte längre.</div>';
@@ -703,6 +750,8 @@ function arkRedigeraUppdrag() {
           <button class="${moms === m.sats ? 'vald' : ''}" data-valjuppdragsmoms="${esc(a.id)}|${m.sats}">${esc(m.etikett)}</button>`).join('')}</div>
       </div>`;
     }).join('')}
+
+    ${nyArtikelBlock(p, artiklar)}
 
     ${artiklar.some(a => a.type === 'travel') ? `
       <div class="faltrubrik">Standardresa i kilometer</div>
@@ -1020,6 +1069,7 @@ const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara',
   'sparaleveransdatum', 'angragenomford', 'aktiverauppdrag', 'valjkund',
   'aktiverabefintligt',
   'valjdebitering', 'valjnyvat', 'sparanyttuppdrag', 'sparaveckomal',
+  'valjnyartikeltyp', 'valjnyartikelmoms', 'sparanyartikel',
   'tabortveckomal', 'sparamanadsmal', 'tabortmanadsmal', 'manad',
   'redigerakund', 'valjkundstatus', 'sparakund',
   'redigerauppdrag', 'sparauppdrag', 'valjuppdragsmoms', 'valjleveransmoms',
@@ -1099,6 +1149,13 @@ document.addEventListener('click', e => {
     ark[`leveransmoms_${id}`] = Number(sats);
     return rita();
   }
+  if (d.valjnyartikeltyp) {
+    if (d.valjnyartikeltyp === 'oppna') ark.nyartikel = true;
+    else { ark.nyartikeltyp = d.valjnyartikeltyp; ark.nyartikelnamn = undefined; ark.nyartikelpris = ''; }
+    return rita();
+  }
+  if (d.valjnyartikelmoms !== undefined) { ark.nyartikelmoms = Number(d.valjnyartikelmoms); return rita(); }
+  if (d.sparanyartikel) return sparaNyArtikel(d.sparanyartikel);
   if (d.sparauppdrag) return sparaUppdrag(d.sparauppdrag);
   if (d.valjkundstatus) { ark.status = d.valjkundstatus; return rita(); }
   if (d.sparakund) return sparaKund(d.sparakund);
@@ -1199,6 +1256,23 @@ function sparaKund(id) {
     s = L.uppdateraKund(s, id, ark);
     spara(); ark = { typ: 'kunder' };
     visa('Kunduppgifterna är sparade.');
+  } catch (e) { visa(e.message); }
+}
+
+function sparaNyArtikel(id) {
+  try {
+    s = L.laggTillArtikel(s, id, {
+      type: ark.nyartikeltyp,
+      namn: ark.nyartikelnamn,
+      pris: ark.nyartikelpris,
+      vatRate: ark.nyartikelmoms,
+      arbetstidTimmar: ark.nyartikelarbete,
+      standardresaKm: ark.nyartikelresa,
+    });
+    spara();
+    const p = L.uppdragFor(s, id);
+    ark = { typ: 'redigerauppdrag', projectId: id, clientId: p.clientId, uppdragsnamn: p.name };
+    visa('Artikeln är tillagd.');
   } catch (e) { visa(e.message); }
 }
 

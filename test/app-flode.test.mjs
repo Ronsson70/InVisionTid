@@ -325,3 +325,58 @@ test('klickflöde: fastprisarbete kan tidsloggas med anteckning utan fakturarad'
   assert.equal(artikel.type, 'trackingOnly');
   assert.equal(artikel.billable, false);
 });
+
+// Det verkliga felet: Sauna hade bara en tillfällesartikel, och eftersom
+// registreringsknappen Tid letar efter artiklar av typen hourly saknades
+// uppdraget där helt. Hela vägen genom gränssnittet, från knapp till sparat
+// tillstånd till att uppdraget dyker upp under Tid.
+test('klickflöde: ett tillfällesuppdrag kan få en timartikel och syns sedan under Tid', async () => {
+  const sparade = [];
+  const lagring = { async spara(s) { sparade.push(structuredClone(s)); } };
+  startaApp({ lagring, tillstand: skapaTestdata(), tidigareUppdrag: [] });
+
+  klicka({ oppna: 'mer' });
+  klicka({ oppna: 'uppdrag' });
+  klicka({ oppna: 'nyttuppdrag' });
+  klicka({ valjkund: 'k-a' });
+  fyll('namn', 'Passuppdrag');
+  klicka({ valjdebitering: 'session' });
+  fyll('pris', '2400');
+  fyll('arbetstidTimmar', '3');
+  klicka({ valjnyvat: '0' });
+  klicka({ sparanyttuppdrag: '1' });
+  await tom();
+
+  const projectId = sparade.at(-1).projects.find(p => p.name === 'Passuppdrag').id;
+  const artiklarFore = sparade.at(-1).articles.filter(a => a.projectId === projectId);
+  assert.deepEqual(artiklarFore.map(a => a.type), ['session']);
+
+  // Uppdraget går ännu inte att välja under Tid.
+  klicka({ oppna: 'tid' });
+  assert.ok(!/Passuppdrag/.test(html));
+  klicka({ stang: 'knapp' });
+
+  klicka({ oppna: 'mer' });
+  klicka({ oppna: 'uppdrag' });
+  klicka({ redigerauppdrag: projectId });
+  assert.match(html, /Lägg till artikel/);
+
+  klicka({ valjnyartikeltyp: 'oppna' });
+  klicka({ valjnyartikeltyp: 'hourly' });
+  fyll('nyartikelnamn', 'Samtal');
+  fyll('nyartikelpris', '850');
+  klicka({ valjnyartikelmoms: '2500' });
+  klicka({ sparanyartikel: projectId });
+  await tom();
+
+  const ny = sparade.at(-1).articles.find(a => a.projectId === projectId && a.type === 'hourly');
+  assert.equal(ny.name, 'Samtal');
+  assert.equal(ny.unitPriceOre, 85000);
+  assert.equal(ny.vatRate, 2500);
+  // Passen är orörda och fortfarande momsfria.
+  assert.equal(sparade.at(-1).articles.find(a => a.projectId === projectId && a.type === 'session').vatRate, 0);
+
+  // Och nu går uppdraget att välja under Tid.
+  klicka({ oppna: 'tid' });
+  assert.match(html, /Passuppdrag/);
+});

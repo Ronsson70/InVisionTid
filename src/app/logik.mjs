@@ -19,9 +19,9 @@ import {
 import { arbetstidSekunderForArtikel } from './uppdrag.mjs';
 
 export {
-  DEBITERINGSTYPER, KUNDSTATUSAR, tidigareUppdragFranV1,
+  DEBITERINGSTYPER, KUNDSTATUSAR, ARTIKELTYPER_ATT_VALJA, tidigareUppdragFranV1,
   aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag,
-  uppdateraKund, uppdateraUppdrag, arbetstidSekunderForArtikel,
+  uppdateraKund, uppdateraUppdrag, laggTillArtikel, arbetstidSekunderForArtikel,
 } from './uppdrag.mjs';
 
 export { harAvtalsperiod, periodKontroll, periodandelOre, arGenomford };

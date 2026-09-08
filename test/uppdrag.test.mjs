@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import * as L from '../src/app/logik.mjs';
 import { franAppTillstand, tillAppTillstand } from '../src/app/tillstand.mjs';
-import { tidigareUppdragFranV1, aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag, uppdateraKund, uppdateraUppdrag }
+import { tidigareUppdragFranV1, aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag, uppdateraKund, uppdateraUppdrag, laggTillArtikel }
   from '../src/app/uppdrag.mjs';
 
 const artikel = (id, projectId, type, unit) => ({
@@ -319,4 +319,98 @@ test('en registrering kan inte byta huvudtyp eller ändras när den är låst', 
   assert.throws(() => L.andraPost(s, 'fel', { projectId: 'u1', articleId: 'a-resa' }), /huvudtyp/);
   const last = { ...s, poster: [{ ...s.poster[0], invoiceRecordId: 'und-1' }] };
   assert.throws(() => L.andraPost(last, 'fel', { qtyMilli: 2000 }), /överfört/);
+});
+
+// ── Lägga till en artikel på ett uppdrag som redan finns ────────────────────
+// Sauna HVB hade bara en tillfällesartikel, men uppdraget har i verkligheten
+// också samtal per timme. Utan timartikel plockade registreringsknappen Tid
+// bort uppdraget helt, eftersom den letar efter artiklar av typen hourly.
+
+const saunalikt = () => ({
+  clients: [{ id: 'k1', name: 'Sauna Behandlingshem HVB' }],
+  projects: [{ id: 'u1', clientId: 'k1', name: 'Sauna HVB', kind: 'billable', active: true, defaultTripKm: 23 }],
+  articles: [
+    { id: 'a-pass', projectId: 'u1', type: 'session', unit: 'st', name: 'Tillfälle', active: true,
+      unitPriceOre: 240000, vatRate: 0, vatStatus: 'reviewed', billable: true, workSecondsPerUnit: 10800 },
+    { id: 'a-resa', projectId: 'u1', type: 'travel', unit: 'km', name: 'Resa', active: true,
+      unitPriceOre: 550, vatRate: 2500, vatStatus: 'reviewed', billable: true },
+  ],
+  poster: [], deliverables: [], invoiceRecords: [], expenses: [], trips: [], entries: [],
+});
+
+test('ett uppdrag med tillfällespris kan få en timartikel i efterhand', () => {
+  const s = laggTillArtikel(saunalikt(), 'u1',
+    { type: 'hourly', namn: 'Samtal', pris: '850', vatRate: 2500 });
+
+  const ny = s.articles.find(a => a.type === 'hourly');
+  assert.equal(ny.name, 'Samtal');
+  assert.equal(ny.unitPriceOre, 85000);
+  assert.equal(ny.vatRate, 2500);
+  assert.equal(ny.billable, true);
+  assert.equal(ny.active, true);
+  // Tillfällesartikeln är orörd. Passen faktureras fortfarande momsfritt.
+  assert.equal(s.articles.find(a => a.type === 'session').vatRate, 0);
+  assert.equal(s.articles.length, 3);
+});
+
+test('uppdraget syns under Tid först när det har en timartikel', () => {
+  const fore = saunalikt();
+  assert.equal(L.artikelForUppdrag(fore, 'u1', 'hourly'), null);
+
+  const efter = laggTillArtikel(fore, 'u1', { type: 'hourly', pris: '850', vatRate: 2500 });
+  assert.equal(L.artikelForUppdrag(efter, 'u1', 'hourly').name, 'Arbetad tid');
+});
+
+test('samma artikeltyp kan inte läggas till två gånger', () => {
+  assert.throws(() => laggTillArtikel(saunalikt(), 'u1', { type: 'travel', pris: '5,50', vatRate: 2500 }),
+    /redan en artikel/);
+});
+
+test('momssatsen måste väljas uttryckligen', () => {
+  assert.throws(() => laggTillArtikel(saunalikt(), 'u1', { type: 'hourly', pris: '850' }), /momssats/i);
+  assert.throws(() => laggTillArtikel(saunalikt(), 'u1',
+    { type: 'hourly', pris: '850', vatRate: 1000 }), /momssats/i);
+});
+
+test('priset måste vara ett belopp större än noll', () => {
+  assert.throws(() => laggTillArtikel(saunalikt(), 'u1', { type: 'hourly', pris: '', vatRate: 2500 }), /belopp/);
+  assert.throws(() => laggTillArtikel(saunalikt(), 'u1', { type: 'hourly', pris: '0', vatRate: 2500 }), /noll/);
+});
+
+test('okänd artikeltyp och okänt uppdrag avvisas', () => {
+  assert.throws(() => laggTillArtikel(saunalikt(), 'u1', { type: 'piece', pris: '350', vatRate: 2500 }),
+    /Välj vad artikeln/);
+  assert.throws(() => laggTillArtikel(saunalikt(), 'saknas', { type: 'hourly', pris: '850', vatRate: 2500 }),
+    /finns inte längre/);
+});
+
+test('ett internt uppdrag får inga priser', () => {
+  const s = saunalikt();
+  s.projects[0].kind = 'internal';
+  assert.throws(() => laggTillArtikel(s, 'u1', { type: 'hourly', pris: '850', vatRate: 2500 }), /internt uppdrag/);
+});
+
+test('en researtikel kan sätta standardresan när uppdraget saknar den', () => {
+  const utan = saunalikt();
+  utan.articles = utan.articles.filter(a => a.type !== 'travel');
+  utan.projects[0].defaultTripKm = null;
+
+  const s = laggTillArtikel(utan, 'u1',
+    { type: 'travel', pris: '5,50', vatRate: 2500, standardresaKm: '23' });
+  assert.equal(s.projects[0].defaultTripKm, 23);
+  assert.equal(s.articles.find(a => a.type === 'travel').unitPriceOre, 550);
+});
+
+test('arbetstid per tillfälle är valfri på en ny tillfällesartikel', () => {
+  const utan = saunalikt();
+  utan.articles = utan.articles.filter(a => a.type !== 'session');
+
+  // skapaArtikel utelämnar fältet helt när ingen arbetstid angetts, i stället
+  // för att spara null. Ingen arbetstid och noll timmar ska inte se lika ut.
+  const tom = laggTillArtikel(utan, 'u1', { type: 'session', pris: '2400', vatRate: 0 });
+  assert.equal('workSecondsPerUnit' in tom.articles.find(a => a.type === 'session'), false);
+
+  const med = laggTillArtikel(utan, 'u1',
+    { type: 'session', pris: '2400', vatRate: 0, arbetstidTimmar: '3' });
+  assert.equal(med.articles.find(a => a.type === 'session').workSecondsPerUnit, 10800);
 });
