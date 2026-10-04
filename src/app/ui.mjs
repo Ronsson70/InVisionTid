@@ -1056,14 +1056,14 @@ function arkUnderlag() {
       ${L.fakturarader(s, u).map(rad => `<div class="ulrad">
         <div class="ulnamn">${esc(rad.beskrivning)}</div>
         <div class="ulunder">${esc(L.kvantitetTillText(rad.qtyMilli, rad.unit))} · ${esc(L.exaktBelopp(rad.unitPriceOre))} per ${esc(rad.unit)} · moms ${esc(L.momsText(rad.vatRate))}</div>
-        <div class="ulbelopp">${esc(kr(rad.nettoOre))}</div>
+        <div class="ulbelopp">${esc(L.exaktBelopp(rad.nettoOre))}</div>
       </div>`).join('')}
     </div>
     <div class="beloppblock">
-      <div class="brad"><span>Exklusive moms</span><span>${esc(kr(u.nettoOre))}</span></div>
-      <div class="brad"><span>Moms</span><span>${esc(kr(u.momsOre))}</span></div>
-      ${u.avrundningOre ? `<div class="brad"><span>Öresavrundning</span><span>${esc(kr(u.avrundningOre))}</span></div>` : ''}
-      <div class="brad stark"><span>Inklusive moms</span><span>${esc(kr(u.attBetalaOre))}</span></div>
+      <div class="brad"><span>Exklusive moms</span><span>${esc(L.exaktBelopp(u.nettoOre))}</span></div>
+      <div class="brad"><span>Moms</span><span>${esc(L.exaktBelopp(u.momsOre))}</span></div>
+      ${u.avrundningOre ? `<div class="brad"><span>Öresavrundning</span><span>${esc(L.exaktBelopp(u.avrundningOre))}</span></div>` : ''}
+      <div class="brad stark"><span>Inklusive moms</span><span>${esc(L.exaktBelopp(u.attBetalaOre))}</span></div>
     </div>
     <button class="primar" data-kopiera="1">${kopierat ? 'Kopierat' : 'Kopiera underlaget'}</button>
     <p class="notis forklaring">${esc(L.OVERFORINGSBESKED)}</p>

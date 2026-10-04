@@ -12,6 +12,8 @@ Genomförda efter godkänd granskning i oktober 2026.
 - En planerad delbetalnings faktureringsdatum visas före klarmarkering.
 - Uppföljning och radbelopp använder ett befintligt prissnapshot, så en
   prisrättning inte räknar om redan låsta poster.
+- Underlagets skärmvy visar exakta ören i rader, moms och avrundning,
+  precis som texten som kopieras till Lundify.
 
 Företagsval, priser och delbetalningar i verkliga uppdrag sparas endast i
 användarens OneDrive. Privata data och ändringsskript får inte committas.

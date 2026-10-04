@@ -53,6 +53,19 @@ test('företagsfilter döljer inte äldre underlag och avslutade underlag ligger
   lyssnare.change({ target: { dataset: { filter: 'manad' }, value: '' } });
 });
 
+test('underlagets skärmvy behåller ören i rader, summor och avrundning', () => {
+  const s = skapaTestdata();
+  s.poster = s.poster.filter(p => p.id === 'p-2').map(p => ({ ...p, status: 'included', invoiceRecordId: 'exakt-underlag' }));
+  s.invoiceRecords = [{ id: 'exakt-underlag', clientId: 'k-a', period: s.poster[0].date.slice(0, 7) }];
+  startaApp({ lagring: { async spara() { throw new Error('Läsning ska inte skriva'); } }, tillstand: s });
+  klicka({ sparatunderlag: 'exakt-underlag' });
+  assert.match(html, /126,50 kr/);
+  assert.match(html, /Moms<\/span><span>31,63 kr/);
+  assert.match(html, /Öresavrundning<\/span><span>−0,13 kr/);
+  assert.match(html, /Inklusive moms<\/span><span>158 kr/);
+  klicka({ stang: 'knapp' });
+});
+
 test('klickflöde: nytt uppdrag och ny registrering blir sparbara', async () => {
   const sparade = [];
   const lagring = { async spara(s) { sparade.push(structuredClone(s)); } };
