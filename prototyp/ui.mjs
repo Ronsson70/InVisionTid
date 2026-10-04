@@ -7,7 +7,7 @@
 import { startaApp } from '../src/app/ui.mjs';
 import { skapaTestdata } from './testdata.mjs';
 
-const NYCKEL = 'invisiontid-prototyp-5a';
+const NYCKEL = 'invisiontid-mobil-underlag-preview';
 
 /** Lagring i webbläsaren. Produktionsnyckeln invisiontid-data rörs aldrig. */
 const minneslagring = {
@@ -19,17 +19,23 @@ const minneslagring = {
     return null;
   },
   async spara(tillstand) {
-    try { localStorage.setItem(NYCKEL, JSON.stringify(tillstand)); } catch { /* testversion */ }
+    localStorage.setItem(NYCKEL, JSON.stringify(tillstand));
   },
 };
 
 startaApp({
   lagring: minneslagring,
-  tillstand: minneslagring.las() ?? skapaTestdata(),
+  tillstand: minneslagring.las() ?? demo(),
   banner: 'Testversion med påhittade data. Ingen koppling till OneDrive eller Lundify.',
   tillaterAterstallning: true,
   aterstall: () => {
     try { localStorage.removeItem(NYCKEL); } catch { /* ignoreras */ }
-    return skapaTestdata();
+    return demo();
   },
 });
+
+function demo() {
+  const data = skapaTestdata();
+  data.projects = data.projects.map(p => ({ ...p, billingCompany: p.id === 'u-lektioner' ? 'Järvsö IK Event AB' : 'In Vision Järvsö AB' }));
+  return data;
+}

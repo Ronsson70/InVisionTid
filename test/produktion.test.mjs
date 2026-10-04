@@ -371,6 +371,39 @@ test('sparning gör backup, skriver och läser tillbaka', async () => {
   assert.deepEqual(sparad.entries.map(e => e.id), ['ny']);
 });
 
+test('nya företagsfält, privat kvitto och månadsnotering överlever OneDrive-adaptern', async () => {
+  const { skapaOneDriveLagring } = await import('../src/app/lagring-onedrive.mjs');
+  const ursprung = JSON.stringify(tomV2({
+    clients: [{ id: 'kund', name: 'Kund A' }],
+    projects: [{ id: 'uppdrag', clientId: 'kund', name: 'Service', kind: 'billable', billingCompany: L.FORETAG[1] }],
+  }));
+  const fetch = stubbGraph({ [V2_SOKVAG]: ursprung });
+  const lagring = skapaOneDriveLagring({ token: 'T', hamta: fetch, nu: () => NU });
+  let s = await lagring.las();
+  s = L.registreraUtlagg(s, { projectId: 'uppdrag', gross: '407', receiptVat: '2500', invoiceVat: '2500', paidBy: 'private', date: '2026-09-30', description: 'Material', receiptImage: 'data:image/jpeg;base64,dGVzdA==' }, 'kvitto-test');
+  s.poster[0].performedBy = 'Utförare A';
+  s.poster[0].consultedWith = 'Kontakt A';
+  s = L.sattManadskontroll(s, L.FORETAG[1], '2026-09', 'Väntar på underlag');
+  const result = L.forberedUnderlag(s, L.underlagsgrupper(s)[0].id);
+  assert.equal(result.ok, true);
+  s = { ...s, poster: result.poster, deliverables: result.leveranser,
+    invoiceRecords: [{ id: result.underlag.id, clientId: 'kund', period: '2026-09', billingCompany: L.FORETAG[1], status: 'prepared' }] };
+  await lagring.spara(s);
+  // En ny adapter motsvarar en annan enhet som öppnar den sparade filen.
+  const nyLagring = skapaOneDriveLagring({ token: 'T', hamta: fetch, nu: () => NU });
+  const tillbaka = await nyLagring.las();
+  assert.equal(tillbaka.projects[0].billingCompany, L.FORETAG[1]);
+  assert.equal(tillbaka.poster[0].paidBy, 'private');
+  assert.equal(tillbaka.poster[0].receiptVatOre, 8140);
+  assert.equal(tillbaka.poster[0].receiptImage, s.poster[0].receiptImage);
+  assert.equal(tillbaka.installningar.manadskontroll[`${L.FORETAG[1]}|2026-09`], 'Väntar på underlag');
+  const underlag = L.hamtaSparatUnderlag(tillbaka, result.underlag.id);
+  assert.equal(underlag.billingCompany, L.FORETAG[1]);
+  assert.equal(underlag.nettoOre, 32560);
+  assert.match(L.lundifyText(tillbaka, underlag), /samråd med Kontakt A/);
+  assert.equal(fetch.lager[backupSokvag('v2', NU)], ursprung);
+});
+
 // ── En enda tillståndsmodell ────────────────────────────────────────────────
 
 test('klarmarkeradAt är enda sanningskällan', () => {

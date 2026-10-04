@@ -59,6 +59,7 @@ test('klickflöde: nytt uppdrag och ny registrering blir sparbara', async () => 
   // Den registrering som fällde liveversionen måste bära sin källtyp redan
   // innan lagringen anropas.
   klicka({ oppna: 'tillfalle' });
+  fyll('anteckning', 'Tema: återfallsprocessen');
   klicka({ spara: '1' });
   await tom();
   const ny = sparade.at(-1).poster.at(-1);
@@ -290,6 +291,7 @@ test('klickflöde: ett Sauna-pass ger 2 400 kr och tre arbetstimmar', async () =
 
   klicka({ oppna: 'tillfalle' });
   klicka({ valjuppdrag: 'u-behandling' });
+  fyll('anteckning', 'Tema: sinnesro');
   klicka({ spara: '1' });
   await tom();
 

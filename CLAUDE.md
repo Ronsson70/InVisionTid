@@ -1,106 +1,49 @@
-# CLAUDE.md
+# InVisionTid – kodinstruktioner
 
-Det här repo:t är en personlig single-file PWA för tidsregistrering.
+## Aktuell arkitektur
 
-## Projektöversikt
-- Huvudfil: `index.html`
-- Testfil: `test.html`
-- Ingen byggprocess eller bundling
-- Appen körs direkt i browsern via en enkel statisk server
+Appen använder v2. `index.html` laddar `src/app/start.mjs` som startar UI i
+`src/app/ui.mjs`. Appens logik ligger i `src/app/logik.mjs` och
+`src/app/arbetsflode.mjs`; pris, moms och låsning ligger i `src/domain/`.
+Filformatet har entries/trips/expenses. Appens tillstånd har poster.
+Översätt endast via `src/app/tillstand.mjs`.
 
-## Hur man kör projektet lokalt
-1. Starta en lokal server i repo:t:
-   `python -m http.server 8000`
-2. Öppna:
-   `http://localhost:8000`
+Ingen bundling behövs. Lägg ingen `package.json` i roten eftersom Cloudflare
+kan autodetektera ett byggkommando. Kör lokalt med `python -m http.server 8765`.
+`/prototyp/` använder syntetiska data och separat localStorage.
+`arkiv/v1-app.txt` och äldre v1-browsertester är historik, inte produktionsstarten.
 
-## Testning
+## Arbetsregler
 
-Två sviter. Se `test/README.md` för detaljer.
+- Rör inte `src/domain/` och `index.html` i samma ändring.
+- Undvik duplicerad beräkningslogik. Pris hör till artikeln; pengar räknas i heltalsöre.
+- Ändra inte produktionsdata eller OneDrive utan uttryckligt godkännande.
+- Committa aldrig produktionsdata, tokens, kunduppgifter eller kvitton.
+- Fixtures använder pseudonymer; repot är publikt.
+- Gissa aldrig moms, priser, fakturanummer eller avtalsbelopp.
+- Lundify är facit för fakturanummer, registrering, skickstatus, bokföring och betalning.
+- Förbered endast utkast. Ronney registrerar och skickar själv, inklusive
+  åtgärden ”Ladda ned och registrera”. Appens klarmarkering är bara en manuell referens.
+- Företag, kund och månad ska hållas åtskilda även vid val av fastprisleveranser.
+- Varje vy äger sin period. Blanda inte timmar och kronor i samma siffra.
+- Håll telefonens dagliga registrering kort; detaljer hör bakom ett aktivt val.
 
-**Browsertester** — `test.html` använder rena funktioner från `index.html`.
-Kör alltid via en lokal server, inte via `file://`. Använd samma serverkommando
-som ovan.
+## Tester
 
-**Node-tester** — inga beroenden, ingen byggprocess:
+```powershell
+$env:IVT_MAL = 'v2'
+node --test test/*.test.mjs
 ```
-IVT_MAL=v2 node --test test/*.test.mjs    v2-domänen, 61/61 gröna
-node --test test/*.test.mjs               v1-baslinjen, acceptans avsiktligt röd
-node test/rapport.mjs v2                  acceptanstabell
-```
 
-- `test/v1-skyddsnat.test.mjs` täcker `migrate()` och `mergeData()`, som ligger
-  utanför PURE-sektionen och därför inte kan nås av `test.html`. **Ska alltid
-  vara grön.**
-- `test/acceptance.test.mjs` kör acceptansfallen T1–T13 mot v2-kontraktet.
-  **Förväntat röd** tills v2-domänen finns. Baslinjen står i `test/README.md`.
-
-Lägg **ingen `package.json` i roten** — Cloudflare Pages autodetekterar den och
-kan börja köra ett byggkommando mot ett projekt som publicerar statiska filer.
-
-## Viktiga tekniska detaljer
-- Appen är en enda HTML-fil med inline CSS/JS
-- React 18 och Babel används via CDN
-- SheetJS används för Excel-export
-- PWA-funktionalitet finns inline i manifest och service worker
-- Data lagras primärt i `localStorage`
-- Synkning mot OneDrive görs via Microsoft Graph
-
-## Vyer
-Fyra flikar som följer arbetet, inte hur data visas:
-- **Idag** (`TodayView`) — registrering. Timern överst, Snabb tid, Att fixa, dagens poster.
-- **Vecka** (`WeekView`) — rättning. Kalenderimport, veckans poster, redigera, dela, ta bort.
-- **Fakturera** (`InvoiceView`) — underlag per kund och månad, fakturamarkering.
-- **Uppföljning** (`ReportView` + `TrendCharts`) — period, sammanställning, export, trender.
-
-Grunddata (`MasterDataView`: projekt och kunder) och inställningar ligger bakom kugghjulet,
-inte i en flik.
-
-Två regler:
-- **Varje vy äger sin egen period.** Ingen delad veckoräknare mellan vyer.
-- **Timmar och kronor blandas aldrig i samma siffra.** Loggat är timmar, att fakturera är kronor.
-
-## Datamodell
-- `clients`
-- `projects`
-- `entries`
-- `expenses`
-- `trips`
-- `invoices`
-- `hourlyRate`, `kmRate`, `weeklyGoal`
-- `settings` (appinställningar som inte är belopp, t.ex. `staleWarningDays`)
-
-`migrate()` i `index.html` är enda stället som normaliserar datamodellen. Nya fält
-läggs till där, annars försvinner de vid synk eftersom `mergeData()` bygger ett nytt objekt.
-
-## Arbetsregler för ändringar
-- Behåll appen single-file om möjligt
-- Förändringar i UI och logik går i `index.html`
-- Om du behöver testa rena funktioner, använd `test.html`
-- Lägg nya rena funktioner mellan `PURE-START` och `PURE-END`, det är den sektion `test.html` läser
-- Undvik att duplicera logik mellan filer
-
-## Pågående arbete: v2
-
-Appen vidareutvecklas till en fakturerings- och uppföljningsassistent. Analys,
-arkitekturbeslut, v2-datamodell, migreringsstrategi, genomförandeplan,
-Lundify-förstudie och öppna frågor ligger i `docs/`.
-
-Grundproblemet i v1: `pricingModel(project)` väljer **en** prismodell för hela
-projektet, så en dag med både ett fast behandlingspass och ett timdebiterat samtal
-kan inte räknas rätt. I v2 sitter priset på **artikeln**, inte på projektet.
-
-`src/domain/` är byggd och bevisad men **ännu inte kopplad till appen**.
-`index.html` kör fortfarande v1 oförändrad. Rör inte `src/domain/` och
-`index.html` i samma ändring.
-
-Skyddsregler under arbetet:
-- Ingen skrivning till produktionsdata eller OneDrive utan uttryckligt godkännande
-- Aldrig commita produktionsdata, tokens, kunduppgifter eller kvitton
-- Fixtures använder pseudonymer, repot är publikt
-- Hitta aldrig på moms, priser, fakturanummer eller avtalsbelopp
-- Lundify är facit för fakturanummer, skickstatus, bokföring och betalning
+Linux/macOS: `IVT_MAL=v2 node --test test/*.test.mjs`.
+Kör även syntaxkontroll och `git diff --check` för ändrade moduler.
+GitHub Actions kör samma v2-svit. Testantal i äldre dokument är historiska.
+Testa UI via lokal server. Produktionssynk och kamera kräver separat verifiering;
+ett lyckat prototyptest bevisar inte att de fungerar i produktion.
 
 ## Deployment
-- Repo:t deployas via Cloudflare Pages
-- Huvudgren: `main`
+
+Cloudflare Pages publicerar från `main`. Publicera först när Ronney godkänt den
+konkreta ändringen. En lokal ändring eller lyckad testkörning är ingen deploy.
+GitHub Actions är en kontroll; den stoppar inte automatiskt Cloudflares deploy.
+Se README och `docs/09-mobil-och-fakturaunderlag.md` för verifierat läge.

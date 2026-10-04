@@ -1,3 +1,7 @@
+> Aktuell produktionssvit: `IVT_MAL=v2 node --test test/*.test.mjs`.
+> Appen startar nu v2-modulerna från `index.html`. Testantal och beskrivningar
+> av v1/PURE-sektionen nedan är historisk dokumentation.
+
 # Tester
 
 Två sviter som mäter olika saker. Inga beroenden, ingen `package.json`, ingen

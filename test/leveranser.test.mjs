@@ -306,9 +306,10 @@ test('ingen synlig funktion leder till en inte byggd-ruta', () => {
   }
 });
 
-test('Utlägg går inte att öppna från Mer', () => {
-  assert.ok(!/data-oppna="utlagg"/.test(ui));
-  assert.ok(!/typ === 'utlagg'/.test(ui));
+test('Inköp har ett eget formulär utan att ersätta huvudvalen', () => {
+  assert.match(ui, /data-oppna="utlagg"/);
+  assert.match(ui, /function arkUtlagg/);
+  assert.match(ui, /data-sparautlagg/);
 });
 
 test('utlägg finns kvar i modellen och räknas fortfarande', () => {

@@ -1,47 +1,55 @@
 # In Vision Tid
 
-Personlig single-file PWA för tidsregistrering. Byggd för eget bruk i In Vision STH HB.
+Tidsregistrering och fakturaunderlag för In Vision Järvsö AB och Järvsö IK Event AB.
 
 **Live:** https://invisiontid.pages.dev
 
-## Teknik
+## Teknik och start
 
-- En enda `index.html` — HTML, CSS och JS i samma fil
-- React 18 + Babel standalone (ingen byggprocess)
-- SheetJS för Excel-export
-- PWA via inline manifest, installerbar på mobil och desktop
-- Sync mot OneDrive via Microsoft Graph (Files.ReadWrite + Calendars.Read)
+Produktionsstarten finns i `index.html` och `src/app/start.mjs`. Appen använder
+ES-moduler i `src/app/`, domänlogik i `src/domain/` och OneDrive-adaptern i
+`src/integrations/onedrive/`. Ingen bundling eller byggprocess behövs.
+
+Starta `python -m http.server 8765` från repots rot. `/prototyp/` använder
+påhittade data och egen lokal lagring, utan koppling till OneDrive eller Lundify.
+Produktionsappen kräver Microsoft-inloggning med registrerad redirect-adress.
+
+## Data och fakturering
+
+Produktionsdata finns i OneDrive-filen `InVisionTid/invisiontid-data-v2.json`.
+Appen kontrollerar versionen före skrivning, skapar backup och läser tillbaka
+resultatet. Den äldre v1-filen används skrivskyddat vid införande/historikimport.
+Inloggningens token lagras i webbläsaren; produktionsdata får aldrig committas.
+
+Underlag grupperas per fakturerande företag, kund och månad. Appen förbereder
+fakturatext och sparar en referens. Ronney registrerar och skickar själv i Lundify.
+Ingen knapp i appen registrerar eller skickar en faktura i Lundify.
+Se [mobil och fakturaunderlag](docs/09-mobil-och-fakturaunderlag.md) för senaste
+lokala ändringen, testning och kvarstående begränsningar.
 
 ## Tester
 
-**I webbläsaren:** `test.html` återanvänder de rena funktionerna direkt ur
-`index.html` (koden mellan `/* PURE-START */` och `/* PURE-END */` — ingen
-dubblering, ingen byggprocess). Kör via en lokal server och öppna `/test.html`
-(t.ex. `npx serve` eller `python -m http.server`); `fetch` fungerar inte
-på `file://`.
+Node utan externa beroenden:
 
-**I Node**, utan beroenden:
-
-```
-node --test test/*.test.mjs     kör allt
-node test/rapport.mjs           acceptansbaslinje mot nuvarande kod
+```powershell
+$env:IVT_MAL = 'v2'
+node --test test/*.test.mjs
 ```
 
-Se `test/README.md`.
+På Linux/macOS: `IVT_MAL=v2 node --test test/*.test.mjs`.
+Tester körs också i GitHub Actions vid push och pull request.
+V1-baslinjen och äldre browsertester är historiska; se `test/README.md`.
 
-## Vidareutveckling till v2
+## Publicering
 
-Appen byggs ut till en arbets- och faktureringsassistent med artiklar, moms i
-heltalsöre, fasta leveranser, låsta faktureringsunderlag och en Lundify-referens
-som aldrig påstår mer än vad Lundify faktiskt säger.
+Cloudflare Pages-projektet `invisiontid` är kopplat till GitHub-grenen `main`.
+Push till main triggar publicering. GitHub Actions kör tester, men dess resultat
+blockerar inte i sig Cloudflares automatiska publicering. Granska och testa på en
+arbetsgren före sammanslagning. Branch protection och preview-inställningar måste
+kontrolleras i respektive tjänst; de kan inte verifieras enbart från repot.
 
-Analys, arkitekturbeslut, datamodell, migreringsstrategi, genomförandeplan,
-Lundify-förstudie och öppna frågor ligger i [docs/](docs/).
-
-## Datamodell
-
-Privata tidsdata sparas i `invisiontid-data.json` i användarens OneDrive — den filen ligger inte i repot. localStorage används som primär lagring i webbläsaren och syncas mot OneDrive vid inloggning.
-
-## Deploy
-
-Cloudflare Pages-projekt `invisiontid` är kopplat mot main-branchen i detta repo. Push till main triggar automatisk deploy.
+Den 4 oktober 2026 kontrollerades commit `fca1b4697d47835511b5997f69a2ea0932aa7c99`:
+Cloudflare-checken var lyckad och publicerade `index.html`, `src/app/start.mjs`,
+`src/app/ui.mjs` och `src/app/logik.mjs` matchade committen. Den nya lokala
+ombyggnaden är ännu inte pushad eller publicerad. Pushbehörigheten verifierades
+senare med ett lyckat dry-run utanför den begränsade körmiljön.

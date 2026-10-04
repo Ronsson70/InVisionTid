@@ -17,6 +17,8 @@ import {
   aterstallHistorikbeslut, HISTORIK_FAKTURERA, HISTORIK_KLAR_I_LUNDIFY, HISTORIK_ENDAST,
 } from './historikimport.mjs';
 import { arbetstidSekunderForArtikel } from './uppdrag.mjs';
+import { foretagFor, fakturarader } from './arbetsflode.mjs';
+export { FORETAG, foretagFor, fakturarader, registreraUtlagg, sattManadskontroll } from './arbetsflode.mjs';
 
 export {
   DEBITERINGSTYPER, KUNDSTATUSAR, ARTIKELTYPER_ATT_VALJA, tidigareUppdragFranV1,
@@ -91,6 +93,7 @@ export function kundNamnForUppdrag(s, projectId) {
  * uppdragets och arbetstypens namn överlappar räcker det ena.
  */
 export function radrubrik(s, post) {
+  if (post.sourceType === 'expense' && post.beskrivning) return post.beskrivning;
   const uppdrag = uppdragFor(s, post.projectId)?.name ?? '';
   const artikel = artikelFor(s, post.articleId)?.name ?? '';
   if (!artikel) return uppdrag;
@@ -287,6 +290,7 @@ export function saknadeResorForDag(s, datum) {
   const perKund = new Map();
   for (const p of dagens) {
     if (resartikel.has(p.articleId)) continue;
+    if (p.sourceType === 'expense' || artikelFor(s, p.articleId)?.unit === 'kr') continue;
     const u = uppdragFor(s, p.projectId);
     if (!u?.defaultTripKm || kundHarResa.has(u.clientId)) continue;
     // Har kunden flera uppdrag med olika standardavstånd väljs det längsta.
@@ -480,11 +484,11 @@ export function sammanfattaRader(rader, leveranser = []) {
 export function underlagsgrupper(s) {
   const grupper = new Map();
 
-  const lagg = (clientId, period) => {
-    const id = `${clientId}|${period}`;
+  const lagg = (clientId, period, billingCompany = null) => {
+    const id = `${clientId}|${period}${billingCompany ? '|' + billingCompany : ''}`;
     if (!grupper.has(id)) {
       grupper.set(id, {
-        id, clientId, period,
+        id, clientId, period, billingCompany,
         kundnamn: kundFor(s, clientId)?.name ?? 'Utan kund',
         rader: [], leveranser: [], loggadTidSekunder: 0,
       });
@@ -497,7 +501,7 @@ export function underlagsgrupper(s) {
     const a = artikelFor(s, p.articleId);
     const u = uppdragFor(s, p.projectId);
     if (!a || !uppdragArFakturerbart(u)) continue;        // internt och ideellt aldrig här
-    const grupp = lagg(u.clientId ?? '_utan', p.date.slice(0, 7));
+    const grupp = lagg(u.clientId ?? '_utan', p.date.slice(0, 7), foretagFor(s, u.id));
     grupp.loggadTidSekunder += p.seconds || 0;
     if (!kanIngaIFakturaunderlag(s, p)) continue;         // trackingOnly blir ingen rad
     grupp.rader.push({ post: p, artikel: a, uppdragnamn: u.name, beloppOre: radbeloppOre(a.unitPriceOre, p.qtyMilli) });
@@ -509,7 +513,7 @@ export function underlagsgrupper(s) {
     if (!arGenomford(l)) continue;                        // ej genomförd kan inte faktureras
     const u = uppdragFor(s, l.projectId);
     if (!uppdragArFakturerbart(u)) continue;
-    lagg(u.clientId ?? '_utan', (l.completedAt ?? '').slice(0, 7) || 'utan-period').leveranser.push({ ...l, uppdragnamn: u.name });
+    lagg(u.clientId ?? '_utan', (l.completedAt ?? '').slice(0, 7) || 'utan-period', foretagFor(s, u.id)).leveranser.push({ ...l, uppdragnamn: u.name });
   }
 
   return [...grupper.values()].map(g => {
@@ -594,8 +598,19 @@ export function klaraUnderlag(s) {
  * @returns {{ok:true, underlag, poster}|{ok:false, besked:string, artiklar:string[]}}
  */
 export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
-  const grupp = underlagsgrupper(s).find(g => g.id === gruppId || g.clientId === gruppId);
+  const grupper = underlagsgrupper(s);
+  const exakt = grupper.find(g => g.id === gruppId);
+  const kundgrupper = grupper.filter(g => g.clientId === gruppId);
+  if (!exakt && kundgrupper.length > 1) {
+    return { ok: false, besked: 'Välj ett bestämt företag och en månad för underlaget.', artiklar: [] };
+  }
+  const grupp = exakt || kundgrupper[0];
   if (!grupp) return { ok: false, besked: 'Det finns inget att fakturera för den här kunden just nu.', artiklar: [] };
+
+  const tillatnaLeveranser = new Set(grupp.leveranser.map(l => l.id));
+  if (valdaLeveranser.some(id => !tillatnaLeveranser.has(id))) {
+    return { ok: false, besked: 'Leveransen hör inte till valt företag, kund och månad.', artiklar: [] };
+  }
 
   const valdaPoster = grupp.rader.map(r => r.post.id);
   if (!valdaPoster.length && !valdaLeveranser.length) {
@@ -603,7 +618,16 @@ export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
   }
 
   try {
+    const basId = `und-${grupp.clientId}-${grupp.period}${grupp.billingCompany ? '-' + grupp.billingCompany : ''}`;
+    const upptagna = new Set([
+      ...(s.invoiceRecords || []).map(r => r.id),
+      ...s.poster.map(p => p.invoiceRecordId).filter(Boolean),
+      ...(s.deliverables || []).map(l => l.invoiceRecordId).filter(Boolean),
+    ]);
+    let id = basId;
+    for (let nummer = 2; upptagna.has(id); nummer++) id = `${basId}-${nummer}`;
     const { underlag, poster, leveranser } = lasUnderlag({
+      id,
       artiklar: s.articles,
       poster: s.poster,
       valda: valdaPoster,
@@ -612,7 +636,7 @@ export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
       clientId: grupp.clientId,
       period: grupp.period,
     });
-    return { ok: true, underlag, poster, leveranser, grupp };
+    return { ok: true, underlag: { ...underlag, billingCompany: grupp.billingCompany }, poster, leveranser, grupp };
   } catch (e) {
     if (e instanceof OgranskadMoms || e.name === 'OgranskadMoms') {
       return { ok: false, besked: 'Momsen behöver anges', artiklar: (e.artiklar || []).map(a => a.name) };
@@ -621,10 +645,37 @@ export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
   }
 }
 
+/** Sparade underlag som ännu inte markerats som överförda till Lundify. */
+export function forbereddaUnderlag(s) {
+  return (s.invoiceRecords || []).filter(r => !arKlartILundify(r)
+    && (s.poster.some(p => p.invoiceRecordId === r.id)
+      || (s.deliverables || []).some(l => l.invoiceRecordId === r.id)))
+    .map(r => ({ ...r, kundnamn: kundFor(s, r.clientId)?.name ?? '' }));
+}
+
+/** Återöppnar ett sparat underlag utan att skapa eller låsa nya poster. */
+export function hamtaSparatUnderlag(s, id) {
+  const referens = (s.invoiceRecords || []).find(r => r.id === id);
+  if (!referens) throw new Error('Underlaget finns inte längre.');
+  return { ...byggUnderlag({
+    id, clientId: referens.clientId, period: referens.period,
+    artiklar: s.articles,
+    poster: s.poster.filter(p => p.invoiceRecordId === id),
+    leveranser: s.deliverables || [],
+    valdaLeveranser: (s.deliverables || []).filter(l => l.invoiceRecordId === id).map(l => l.id),
+  }), billingCompany: referens.billingCompany ?? null };
+}
+
 /** Förhandsvisning utan att låsa något, för att kunna visa summan i listan. */
 export function forhandsvisa(s, gruppId, { valdaLeveranser = [] } = {}) {
-  const grupp = underlagsgrupper(s).find(g => g.id === gruppId || g.clientId === gruppId);
+  const grupper = underlagsgrupper(s);
+  const exakt = grupper.find(g => g.id === gruppId);
+  const kundgrupper = grupper.filter(g => g.clientId === gruppId);
+  if (!exakt && kundgrupper.length > 1) return null;
+  const grupp = exakt || kundgrupper[0];
   if (!grupp) return null;
+  const tillatnaLeveranser = new Set(grupp.leveranser.map(l => l.id));
+  if (valdaLeveranser.some(id => !tillatnaLeveranser.has(id))) return null;
   try {
     return byggUnderlag({
       artiklar: s.articles,
@@ -652,7 +703,7 @@ export const momsText = sats => (sats === null || sats === undefined) ? 'ej fast
 
 /** Fakturaunderlaget som ren text att klistra in i Lundify. */
 export function lundifyText(s, underlag) {
-  const rader = underlag.rader.map(r => {
+  const rader = fakturarader(s, underlag).map(r => {
     const antal = kvantitetTillText(r.qtyMilli, r.unit);
     return `${r.beskrivning}\t${antal}\t${exaktBelopp(r.unitPriceOre)}\t${momsText(r.vatRate)}\t${exaktBelopp(r.nettoOre)}`;
   });
@@ -660,6 +711,8 @@ export function lundifyText(s, underlag) {
   const period = underlagsPeriod(underlag);
   return [
     `Underlag till Lundify – ${kund}`,
+    `Fakturerande företag: ${underlag.billingCompany || 'Inte valt – kontrollera innan du skapar utkast'}`,
+    'Endast fakturaunderlag. Ronney registrerar och skickar själv.',
     period ? `Avser: ${period}` : null,
     '',
     'Beskrivning\tAntal\tÁ-pris\tMoms\tBelopp',
@@ -1079,7 +1132,7 @@ export function andraPost(s, id, andringar) {
     qtyMilli,
     date,
     sourceType: befintligKalltyp,
-    beskrivning: artikel.name,
+    beskrivning: String(andringar.beskrivning ?? befintlig.beskrivning ?? artikel.name).trim() || artikel.name,
     anteckning: Object.hasOwn(andringar, 'anteckning')
       ? String(andringar.anteckning ?? '').trim() || null
       : befintlig.anteckning ?? null,

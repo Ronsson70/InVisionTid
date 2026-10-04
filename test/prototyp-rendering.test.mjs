@@ -206,11 +206,12 @@ test('rendering: Uppföljning visar månadsmål, fastprisandel och månadsnavige
   assert.match(html, /data-oppna="manadsmal"/);
 });
 
-test('rendering: registreringsarket kräver högst tre val', () => {
+test('rendering: pass har tema och utförare bakom extra detaljer', () => {
   klicka({ vy: 'idag' });
   klicka({ oppna: 'tillfalle' });
   const rubriker = [...html.matchAll(/class="faltrubrik">([^<]+)</g)].map(m => m[1]);
-  assert.deepEqual(rubriker, ['Vilket uppdrag?', 'Hur många tillfällen?', 'Vilken dag?']);
+  assert.deepEqual(rubriker, ['Vilket uppdrag?', 'Tema / innehåll', 'Hur många tillfällen?', 'Vilken dag?', 'Utförare, valfritt', 'I samråd med, valfritt']);
+  assert.match(html, /<details[^>]*><summary>Utförare och samråd/);
   assert.match(html, /senast använt/, 'senast använda uppdrag är förvalt');
 });
 
@@ -226,7 +227,7 @@ test('rendering: tidsarket erbjuder både snabbval och klockslag', () => {
 
 test('rendering: researket föreslår uppdragets standardavstånd', () => {
   klicka({ oppna: 'resa' });
-  assert.match(html, /Hur långt\?/);
+  assert.match(html, /Kilometer totalt, tur och retur/);
   assert.match(html, /data-km="23"/, 'standardavståndet ligger först');
 });
 
