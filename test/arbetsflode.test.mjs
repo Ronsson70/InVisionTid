@@ -109,3 +109,35 @@ test('En fastprisleverans från ett annat företag stoppas före låsning', () =
   assert.equal(L.forhandsvisa(s, group.id, { valdaLeveranser: [lev.id] }), null);
   assert.equal(lev.status, 'open');
 });
+
+test('Interna, vilande och redan fakturerade leveranser kan inte klarmarkeras igen', () => {
+  for (const variant of ['internal', 'inactive', 'invoiced']) {
+    const s = skapaTestdata(new Date('2026-08-27T12:00:00'));
+    const lev = s.deliverables.find(l => l.id === 'lev-verkstad-2');
+    const p = s.projects.find(p => p.id === lev.projectId);
+    if (variant === 'internal') p.kind = 'internal';
+    if (variant === 'inactive') p.active = false;
+    if (variant === 'invoiced') lev.status = 'invoiced';
+    assert.ok(!L.enstakaLeveranser(s).some(l => l.id === lev.id));
+    assert.equal(L.markeraGenomford(s, lev.id, '2026-09-30').ok, false);
+  }
+});
+
+test('En arkiverad totalpost räknas inte ovanpå sina delbetalningar', () => {
+  const s = skapaTestdata(new Date('2026-08-27T12:00:00'));
+  const lev = s.deliverables.find(l => l.id === 'lev-verkstad-2');
+  const fore = L.jobbatIn(s, L.manadensDatum(s, '2026-08')).jobbatInOre;
+  s.deliverables.push({ ...lev, id: 'arkiverad-total', billingDisabled: true });
+  assert.equal(L.jobbatIn(s, L.manadensDatum(s, '2026-08')).jobbatInOre, fore);
+  assert.ok(!L.enstakaLeveranser(s).some(l => l.id === 'arkiverad-total'));
+  assert.equal(L.markeraGenomford(s, 'arkiverad-total', '2026-09-30').ok, false);
+});
+
+test('Prisrättning behåller låst pris i veckosumma och månadsuppföljning', () => {
+  const s = state();
+  s.poster = [{ id: 't', projectId: 'b', articleId: 'br', date: '2026-09-18', qtyMilli: 1000, sourceType: 'entry', status: 'included', invoiceRecordId: 'fakturerat', priceSnapshot: { unitPriceOre: 44000, vatRate: 2500 } }];
+  s.articles.find(a => a.id === 'br').unitPriceOre = 42000;
+  assert.equal(L.fakturerbartOre(s, s.poster), 44000);
+  assert.equal(L.jobbatIn(s, ['2026-09-18']).jobbatInOre, 44000);
+  assert.equal(L.perKund(s, ['2026-09-18'])[0].beloppOre, 44000);
+});

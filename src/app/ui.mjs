@@ -359,13 +359,15 @@ function klartkort(r) {
 }
 
 function vyFakturera() {
-  const passar = r => (!fakturaForetag || r.billingCompany === fakturaForetag) && (!fakturaManad || r.period === fakturaManad);
+  // Äldre underlag utan företagsval måste vara synliga även när ett företag filtreras.
+  const passar = r => (!fakturaForetag || !r.billingCompany || r.billingCompany === fakturaForetag) && (!fakturaManad || r.period === fakturaManad);
   const grupper = L.underlagsgrupper(s).filter(passar);
   const kontroll = grupper.filter(g => g.lage === L.LAGE_KONTROLL);
   const redo = grupper.filter(g => g.lage === L.LAGE_REDO);
   const klara = L.klaraUnderlag(s).filter(passar);
   const forberedda = L.forbereddaUnderlag(s).filter(passar);
   const note = s.installningar?.manadskontroll?.[`${fakturaForetag}|${fakturaManad}`] || '';
+  const okanda = [...grupper, ...klara, ...forberedda].filter(r => !r.billingCompany).length;
 
   const avsnitt = (titel, innehall) => innehall
     ? `<div class="avsnitt"><div class="avsnittsrubrik">${esc(titel)}</div>${innehall}</div>` : '';
@@ -379,19 +381,21 @@ function vyFakturera() {
     <label>Månad<input type="month" data-filter="manad" value="${esc(fakturaManad)}"></label>
     ${fakturaForetag && fakturaManad ? `<details ${note ? 'open' : ''}><summary>Vad återstår den här månaden?</summary><textarea data-manadsnotis="1" placeholder="Till exempel: väntar på underlag från Emelie">${esc(note)}</textarea><button class="sekundar" data-sparamanadskontroll="1">Spara månadsnotering</button></details>` : '<p class="notis">Välj företag och månad för att anteckna vad som återstår. Saknade tider syns bara om du lägger till eller noterar dem.</p>'}
   </div>
+  ${okanda ? `<div class="varning"><strong>${okanda} underlag saknar företagsval.</strong>De visas för kontroll även när du filtrerar på ett företag. Välj företag i uppdraget för nya underlag. Äldre låsta underlag ändras inte automatiskt.</div>` : ''}
   ${inget ? '<div class="kort"><div class="tom">Inget att fakturera just nu.</div></div>' : ''}
   ${avsnitt('Behöver kontrolleras', kontroll.map(kontrollkort).join(''))}
   ${avsnitt('Redo för Lundify', redo.map(redokort).join(''))}
   ${avsnitt('Förberedda underlag', forberedda.map(r => `<div class="kort kundkort">
     <div class="kundnamn">${esc(r.kundnamn)}</div>
+    <div class="under">${esc(r.billingCompany || 'Företag inte valt – kontrollera före överföring')}</div>
     <div class="kortperiod">${esc(MANADSNAMN(r.period))}</div>
     <div class="notis">Underlaget är sparat i InVisionTid. Överföringen till Lundify återstår.</div>
     <button class="primar" data-sparatunderlag="${esc(r.id)}">Öppna underlaget</button>
   </div>`).join(''))}
-  ${avsnitt('Markerat klart av dig', klara.length
-    ? `<div class="kort">${klara.map(klartkort).join('')}
+  ${klara.length ? `<details class="avsnitt"><summary>Historik – markerat klart av dig (${klara.length})</summary>
+      <div class="kort">${klara.map(klartkort).join('')}
         <div class="notis">Lundify håller reda på fakturanummer, utskick och betalning.</div>
-      </div>` : '')}`;
+      </div></details>` : ''}`;
 }
 
 // ── Vy: Uppföljning ─────────────────────────────────────────────────────────
@@ -459,8 +463,6 @@ const RUBRIKER = {
 const TYPKARTA = { tillfalle: ['session'], tid: ['hourly', 'trackingOnly'], resa: ['travel'] };
 
 function arkMer() {
-  // Utlägg är inte byggt och visas därför inte. En synlig knapp som leder till
-  // en återvändsgränd är sämre än ingen knapp alls.
   return `<div class="val">
     <button data-oppna="leverans">Leverans klar<span class="kund">Markera en avtalad leverans som genomförd</span></button>
     <button data-oppna="uppdrag">Mina uppdrag<span class="kund">Visa, återaktivera eller lägg till uppdrag</span></button>
@@ -855,6 +857,7 @@ function arkLeverans() {
     <input type="date" data-falt="datum" value="${esc(ark.datum)}">
 
     ${vald ? `<div class="beloppforhand">${esc(kr(vald.amountOre))}<small>exklusive moms, enligt avtalet</small></div>
+      ${vald.plannedInvoiceDate ? `<div class="notis">Planerad fakturering: ${esc(vald.plannedInvoiceDate)}. Du bekräftar själv när delen är genomförd.</div>` : ''}
       ${vald.startDate && vald.endDate ? `<div class="notis">Upparbetas ${esc(vald.startDate)} till ${esc(vald.endDate)}.</div>` : ''}
       <p class="notis forklaring">${esc(L.genomforandebesked(vald))}</p>
       <button class="spara" data-markeragenomford="${esc(vald.id)}">Markera som genomförd</button>` : ''}

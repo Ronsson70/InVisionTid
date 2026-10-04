@@ -223,7 +223,7 @@ export function fakturerbartOre(s, poster) {
   return poster.reduce((summa, p) => {
     if (!kanIngaIFakturaunderlag(s, p)) return summa;
     const a = artikelFor(s, p.articleId);
-    return summa + radbeloppOre(a.unitPriceOre, p.qtyMilli);
+    return summa + radbeloppOre(p.priceSnapshot?.unitPriceOre ?? a.unitPriceOre, p.qtyMilli);
   }, 0);
 }
 
@@ -329,7 +329,7 @@ export const uppdragHarTillfallespris = (s, projectId) =>
 
 /** En fastprispost är giltig bara när uppdraget inte debiteras per tillfälle. */
 export const arGiltigFastprispost = (s, leverans) =>
-  !!leverans && !uppdragHarTillfallespris(s, leverans.projectId);
+  !!leverans && leverans.billingDisabled !== true && !uppdragHarTillfallespris(s, leverans.projectId);
 
 /**
  * Leveranser som går att markera genomförda.
@@ -342,6 +342,8 @@ export function enstakaLeveranser(s, { endastEjGenomforda = false } = {}) {
   return (s.deliverables || [])
     .filter(l => arGiltigFastprispost(s, l))
     .filter(l => uppdragArFakturerbart(uppdragFor(s, l.projectId)))
+    .filter(l => uppdragFor(s, l.projectId)?.active !== false)
+    .filter(l => l.status !== 'invoiced')
     .filter(l => !endastEjGenomforda || !arGenomford(l))
     .map(l => ({ ...l, uppdragnamn: uppdragFor(s, l.projectId)?.name ?? '' }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -376,6 +378,13 @@ export function genomforandebesked(leverans) {
 export function markeraGenomford(s, leveransId, datum) {
   const leverans = (s.deliverables || []).find(l => l.id === leveransId);
   if (!leverans) return { ok: false, besked: 'Leveransen finns inte längre.' };
+  const uppdrag = uppdragFor(s, leverans.projectId);
+  if (!uppdragArFakturerbart(uppdrag) || uppdrag.active === false) {
+    return { ok: false, besked: 'Leveransen hör inte till ett aktivt fakturerbart uppdrag.' };
+  }
+  if (leverans.status === 'invoiced') {
+    return { ok: false, besked: 'Leveransen är redan markerad som fakturerad.' };
+  }
   if (!arGiltigFastprispost(s, leverans)) {
     return { ok: false, besked: 'Uppdraget debiteras per tillfälle. Registrera passet under Tillfälle i stället.' };
   }
@@ -878,7 +887,7 @@ export function jobbatIn(s, datumLista) {
   for (const p of poster) {
     if (!kanIngaIFakturaunderlag(s, p)) continue;
     const a = artikelFor(s, p.articleId);
-    const belopp = radbeloppOre(a.unitPriceOre, p.qtyMilli);
+    const belopp = radbeloppOre(p.priceSnapshot?.unitPriceOre ?? a.unitPriceOre, p.qtyMilli);
     const redoForLundify = p.status === 'open' && !p.invoiceRecordId;
     if (redoForLundify) totaltUnderlagOre += belopp;
 

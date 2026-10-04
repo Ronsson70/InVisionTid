@@ -5,8 +5,11 @@
 // den vanligaste sortens fel i ett gränssnitt utan byggsteg: en stavfel i ett
 // funktionsnamn som bara visar sig när man klickar sig till rätt vy.
 
-import test from 'node:test';
+import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
+
+// Veckovyn ska testas mot samma vecka även när testerna körs på en måndag.
+mock.timers.enable({ apis: ['Date'], now: new Date('2026-08-27T12:00:00') });
 
 let html = '';
 const lyssnare = {};

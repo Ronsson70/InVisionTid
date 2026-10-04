@@ -4,6 +4,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { skapaTestdata } from '../prototyp/testdata.mjs';
 import { planeraHistorikimport } from '../src/app/historikimport.mjs';
+import { FORETAG } from '../src/app/arbetsflode.mjs';
 
 let html = '';
 const lyssnare = {};
@@ -36,6 +37,21 @@ const fyll = (falt, value) => {
 const tom = () => new Promise(resolve => setImmediate(resolve));
 
 const { startaApp } = await import('../src/app/ui.mjs');
+
+test('företagsfilter döljer inte äldre underlag och avslutade underlag ligger i historik', () => {
+  const s = skapaTestdata();
+  s.invoiceRecords.push({ id: 'gammalt-underlag', clientId: 'k-a', period: '2026-09', nettoOre: 10000, klarmarkeradAt: '2026-09-30' });
+  startaApp({ lagring: { async spara() { throw new Error('Läsning ska inte skriva'); } }, tillstand: s });
+  klicka({ vy: 'fakturera' });
+  lyssnare.change({ target: { dataset: { filter: 'foretag' }, value: FORETAG[0] } });
+  lyssnare.change({ target: { dataset: { filter: 'manad' }, value: '2026-09' } });
+  assert.match(html, /underlag saknar företagsval/);
+  assert.match(html, /gammalt-underlag/);
+  assert.match(html, /<details class="avsnitt"><summary>Historik/);
+  assert.ok(!/<details class="avsnitt" open/.test(html));
+  lyssnare.change({ target: { dataset: { filter: 'foretag' }, value: '' } });
+  lyssnare.change({ target: { dataset: { filter: 'manad' }, value: '' } });
+});
 
 test('klickflöde: nytt uppdrag och ny registrering blir sparbara', async () => {
   const sparade = [];
