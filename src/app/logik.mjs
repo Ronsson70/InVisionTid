@@ -18,7 +18,7 @@ import {
 } from './historikimport.mjs';
 import { arbetstidSekunderForArtikel } from './uppdrag.mjs';
 import { foretagFor, fakturarader } from './arbetsflode.mjs';
-export { FORETAG, foretagFor, fakturarader, registreraUtlagg, sattManadskontroll } from './arbetsflode.mjs';
+export { FORETAG, foretagFor, faktureringsvag, foretagskopplingar, kopplaUnderlagsForetag, fakturarader, registreraUtlagg, sattManadskontroll } from './arbetsflode.mjs';
 
 export {
   DEBITERINGSTYPER, KUNDSTATUSAR, ARTIKELTYPER_ATT_VALJA, tidigareUppdragFranV1,

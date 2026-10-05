@@ -3,6 +3,32 @@ import { radbeloppOre } from '../domain/pengar.mjs';
 export const FORETAG = ['In Vision Järvsö AB', 'Järvsö IK Event AB'];
 export const foretagFor = (s, projectId) => s.projects.find(p => p.id === projectId)?.billingCompany || null;
 
+export const faktureringsvag = (s, projectId) => {
+  const p = s.projects.find(p => p.id === projectId);
+  const kund = s.clients.find(c => c.id === p?.clientId)?.name || 'Kund inte vald';
+  return `${p?.billingCompany || 'Fakturerande företag inte valt'} → ${kund}`;
+};
+
+/** Endast entydiga kopplingar från underlagets egna registreringar föreslås. */
+export function foretagskopplingar(s) {
+  return (s.invoiceRecords || []).filter(r => !r.billingCompany).flatMap(r => {
+    const kallor = [...(s.poster || []), ...(s.deliverables || [])]
+      .filter(p => p.invoiceRecordId === r.id);
+    const foretag = new Set(kallor.map(p => foretagFor(s, p.projectId)));
+    return kallor.length && foretag.size === 1 && FORETAG.includes([...foretag][0])
+      ? [{ id: r.id, billingCompany: [...foretag][0], period: r.period,
+        kundnamn: s.clients.find(c => c.id === r.clientId)?.name || 'Utan kund' }] : [];
+  });
+}
+
+/** Rättar bara saknat företagsfält. Status, låsning och pengar bevaras. */
+export function kopplaUnderlagsForetag(s, ids) {
+  const forslag = new Map(foretagskopplingar(s).map(r => [r.id, r.billingCompany]));
+  if (!ids.length || ids.some(id => !forslag.has(id))) throw new Error('Företagskopplingen är inte entydig. Kontrollera underlaget.');
+  return { ...s, invoiceRecords: s.invoiceRecords.map(r => ids.includes(r.id)
+    ? { ...r, billingCompany: forslag.get(r.id) } : r) };
+}
+
 // Detta är presentationsrader. Originalbesöken och prisögonblicksbilden behålls.
 export function fakturarader(s, underlag) {
   const resor = new Map();

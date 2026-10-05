@@ -11,6 +11,31 @@ function state() {
 }
 const trip = (id, km, date = '2026-09-18') => ({ id, projectId: 'a', articleId: 'ar', date, qtyMilli: km * 1000, sourceType: 'trip', status: 'open' });
 
+test('saknat företag rättas från låsta källor utan att ändra belopp, status eller registreringar', () => {
+  const s = state();
+  s.poster = [{ ...trip('r', 10), status: 'included', invoiceRecordId: 'historik', priceSnapshot: { unitPriceOre: 625 } }];
+  s.invoiceRecords = [{ id: 'historik', clientId: 'c', period: '2026-09', nettoOre: 6250,
+    invoiceNumber: '123', klarmarkeradAt: '2026-10-01', momsOre: 1563 }];
+  const fore = structuredClone(s);
+  assert.equal(L.foretagskopplingar(s)[0].billingCompany, L.FORETAG[0]);
+  const efter = L.kopplaUnderlagsForetag(s, ['historik']);
+  assert.deepEqual(efter.invoiceRecords[0], { ...fore.invoiceRecords[0], billingCompany: L.FORETAG[0] });
+  assert.deepEqual(efter.poster, fore.poster);
+  assert.deepEqual(s, fore);
+  assert.deepEqual(L.foretagskopplingar(efter), []);
+});
+
+test('blandade, saknade eller okända företagskopplingar får aldrig gissas', () => {
+  const s = state();
+  s.invoiceRecords = [{ id: 'blandat' }, { id: 'tomt' }, { id: 'okant' }];
+  s.poster = [{ ...trip('r', 10), invoiceRecordId: 'blandat' },
+    { id: 't', projectId: 'b', invoiceRecordId: 'blandat' },
+    { id: 'ok', projectId: 'saknas', invoiceRecordId: 'okant' }];
+  assert.deepEqual(L.foretagskopplingar(s), []);
+  assert.throws(() => L.kopplaUnderlagsForetag(s, ['blandat']), /inte entydig/);
+  assert.equal(L.faktureringsvag(s, 'a'), `${L.FORETAG[0]} → Kund A`);
+});
+
 test('Alla sex resor förblir spårbara men exporteras som 35 km på en rad', () => {
   const s = state();
   s.poster = [trip('1', 10), ...[17, 18, 20, 22, 29].map(d => trip(`r${d}`, 5, `2026-09-${d}`))];

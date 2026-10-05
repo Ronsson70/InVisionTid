@@ -38,6 +38,62 @@ const tom = () => new Promise(resolve => setImmediate(resolve));
 
 const { startaApp } = await import('../src/app/ui.mjs');
 
+test('egna timmar och kundens samlade arbete registreras hos rätt fakturerande företag', async () => {
+  const sparade = [];
+  const s = skapaTestdata();
+  s.projects.forEach(p => { p.billingCompany = FORETAG[0]; });
+  s.projects.push({ id: 'kundjobb', clientId: 'k-a', name: 'Kundens städning', kind: 'billable', active: true, billingCompany: FORETAG[1] });
+  s.articles.push({ id: 'stadpris', projectId: 'kundjobb', name: 'Städning', type: 'hourly', unit: 'tim', unitPriceOre: 50000, vatRate: 2500, vatStatus: 'reviewed', billable: true, active: true });
+  startaApp({ tillstand: s, lagring: { async spara(s) { sparade.push(structuredClone(s)); } } });
+  klicka({ vy: 'fakturera' });
+  klicka({ faktureringsval: FORETAG[1] });
+  assert.match(html, /timmar förs inte över automatiskt/);
+  klicka({ fakturaarbete: 'tid' });
+  assert.match(html, /Kundens städning/);
+  assert.ok(!html.includes('data-valjuppdrag="u-a"'));
+  fyll('performedBy', 'Testperson A');
+  klicka({ timmar: '3' });
+  klicka({ spara: '1' });
+  await tom();
+  assert.equal(sparade.at(-1).poster.at(-1).projectId, 'kundjobb');
+  assert.equal(sparade.at(-1).poster.at(-1).performedBy, 'Testperson A');
+  assert.equal(sparade.at(-1).poster.at(-1).qtyMilli, 3000);
+  klicka({ fakturaarbete: 'tid' });
+  fyll('performedBy', 'Testperson B');
+  klicka({ timmar: '3' });
+  klicka({ spara: '1' });
+  await tom();
+  const { underlagsgrupper } = await import('../src/app/logik.mjs');
+  const kundgrupp = underlagsgrupper(sparade.at(-1)).find(g => g.billingCompany === FORETAG[1]);
+  assert.equal(kundgrupp.rader.length, 2);
+  assert.equal(kundgrupp.loggadTidSekunder, 21600);
+  assert.equal(kundgrupp.summaOre, 300000);
+  klicka({ faktureringsval: FORETAG[0] });
+  klicka({ fakturaarbete: 'tid' });
+  assert.ok(!html.includes('data-valjuppdrag="kundjobb"'));
+  assert.match(html, /Faktureringsväg/);
+  klicka({ stang: 'knapp' });
+  klicka({ faktureringsval: '' });
+  lyssnare.change({ target: { dataset: { filter: 'foretag' }, value: '' } });
+});
+
+test('tomt företagsurval väljer aldrig ett uppdrag från det andra företaget', async () => {
+  const s = skapaTestdata();
+  s.projects.forEach(p => { p.billingCompany = FORETAG[0]; });
+  let sparningar = 0;
+  startaApp({ tillstand: s, lagring: { async spara() { sparningar++; } } });
+  klicka({ vy: 'fakturera' });
+  klicka({ faktureringsval: FORETAG[1] });
+  klicka({ fakturaarbete: 'tid' });
+  assert.match(html, /Inget uppdrag med den här arbetstypen/);
+  assert.match(html, /data-spara="1" disabled/);
+  klicka({ spara: '1' });
+  await tom();
+  assert.equal(sparningar, 0);
+  klicka({ stang: 'knapp' });
+  lyssnare.change({ target: { dataset: { filter: 'foretag' }, value: '' } });
+});
+
 test('företagsfilter döljer inte äldre underlag och avslutade underlag ligger i historik', () => {
   const s = skapaTestdata();
   s.invoiceRecords.push({ id: 'gammalt-underlag', clientId: 'k-a', period: '2026-09', nettoOre: 10000, klarmarkeradAt: '2026-09-30' });
@@ -45,7 +101,7 @@ test('företagsfilter döljer inte äldre underlag och avslutade underlag ligger
   klicka({ vy: 'fakturera' });
   lyssnare.change({ target: { dataset: { filter: 'foretag' }, value: FORETAG[0] } });
   lyssnare.change({ target: { dataset: { filter: 'manad' }, value: '2026-09' } });
-  assert.match(html, /underlag saknar företagsval/);
+  assert.match(html, /underlag saknar uppgift om fakturerande företag/);
   assert.match(html, /gammalt-underlag/);
   assert.match(html, /<details class="avsnitt"><summary>Historik/);
   assert.ok(!/<details class="avsnitt" open/.test(html));

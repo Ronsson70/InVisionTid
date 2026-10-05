@@ -142,6 +142,7 @@ function postrad(p, { klickbar = true } = {}) {
     <span class="prick" style="background:${farg(p.projectId)}"></span>
     <span class="txt">
       <span class="namn">${esc(L.radrubrik(s, p))}</span>
+      ${L.foretagFor(s, p.projectId) && !ejFakt ? `<span class="under">${esc(L.faktureringsvag(s, p.projectId))}${p.performedBy ? ` · Utförare: ${esc(p.performedBy)}` : ''}</span>` : ''}
       <span class="under">${p.anteckning ? `${esc(p.anteckning)} · ` : ''}${esc(historikkund)}${esc(mangd)}${last ? ' · klart i Lundify' : ''}${historiklage ? ' · ' + esc(historiklage) : ''}</span>
     </span>
     ${p.legacyReviewStatus === 'needsReview' || p.legacyReviewStatus === 'historyOnly'
@@ -309,10 +310,11 @@ const MANADSNAMN = m => {
 function redokort(g) {
   const forhand = L.forhandsvisa(s, g.id);
   return `<div class="kort kundkort">
-    <div class="kundnamn">${esc(g.kundnamn)}</div>
-    <div class="under">${esc(g.billingCompany || 'Fakturerande företag behöver väljas i uppdraget')}</div>
+    <div class="kundnamn">Kund: ${esc(g.kundnamn)}</div>
+    <div class="under">Fakturerar: ${esc(g.billingCompany || 'Fakturerande företag behöver väljas i uppdraget')}</div>
     <div class="kortperiod">${esc(MANADSNAMN(g.period))}</div>
     <div class="sammanfattning">${esc(g.sammanfattning)}</div>
+    ${g.loggadTidSekunder ? `<div class="notis">Registrerad tid: ${esc(timmar(g.loggadTidSekunder))} h</div>` : ''}
     ${g.uppdrag.length > 1 ? `<div class="notis">${esc(g.uppdrag.join(' och '))}</div>` : ''}
     <div class="summa">
       <span class="etikett">Redo för Lundify</span>
@@ -326,8 +328,8 @@ function redokort(g) {
 function kontrollkort(g) {
   const atgard = g.atgard ?? { besked: 'Behöver kontrolleras', artiklar: [] };
   return `<div class="kort kundkort">
-    <div class="kundnamn">${esc(g.kundnamn)}</div>
-    <div class="under">${esc(g.billingCompany || 'Fakturerande företag behöver väljas i uppdraget')}</div>
+    <div class="kundnamn">Kund: ${esc(g.kundnamn)}</div>
+    <div class="under">Fakturerar: ${esc(g.billingCompany || 'Fakturerande företag behöver väljas i uppdraget')}</div>
     <div class="kortperiod">${esc(MANADSNAMN(g.period))}</div>
     <div class="varning">
       <strong>${esc(atgard.besked)}</strong>
@@ -349,6 +351,7 @@ function klartkort(r) {
   return `<div class="statusrad">
     <div class="statustxt">
       <div class="kundnamn liten">${esc(r.kundnamn)}</div>
+      <div class="under">Fakturerar: ${esc(r.billingCompany || 'Inte angivet i äldre underlag')}</div>
       <div class="under">${esc(MANADSNAMN(r.period))} · ${esc(kr(r.nettoOre))} exklusive moms</div>
       <div class="under">Klart ${esc(r.klarmarkeradAt)}${r.invoiceNumber ? ` · faktura ${esc(r.invoiceNumber)}` : ''}</div>
       <div class="notis">Öppnar registreringarna i InVisionTid. Ingenting ändras i Lundify.</div>
@@ -369,6 +372,7 @@ function vyFakturera() {
   const forberedda = L.forbereddaUnderlag(s).filter(passar);
   const note = s.installningar?.manadskontroll?.[`${fakturaForetag}|${fakturaManad}`] || '';
   const okanda = [...grupper, ...klara, ...forberedda].filter(r => !r.billingCompany).length;
+  const kopplingar = L.foretagskopplingar(s).filter(r => passar(r));
 
   const avsnitt = (titel, innehall) => innehall
     ? `<div class="avsnitt"><div class="avsnittsrubrik">${esc(titel)}</div>${innehall}</div>` : '';
@@ -378,17 +382,29 @@ function vyFakturera() {
   return `
   <header><h1>Fakturaunderlag</h1><div class="datum">Du registrerar och skickar fakturorna själv.</div></header>
   <div class="kort">
-    <label>Företag<select data-filter="foretag"><option value="">Alla företag</option>${L.FORETAG.map(c => `<option ${fakturaForetag === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
+    <div class="rubrik">Vad ska du fakturera?</div>
+    <div class="val">
+      <button data-faktureringsval="${esc(L.FORETAG[0])}" class="${fakturaForetag === L.FORETAG[0] ? 'vald' : ''}">In Vision – min fakturering<span class="kund">Mina timmar och resor till JIK och andra kunder</span></button>
+      <button data-faktureringsval="${esc(L.FORETAG[1])}" class="${fakturaForetag === L.FORETAG[1] ? 'vald' : ''}">JIK Event – till kunder<span class="kund">Kundens samlade arbete, städning, resor och material</span></button>
+    </div>
+    ${fakturaForetag ? `<p class="notis">${fakturaForetag === L.FORETAG[0]
+      ? 'Här fakturerar In Vision dina registrerade uppdrag. När du arbetar åt JIK är Järvsö IK Event AB kunden. Varje uppdrag använder sitt eget pris.'
+      : 'Här fakturerar JIK slutkunden. Registrera varje persons arbete på JIK:s kunduppdrag och ange utförare. Lägg till kundens resor och material. Dina In Vision-timmar förs inte över automatiskt; JIK:s kundpris kan vara ett annat.'}</p>
+      <div class="snabbval"><button data-fakturaarbete="tid">Lägg till tid</button><button data-fakturaarbete="resa">Lägg till resa</button><button data-fakturaarbete="utlagg">Lägg till inköp</button><button data-fakturaarbete="nyttuppdrag">Nytt kunduppdrag</button></div>` : ''}
+  </div>
+  <div class="kort">
+    <label>Fakturerande företag<select data-filter="foretag"><option value="">Alla företag</option>${L.FORETAG.map(c => `<option ${fakturaForetag === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>
     <label>Månad<input type="month" data-filter="manad" value="${esc(fakturaManad)}"></label>
     ${fakturaForetag && fakturaManad ? `<details ${note ? 'open' : ''}><summary>Vad återstår den här månaden?</summary><textarea data-manadsnotis="1" placeholder="Till exempel: väntar på underlag från Emelie">${esc(note)}</textarea><button class="sekundar" data-sparamanadskontroll="1">Spara månadsnotering</button></details>` : '<p class="notis">Välj företag och månad för att anteckna vad som återstår. Saknade tider syns bara om du lägger till eller noterar dem.</p>'}
   </div>
-  ${okanda ? `<div class="varning"><strong>${okanda} underlag saknar företagsval.</strong>De visas för kontroll även när du filtrerar på ett företag. Välj företag i uppdraget för nya underlag. Äldre låsta underlag ändras inte automatiskt.</div>` : ''}
+  ${okanda ? `<div class="varning"><strong>${okanda} äldre eller nya underlag saknar uppgift om fakturerande företag.</strong>De visas för kontroll även när du filtrerar på ett företag.
+    ${kopplingar.length ? `<details><summary>Kontrollera ${kopplingar.length} entydiga företagskopplingar</summary>${kopplingar.map(r => `<p>${esc(r.kundnamn)} · ${esc(MANADSNAMN(r.period))} · Fakturerar: ${esc(r.billingCompany)}</p>`).join('')}<p>Endast företagsfältet kompletteras. Belopp och klarmarkering behålls.</p><button class="primar" data-kopplaforetag="${esc(kopplingar.map(r => r.id).join('|'))}">Spara företagskopplingarna</button></details>` : 'Välj företag i uppdraget för nya underlag. Äldre underlag med oklar koppling behöver kontrolleras separat.'}</div>` : ''}
   ${inget ? '<div class="kort"><div class="tom">Inget att fakturera just nu.</div></div>' : ''}
   ${avsnitt('Behöver kontrolleras', kontroll.map(kontrollkort).join(''))}
   ${avsnitt('Redo för Lundify', redo.map(redokort).join(''))}
   ${avsnitt('Förberedda underlag', forberedda.map(r => `<div class="kort kundkort">
-    <div class="kundnamn">${esc(r.kundnamn)}</div>
-    <div class="under">${esc(r.billingCompany || 'Företag inte valt – kontrollera före överföring')}</div>
+    <div class="kundnamn">Kund: ${esc(r.kundnamn)}</div>
+    <div class="under">Fakturerar: ${esc(r.billingCompany || 'Företag inte valt – kontrollera före överföring')}</div>
     <div class="kortperiod">${esc(MANADSNAMN(r.period))}</div>
     <div class="notis">Underlaget är sparat i InVisionTid. Överföringen till Lundify återstår.</div>
     <button class="primar" data-sparatunderlag="${esc(r.id)}">Öppna underlaget</button>
@@ -896,17 +912,26 @@ function arkAndraLeverans() {
          <button class="avbryt" data-stang="knapp">Avbryt</button>`}`;
 }
 
+function registreringsForetagsval() {
+  return `<label>Vem fakturerar?<select data-registreringsforetag="1"><option value="">Alla företag</option>${L.FORETAG.map(c => `<option value="${esc(c)}" ${ark.foretag === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label>`;
+}
+
+function registreringsUppdrag() {
+  return L.uppdragEfterSenast(s, TYPKARTA[ark.typ])
+    .filter(p => !ark.foretag || p.billingCompany === ark.foretag);
+}
+
 function arkRegistrering() {
   const typer = TYPKARTA[ark.typ];
-  const uppdrag = L.uppdragEfterSenast(s, typer);
+  const uppdrag = registreringsUppdrag();
   const valt = ark.projectId ?? uppdrag[0]?.id ?? null;
   const artikel = valt ? L.artikelForUppdrag(s, valt, typer.find(t => L.artikelForUppdrag(s, valt, t))) : null;
 
   const uppdragVal = `<div class="faltrubrik">Vilket uppdrag?</div>
     <div class="val">${uppdrag.map((p, i) => `
       <button class="${p.id === valt ? 'vald' : ''}" data-valjuppdrag="${esc(p.id)}">
-        ${esc(p.name)}<span class="kund">${esc(L.kundNamnForUppdrag(s, p.id))}${i === 0 && !ark.projectId ? ' · senast använt' : ''}</span>
-      </button>`).join('')}</div>`;
+        ${esc(p.name)}<span class="kund">${esc(L.faktureringsvag(s, p.id))}${i === 0 && !ark.projectId ? ' · senast använt' : ''}</span>
+      </button>`).join('') || '<p class="notis">Inget uppdrag med den här arbetstypen finns för valt företag. Lägg upp kunduppdraget under Mina uppdrag.</p>'}</div>`;
 
   let mangdVal = '';
   if (ark.typ === 'tillfalle') {
@@ -945,20 +970,20 @@ function arkRegistrering() {
     <input type="date" data-falt="datum" value="${esc(ark.datum)}">`;
 
   const forhand = beraknaForhand(valt, artikel);
-  return `${uppdragVal}${mangdVal}${datumVal}
-    ${ark.typ !== 'resa' ? `<details class="avskild"><summary>Utförare och samråd</summary>
+  return `${registreringsForetagsval()}${uppdragVal}${valt ? `<p class="notis"><strong>Faktureringsväg:</strong> ${esc(L.faktureringsvag(s, valt))}</p>` : ''}${mangdVal}${datumVal}
+    ${ark.typ !== 'resa' ? `<details class="avskild" ${L.foretagFor(s, valt) === L.FORETAG[1] ? 'open' : ''}><summary>Utförare och samråd</summary>
       <div class="faltrubrik">Utförare, valfritt</div><input data-falt="performedBy" value="${esc(ark.performedBy ?? '')}" placeholder="Till exempel AM eller Tobias">
       <div class="faltrubrik">I samråd med, valfritt</div><input data-falt="consultedWith" value="${esc(ark.consultedWith ?? '')}" placeholder="Till exempel Minette"></details>` : ''}
     ${forhand !== null
       ? `<div class="beloppforhand">${esc(kr(forhand))}<small>exklusive moms</small></div>`
       : '<div class="beloppforhand"><small>Inte fakturerbart</small></div>'}
-    <button class="spara" data-spara="1" ${forhandGiltig() ? '' : 'disabled'}>Spara</button>
+    <button class="spara" data-spara="1" ${forhandGiltig() && artikel ? '' : 'disabled'}>Spara</button>
     <button class="avbryt" data-stang="knapp">Avbryt</button>`;
 }
 
 function arkUtlagg() {
   const options = vat => `<option value="">Välj moms</option>${L.MOMSSATSER.map(m => `<option value="${m.sats}" ${String(vat) === String(m.sats) ? 'selected' : ''}>${m.etikett}</option>`).join('')}`;
-  return `<div class="faltrubrik">Uppdrag</div><select data-falt="projectId" aria-label="Uppdrag"><option value="">Välj uppdrag</option>${s.projects.filter(p => p.active !== false && p.kind === 'billable').map(p => `<option value="${esc(p.id)}" ${ark.projectId === p.id ? 'selected' : ''}>${esc(p.name)} · ${esc(L.kundNamnForUppdrag(s, p.id))}</option>`).join('')}</select>
+  return `${registreringsForetagsval()}<div class="faltrubrik">Uppdrag</div><select data-falt="projectId" aria-label="Uppdrag"><option value="">Välj uppdrag</option>${s.projects.filter(p => p.active !== false && p.kind === 'billable' && (!ark.foretag || p.billingCompany === ark.foretag)).map(p => `<option value="${esc(p.id)}" ${ark.projectId === p.id ? 'selected' : ''}>${esc(p.name)} · ${esc(L.faktureringsvag(s, p.id))}</option>`).join('')}</select>
     <div class="faltrubrik">Vad köpte du?</div><input data-falt="description" value="${esc(ark.description || '')}" placeholder="Material och kvittonummer">
     <div class="faltrubrik">Datum</div><input type="date" data-falt="date" value="${esc(ark.date)}">
     <div class="faltrubrik">Kvittots belopp inklusive moms</div><input inputmode="decimal" data-falt="gross" value="${esc(ark.gross || '')}" placeholder="407,00">
@@ -1063,6 +1088,7 @@ function arkUnderlag() {
   const r = ark.referens;
   const u = ark.underlag;
   return `
+    <p class="notis"><strong>Fakturerar:</strong> ${esc(u.billingCompany || 'Företag inte valt')}<br><strong>Kund:</strong> ${esc(L.kundFor(s, u.clientId)?.name || 'Kund inte vald')}</p>
     ${ark.period ? `<div class="notis">Avser ${esc(ark.period)}</div>` : ''}
     <div class="underlagrader">
       ${L.fakturarader(s, u).map(rad => `<div class="ulrad">
@@ -1169,8 +1195,22 @@ document.addEventListener('click', e => {
   const t = e.target.closest(VALJARE);
   if (!t) return;
   const d = t.dataset;
+  if (d.faktureringsval) { fakturaForetag = d.faktureringsval; return rita(); }
+  if (d.kopplaforetag) {
+    try { s = L.kopplaUnderlagsForetag(s, d.kopplaforetag.split('|')); spara(); visa('Företagskopplingarna sparas. Belopp och klarmarkering är bevarade.'); }
+    catch (error) { visa(error.message); }
+    return;
+  }
+  if (d.fakturaarbete) {
+    if (d.fakturaarbete === 'nyttuppdrag') ark = { typ: 'nyttuppdrag', billingCompany: fakturaForetag, clientId: null, debitering: null };
+    else if (d.fakturaarbete === 'utlagg') ark = { typ: 'utlagg', foretag: fakturaForetag, projectId: '', date: idag(), receiptVat: '', invoiceVat: '', paidBy: 'company' };
+    else ark = { typ: d.fakturaarbete, foretag: fakturaForetag, projectId: null, antal: 1, timmar: 1, km: null, start: '', slut: '', datum: idag() };
+    return rita();
+  }
   if (d.sparautlagg) {
-    try { s = L.registreraUtlagg(s, ark, L.nyttId('utlagg')); spara(); ark = null; visa('Inköpet sparas. Ersättning och bokföring hanteras separat.'); }
+    try {
+      if (ark.foretag && L.foretagFor(s, ark.projectId) !== ark.foretag) throw new Error('Välj ett uppdrag för det fakturerande företaget.');
+      s = L.registreraUtlagg(s, ark, L.nyttId('utlagg')); spara(); ark = null; visa('Inköpet sparas. Ersättning och bokföring hanteras separat.'); }
     catch (error) { visa(error.message); }
     return;
   }
@@ -1299,6 +1339,10 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('change', async e => {
+  if (e.target.dataset.registreringsforetag && ark) {
+    ark.foretag = e.target.value; ark.projectId = null; ark.km = null;
+    return rita();
+  }
   if (e.target.dataset.filter) {
     if (e.target.dataset.filter === 'foretag') fakturaForetag = e.target.value;
     if (e.target.dataset.filter === 'manad') fakturaManad = e.target.value;
@@ -1455,8 +1499,9 @@ function loggaUtFranApp() {
 
 function sparaNy() {
   const typer = TYPKARTA[ark.typ];
-  const projectId = ark.projectId ?? L.uppdragEfterSenast(s, typer)[0]?.id;
+  const projectId = ark.projectId ?? registreringsUppdrag()[0]?.id;
   if (!projectId) return visa('Välj ett uppdrag först.');
+  if (ark.foretag && L.foretagFor(s, projectId) !== ark.foretag) return visa('Välj ett uppdrag för det fakturerande företaget.');
   const typ = typer.find(t => L.artikelForUppdrag(s, projectId, t));
   const artikel = L.artikelForUppdrag(s, projectId, typ);
   if (!artikel) return visa('Det uppdraget har ingen sådan arbetstyp.');
