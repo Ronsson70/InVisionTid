@@ -27,7 +27,8 @@ globalThis.setTimeout = fn => { queueMicrotask(fn); return 1; };
 globalThis.clearTimeout = () => {};
 
 const klicka = dataset => {
-  const nod = { dataset, classList: { contains: () => false }, closest: () => nod };
+  const nod = { dataset, classList: { contains: () => false }, closest: selector =>
+    Object.keys(dataset).some(key => selector.includes(`[data-${key}]`)) ? nod : null };
   lyssnare.click({ target: nod });
 };
 const fyll = (falt, value) => {

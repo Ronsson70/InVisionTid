@@ -1177,6 +1177,7 @@ function rita() {
 // ── Händelser ───────────────────────────────────────────────────────────────
 
 const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara', 'stang', 'post',
+  'faktureringsval', 'fakturaarbete', 'kopplaforetag',
   'sparaandring', 'tabort', 'vecka', 'godkannresa', 'avboj', 'underlag', 'valjleverans', 'kopiera',
   'markklart', 'merinfo', 'sparanummer', 'borjaom', 'angemoms', 'valjmoms', 'sparamoms',
   'angra', 'valjlevuppdrag', 'valjleveransklar', 'markeragenomford', 'leverans',
