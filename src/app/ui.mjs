@@ -263,9 +263,9 @@ function vyVecka() {
       ${v.delar.tillfallenOre ? `<div class="brad under"><span>Behandlingstillfällen</span><span>${esc(kr(v.delar.tillfallenOre))}</span></div>` : ''}
       ${v.delar.styckOre ? `<div class="brad under"><span>Styckprisat arbete</span><span>${esc(kr(v.delar.styckOre))}</span></div>` : ''}
       ${v.delar.fastPrisAndelOre ? `<div class="brad under"><span>Fast pris, veckans andel</span><span>${esc(kr(v.delar.fastPrisAndelOre))}</span></div>` : ''}
-      ${v.fastPrisDetaljer.map(p => `<div class="fastprisrad">
+      ${L.samlaFastprisDetaljer(s, v.fastPrisDetaljer).map(p => `<div class="fastprisrad">
         <div class="fastprishuvud">
-          <span>${esc(p.uppdragsnamn)} · ${esc(p.namn)}</span>
+          <span>${esc(p.uppdragsnamn)}${p.namn ? ` · ${esc(p.namn)}` : ''}</span>
           <span>${esc(kr(p.andelOre))}</span>
         </div>
         <div class="fastprisunder">
@@ -273,6 +273,7 @@ function vyVecka() {
           ${esc(periodDatum(p.startDate))}–${esc(periodDatum(p.endDate))} · totalt ${esc(kr(p.amountOre))}
           ${p.uppdragAktivt ? '' : ' · vilande uppdrag'}
         </div>
+        ${p.oversikt ? fastprisStatus(p.oversikt) : ''}
       </div>`).join('')}
       <div class="brad avstand"><span>Resor att fakturera</span><span>${esc(kr(v.resorOre))}</span></div>
       <div class="brad"><span>Utlägg att ersätta</span><span>${esc(kr(v.utlaggOre))}</span></div>
@@ -758,6 +759,13 @@ function nyArtikelBlock(p, artiklar) {
   </div>`;
 }
 
+function fastprisStatus(oversikt) {
+  return `<div class="fastprisunder">
+    Totalt ${esc(kr(oversikt.totaltOre))} · Markerat fakturerat ${esc(kr(oversikt.faktureratOre))} · Kvar ${esc(kr(oversikt.kvarOre))} exkl. moms
+    ${oversikt.delar.filter(l => l.status !== 'invoiced').map(l => `<div>${esc(l.name)} · ${esc(kr(l.amountOre))}${l.plannedInvoiceDate ? ` · planerad fakturering ${esc(periodDatum(l.plannedInvoiceDate))}` : ' · fakturadatum saknas'}${l.invoiceRecordId ? ' · underlag sparat' : ''}</div>`).join('')}
+  </div>`;
+}
+
 function arkRedigeraUppdrag() {
   const p = L.uppdragFor(s, ark.projectId);
   if (!p) return '<div class="tom">Uppdraget finns inte längre.</div>';
@@ -765,10 +773,12 @@ function arkRedigeraUppdrag() {
   const prisartiklar = artiklar.filter(a => a.type !== 'trackingOnly' && a.billable !== false);
   const leveranser = (s.deliverables || []).filter(l => l.projectId === p.id
     && L.arGiltigFastprispost(s, l) && (l.startDate || l.endDate));
+  const harDelbetalningar = leveranser.some(l => l.splitFrom);
   const valt = (nyckel, reserv) => ark[nyckel] ?? reserv;
   return `
     ${p.active === false ? `<div class="notis vilandenotis"><strong>Vilande uppdrag.</strong> Du kan granska och rätta priser, moms och fastprisperioder utan att aktivera uppdraget.</div>` : ''}
     <p class="notis">Rätta uppgifter som blivit fel. Registreringar som redan ligger i ett klart Lundify-underlag behåller sitt låsta pris.</p>
+    ${harDelbetalningar ? `<div class="kort"><div class="rubrik">${esc(p.name)} · faktureringsöversikt</div>${fastprisStatus(L.fastprisOversikt(s, p.id))}<p class="notis">Statusen är sparad i InVisionTid. Arbetsperiod och planerad fakturering är skilda datum.</p></div>` : ''}
     <div class="faltrubrik">Kund</div>
     <div class="val">${(s.clients || []).map(c => `
       <button class="${valt('clientId', p.clientId) === c.id ? 'vald' : ''}" data-valjredigerakund="${esc(c.id)}">${esc(c.name)}</button>`).join('')}</div>
@@ -801,6 +811,7 @@ function arkRedigeraUppdrag() {
       <div class="faltrubrik">Standardresa i kilometer</div>
       <input type="number" inputmode="decimal" data-falt="standardresaKm" value="${esc(valt('standardresaKm', p.defaultTripKm ?? ''))}" placeholder="Kan lämnas tomt">` : ''}
 
+    ${harDelbetalningar ? '<details><summary>Ändra delbelopp, arbetsperiod eller moms</summary>' : ''}
     ${leveranser.map(l => {
       const last = !!l.invoiceRecordId;
       return `<div class="avskild">
@@ -817,6 +828,7 @@ function arkRedigeraUppdrag() {
           <button class="${Number(valt(`leveransmoms_${l.id}`, l.vatRate)) === m.sats ? 'vald' : ''}" data-valjleveransmoms="${esc(l.id)}|${m.sats}" ${last ? 'disabled' : ''}>${esc(m.etikett)}</button>`).join('')}</div>
       </div>`;
     }).join('')}
+    ${harDelbetalningar ? '</details>' : ''}
 
     <button class="spara" data-sparauppdrag="${esc(p.id)}">Spara uppdraget</button>
     <button class="avbryt" data-oppna="uppdrag">Tillbaka</button>`;

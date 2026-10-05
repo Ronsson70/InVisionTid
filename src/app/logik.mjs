@@ -331,6 +331,42 @@ export const uppdragHarTillfallespris = (s, projectId) =>
 export const arGiltigFastprispost = (s, leverans) =>
   !!leverans && leverans.billingDisabled !== true && !uppdragHarTillfallespris(s, leverans.projectId);
 
+/** Visningsöversikt. Ändrar aldrig leveranser eller fakturaunderlag. */
+export function fastprisOversikt(s, projectId, splitFrom = null) {
+  const delar = (s.deliverables || []).filter(l => l.projectId === projectId
+    && arGiltigFastprispost(s, l) && (!splitFrom || l.splitFrom === splitFrom));
+  const totaltOre = delar.reduce((sum, l) => sum + l.amountOre, 0);
+  const faktureratOre = delar.filter(l => l.status === 'invoiced')
+    .reduce((sum, l) => sum + l.amountOre, 0);
+  return {
+    totaltOre, faktureratOre, kvarOre: totaltOre - faktureratOre,
+    delar: [...delar].sort((a, b) => (a.plannedInvoiceDate || '').localeCompare(b.plannedInvoiceDate || '')
+      || a.name.localeCompare(b.name, 'sv', { numeric: true })),
+  };
+}
+
+/** Samla delbetalningar med samma arbetsperiod utan att räkna om deras ören. */
+export function samlaFastprisDetaljer(s, detaljer) {
+  const grupper = new Map();
+  for (const p of detaljer) {
+    const l = (s.deliverables || []).find(l => l.id === p.id);
+    const nyckel = JSON.stringify(l?.splitFrom
+      ? [p.projectId, l.splitFrom, p.startDate, p.endDate] : [p.id]);
+    const grupp = grupper.get(nyckel);
+    if (grupp) {
+      grupp.andelOre += p.andelOre;
+      grupp.amountOre += p.amountOre;
+    } else {
+      grupper.set(nyckel, {
+        ...p,
+        namn: l?.splitFrom ? '' : p.namn,
+        oversikt: l?.splitFrom ? fastprisOversikt(s, p.projectId, l.splitFrom) : null,
+      });
+    }
+  }
+  return [...grupper.values()];
+}
+
 /**
  * Leveranser som går att markera genomförda.
  *
