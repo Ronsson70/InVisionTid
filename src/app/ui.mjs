@@ -8,6 +8,7 @@
 // varken testdata eller en väg tillbaka till testdata.
 
 import * as L from './logik.mjs';
+import { importeraFakturaregister, fakturafacit } from './fakturaregister.mjs';
 
 const DAGAR = ['Söndag', 'Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lördag'];
 const MANADER = ['januari', 'februari', 'mars', 'april', 'maj', 'juni',
@@ -426,6 +427,28 @@ function malForetagsval() {
   return `<label>Mål och uppföljning för bolag<select data-malforetag="1"><option value="">Alla bolag (befintligt mål)</option>${L.FORETAG.map(c => `<option value="${esc(c)}" ${malForetag === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label><p class="notis">Målbeloppen ändras inte när du väljer bolag.</p>`;
 }
 
+function fakturaregisterKort(month) {
+  try {
+    const f = fakturafacit(s, month, malForetag);
+    return `<div class="kort"><h2>Fakturerat enligt Lundify</h2>
+      <p class="notis">Fakturadatum styr månaden. Arbetsperiod och arbetstid är separata. Endast importerade kunder och fakturor ingår; detta är inte hela bolagets intäkt.</p>
+      ${f.hasRegister ? `<div class="brad stark"><span>Fakturerat netto efter registrerade krediter · ${esc(month)}</span><span>${f.coveredMonth ? esc(L.exaktBelopp(f.netOre)) : 'Täckning saknas för månaden'}</span></div>
+      <p>Totalt i det avgränsade registret: ${esc(L.exaktBelopp(f.allNetOre))} netto · ${f.allCount} dokument.</p>
+      <p>${f.records.length} registrerade dokument. Saknade fakturor eller senare krediter kan påverka summan.</p>` : '<p>Inget verifierat fakturaregister har importerats.</p>'}
+      ${f.coverage.map(c => `<p class="notis">Täckning: ${esc(c.billingCompany)} · fakturadatum ${esc(c.from)}–${esc(c.to)} · kundnummer ${esc(c.customerNumbers.join(', '))}. Listkontroll ${esc(c.checkedAt)}. ${esc(c.limitations)}</p>`).join('')}
+      <p class="notis">Betalstatus i Lundify är inte verifierad bankinbetalning. Utkast ingår inte.</p>
+      <details><summary>Visa registrerade fakturor för månaden</summary>${f.records.map(r=>`<p><strong>${esc(r.billingCompany)} · faktura ${esc(r.invoiceNumber)}</strong><br>${esc(r.customer.name)} · kundnummer ${esc(r.customer.number)}<br>Fakturadatum ${esc(r.invoiceDate)} · arbetsperiod: ${esc(r.workPeriod.description)}<br>Netto ${esc(L.exaktBelopp(r.netOre))} · moms ${esc(L.exaktBelopp(r.vatOre))} · avrundning ${esc(L.exaktBelopp(r.roundingOre))} · totalt ${esc(L.exaktBelopp(r.totalOre))}${r.creditOf ? '<br>Kredit till faktura '+esc(r.creditOf) : ''}<br>Betalstatus enligt Lundify: ${esc(r.lundifyPaymentStatus)}. Källa: ${esc(r.source.detailsBasis)}</p>`).join('')}</details>
+      <button class="sekundar" data-registeroppna="1">Läs in verifierat fakturaregister</button></div>`;
+  } catch(error) { return `<div class="kort"><p class="varning">${esc(error.message)}</p></div>`; }
+}
+function arkFakturaregister() {
+  return `<p class="notis">Läs in verifierade Lundifyfakturor som JSON. Endast fakturaregistret läggs till; tider, resor, priser och mål ändras inte. Utkast godtas inte.</p>
+    <label>Verifierat register (JSON)<textarea data-falt="registerJson">${esc(ark.registerJson || '')}</textarea></label>
+    <button class="sekundar" data-registergranska="1">Granska utan att spara</button>
+    ${ark.registerPreview ? `<p>${ark.registerPreview.added} nya fakturor, ${ark.registerPreview.duplicates} redan registrerade.</p><p>Netto för nya fakturor: ${esc(L.exaktBelopp(ark.registerNetOre))}</p><p>${esc(ark.registerCoverage)}</p><button class="spara" data-registerspara="1">Spara verifierade fakturor i appen</button>` : ''}
+    <button class="avbryt" data-stang="knapp">Stäng utan att ändra något</button>`;
+}
+
 // ── Vy: Uppföljning ─────────────────────────────────────────────────────────
 
 function vyUppfoljning() {
@@ -463,8 +486,9 @@ function vyUppfoljning() {
     <div class="uppfrad"><span>Redo för Lundify<div class="markning">exklusive moms</div></span><span class="v">${esc(kr(m.redoForLundifyOre))}</span></div>
     <div class="uppfrad"><span>Äldre manuell klarmarkering, ej verifierad<div class="markning">exklusive moms</div></span><span class="v">${esc(kr(m.klartILundifyOre))}</span></div>
     <div class="uppfrad"><span>Arbetad tid</span><span class="v">${esc(timmar(m.arbetadTidSekunder))} h</span></div>
-    <p class="notis">Fakturerat netto efter krediter och faktiskt inbetalt: inte verifierat. Dessa värden kräver aktuell avstämning mot Lundify och kan inte räknas från klarmarkeringar.</p>
+    <p class="notis">Arbetsvärdet ovan är beräknat. Fakturerat enligt Lundify visas separat nedan. Faktiskt inbetalt är inte verifierat och kan inte räknas från klarmarkeringar.</p>
   </div>
+  ${fakturaregisterKort(manad)}
   <div class="kort">
     <div class="rubrik">Kostnadsersättning</div>
     <div class="uppfrad"><span>Resor</span><span class="v">${esc(kr(m.resorOre))}</span></div>
@@ -1177,7 +1201,8 @@ function arkUnderlag() {
 function ritaArk() {
   if (!ark) return '';
   let innehall = '';
-  if (ark.typ === 'mer') innehall = arkMer();
+  if (ark.typ === 'fakturaregister') innehall = arkFakturaregister();
+  else if (ark.typ === 'mer') innehall = arkMer();
   else if (ark.typ === 'utlagg') innehall = arkUtlagg();
   else if (ark.typ === 'uppdrag') innehall = arkUppdrag();
   else if (ark.typ === 'nyttuppdrag') innehall = arkNyttUppdrag();
@@ -1234,7 +1259,7 @@ function rita() {
 
 // ── Händelser ───────────────────────────────────────────────────────────────
 
-const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara', 'stang', 'post',
+const VALJARE = ['registeroppna', 'registergranska', 'registerspara', 'vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara', 'stang', 'post',
   'faktureringsval', 'fakturaarbete', 'kopplaforetag',
   'sparaandring', 'tabort', 'vecka', 'godkannresa', 'avboj', 'underlag', 'valjleverans', 'kopiera',
   'merinfo', 'borjaom', 'angemoms', 'valjmoms', 'sparamoms',
@@ -1254,6 +1279,26 @@ document.addEventListener('click', e => {
   const t = e.target.closest(VALJARE);
   if (!t) return;
   const d = t.dataset;
+  if (d.registeroppna) { ark = {typ:'fakturaregister',rubrik:'Verifierat fakturaregister',registerJson:''}; return rita(); }
+  if (d.registergranska || d.registerspara) {
+    try {
+      if (sparlage !== 'sparat') throw new Error('Spara klart eller ladda om innan du läser in registret.');
+      if (d.registerspara && (ark.registerBase !== JSON.stringify(s) || ark.registerCheckedJson !== ark.registerJson)) throw new Error('Uppgifterna har ändrats. Granska igen innan sparning.');
+      const batch = JSON.parse(ark.registerJson);
+      const result = importeraFakturaregister(s, batch);
+      if (d.registergranska) {
+        ark.registerPreview = {added:result.added,duplicates:result.duplicates};
+        const oldKeys = new Set((s.lundifyLedger?.records || []).map(r=>JSON.stringify([r.billingCompany,r.invoiceNumber])));
+        ark.registerNetOre = result.state.lundifyLedger.records.filter(r=>!oldKeys.has(JSON.stringify([r.billingCompany,r.invoiceNumber]))).reduce((n,r)=>n+r.netOre,0);
+        ark.registerCoverage = batch.coverage.map(c=>c.billingCompany+' · '+c.from+'–'+c.to+' · kunder '+c.customerNumbers.join(', ')+' · '+c.limitations).join('; ');
+        ark.registerBase = JSON.stringify(s); ark.registerCheckedJson = ark.registerJson; return rita();
+      }
+      if (!lagring?.version?.eTag) throw new Error('Versionsskyddad OneDrive-lagring saknas. Ingenting sparas.');
+      if (result.state === s) return visa('Alla fakturor finns redan. Ingenting ändrades.');
+      s = result.state; spara(); ark = null; return rita();
+    } catch(error) { return visa(error.message); }
+  }
+
   if (d.faktureringsval) { fakturaForetag = d.faktureringsval; return rita(); }
   if (d.kopplaforetag) {
     try { s = L.kopplaUnderlagsForetag(s, d.kopplaforetag.split('|')); spara(); visa('Företagskopplingarna sparas. Belopp och klarmarkering är bevarade.'); }
@@ -1405,6 +1450,7 @@ document.addEventListener('input', e => {
     if (button) button.disabled = !forhandGiltig();
     return;
   }
+  if (f === 'registerJson') ark.registerPreview = null;
   ark[f] = e.target.value;
   if (f === 'start' || f === 'slut') { ark.timmar = null; rita(); }
 });

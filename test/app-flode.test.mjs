@@ -544,3 +544,15 @@ test('registrerat underlag kan få spårbart rättelsebehov via UI utan att frig
   klicka({rattelsebehov:r.id}); await tom();
   assert.equal(saved.length,1);
 });
+
+test('fakturaregister: granska/stäng är läsande, versionsskydd krävs, upprepad import sparar inte', async()=>{
+ const {FORETAG}=await import('../src/app/arbetsflode.mjs');const s=skapaTestdata(),before=structuredClone(s),saved=[];
+ const data={version:1,coverage:[{billingCompany:FORETAG[0],from:'2026-07-01',to:'2026-10-31',customerNumbers:['10'],checkedAt:'2026-11-01T01:10:00Z',limitations:'Endast testkund; senare krediter ej kontrollerade.'}],records:[{billingCompany:FORETAG[0],invoiceNumber:'100',customer:{number:'10',name:'Testkund'},invoiceDate:'2026-07-01',workPeriod:{from:null,to:null,description:'Juniarbete'},netOre:10000,vatOre:2500,roundingOre:0,totalOre:12500,status:'registered',kind:'invoice',lundifyPaymentStatus:'paid',cashVerified:false,source:{system:'Lundify',listCheckedAt:'2026-11-01T01:10:00Z',detailsBasis:'Syntetisk test'}}]};
+ startaApp({tillstand:s,lagring:{async spara(x){saved.push(x);}}});
+ klicka({registeroppna:'1'});fyll('registerJson',JSON.stringify(data));klicka({registergranska:'1'});assert.match(html,/1 nya fakturor/);klicka({stang:'knapp'});await tom();assert.equal(saved.length,0);assert.deepEqual(s,before);
+ klicka({registeroppna:'1'});fyll('registerJson',JSON.stringify(data));klicka({registergranska:'1'});klicka({registerspara:'1'});await tom();assert.equal(saved.length,0);
+ startaApp({tillstand:s,lagring:{version:{eTag:'version-1'},async spara(x){saved.push(structuredClone(x));}}});
+ klicka({registeroppna:'1'});fyll('registerJson',JSON.stringify(data));klicka({registergranska:'1'});fyll('registerJson',JSON.stringify({...data,version:2}));klicka({registerspara:'1'});await tom();assert.equal(saved.length,0);
+ fyll('registerJson',JSON.stringify(data));klicka({registergranska:'1'});klicka({registerspara:'1'});await tom();assert.equal(saved.length,1);const {lundifyLedger,...rest}=saved[0];assert.deepEqual(rest,before);
+ klicka({registeroppna:'1'});fyll('registerJson',JSON.stringify(data));klicka({registergranska:'1'});klicka({registerspara:'1'});await tom();assert.equal(saved.length,1);
+});

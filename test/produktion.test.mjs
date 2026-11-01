@@ -505,3 +505,16 @@ test('den gamla appen är arkiverad som text och kan inte köras', () => {
   const filer = readdirSync(join(repoRot, 'arkiv'));
   assert.ok(!filer.some(n => extname(n) === '.html'), 'arkivet innehåller ingen körbar sida');
 });
+
+test('fakturaregister använder backup, If-Match och återläsning; sen konflikt skriver inte över',async()=>{
+ const {skapaOneDriveLagring}=await import('../src/app/lagring-onedrive.mjs');
+ for(const conflict of [false,true]) {
+  const original=JSON.stringify(tomV2({installningar:{veckomalOre:1850000,manadsmalOre:8000000}}));const f=stubbGraph({[V2_SOKVAG]:original});let guard;
+  const fetch=async(url,init={})=>{if(init.method==='PUT'&&String(url).includes('invisiontid-data-v2.json:/content')){guard=init.headers['If-Match'];if(conflict)return {ok:false,status:412};}return f(url,init);};
+  const storage=skapaOneDriveLagring({token:'syntetiskt',hamta:fetch,nu:()=>NU});const s=await storage.las();const expected=storage.version.eTag;
+  const changed={...s,lundifyLedger:{version:1,records:[],coverage:[]}};
+  if(conflict){await assert.rejects(()=>storage.spara(changed),Synkkonflikt);assert.equal(f.lager[V2_SOKVAG],original);}
+  else{await storage.spara(changed);assert.deepEqual((await storage.las()).lundifyLedger,changed.lundifyLedger);}
+  assert.equal(guard,expected);const backup=Object.keys(f.lager).find(p=>p.includes('-backup-'));assert.ok(backup);assert.equal(f.lager[backup],original);
+ }
+});
