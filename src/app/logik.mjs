@@ -1,3 +1,4 @@
+import { underlagsStatus } from './underlagskontroll.mjs';
 import { faktureringsprofil } from './faktureringsprofil.mjs';
 export { faktureringsprofil, uppdateraKundprofil } from './faktureringsprofil.mjs';
 export { underlagsStatus, kontrollversion, sparaForberett, kontrolleraDokument, oppnaNyVersion, registreraRattelsebehov } from './underlagskontroll.mjs';
@@ -719,7 +720,7 @@ export function hamtaSparatUnderlag(s, id) {
     poster: s.poster.filter(p => p.invoiceRecordId === id),
     leveranser: s.deliverables || [],
     valdaLeveranser: (s.deliverables || []).filter(l => l.invoiceRecordId === id).map(l => l.id),
-  }), billingCompany: referens.billingCompany ?? null };
+  }), id: referens.id, reconstructed: true, billingCompany: referens.billingCompany ?? null };
 }
 
 /** Förhandsvisning utan att låsa något, för att kunna visa summan i listan. */
@@ -771,7 +772,9 @@ export function lundifyText(s, underlag) {
     `Fakturerande företag: ${underlag.billingCompany || 'Inte valt – kontrollera innan du skapar utkast'}`,
     'Endast fakturaunderlag. Ronney granskar och registrerar själv.',
     `Källposter: ${underlag.rader.map(r => r.sourceType + ':' + r.sourceId).join(', ')}`,
-    sparad?.createdAt ? `Underlagsversion: ${sparad.id}, sparad ${sparad.createdAt}` : 'Förhandsvisning – inte sparad',
+    sparad ? `Underlagsreferens: ${sparad.id}${sparad.createdAt ? ', sparad ' + sparad.createdAt : ', spartid saknas'}` : 'Förhandsvisning – inte sparad',
+    ...(sparad && underlag.reconstructed ? [`Status: ${underlagsStatus(sparad)}`, `Dokumentreferens: ${sparad.documentReference || sparad.invoiceNumber || sparad.lundifyDraftId || 'saknas – behöver avstämmas'}`] : []),
+    ...(underlag.reconstructed ? ['Äldre sparat underlag utan fryst snapshot. Rekonstruerat från nuvarande kopplade poster; historiskt innehåll måste stämmas av.'] : []),
     ...(underlag.previousDraftReferences ?? (sparad ? [] : (s.invoiceRecords || []).filter(r => r.workflowStatus === 'superseded' && r.lundifyDraftId && r.snapshot?.rader.some(old => underlag.rader.some(row => row.sourceType === old.sourceType && row.sourceId === old.sourceId))).map(r => r.lundifyDraftId))).map(ref => `Tidigare Lundify-utkast: ${ref}. Stäm av och uppdatera samma utkast; skapa inte ett nytt.`),
     period ? `Avser: ${period}` : null,
     '',

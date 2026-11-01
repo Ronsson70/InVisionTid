@@ -18,6 +18,8 @@ const FARGER = ['#7C9082', '#D4856A', '#8B7EA8', '#C4A55A', '#5B8A72', '#B07156'
 
 let s, vy = 'idag', veckoOffset = 0, manadsOffset = 0, ark = null, flash = null, kopierat = false;
 let fakturaForetag = '', fakturaManad = '';
+let malForetag = '';
+const malVisning = () => ({ ...s, installningar: { ...s.installningar, malForetag: malForetag || null } });
 let tidigareUppdrag = [];
 let historikForslag = null;
 
@@ -235,7 +237,7 @@ function vyVecka() {
     </div>`;
   }).join('');
 
-  const v = L.veckoSammanstallning(s, veckoOffset);
+  const v = L.veckoSammanstallning(malVisning(), veckoOffset);
   const bredd = v.harMal ? Math.min(100, Math.round(v.jobbatInOre / v.malOre * 100)) : 0;
 
   return `
@@ -421,7 +423,7 @@ function vyFakturera() {
 }
 
 function malForetagsval() {
-  return `<label>Mål och uppföljning för bolag<select data-malforetag="1"><option value="">Alla bolag (befintligt mål)</option>${L.FORETAG.map(c => `<option value="${esc(c)}" ${s.installningar?.malForetag === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label><p class="notis">Målbeloppen ändras inte när du väljer bolag.</p>`;
+  return `<label>Mål och uppföljning för bolag<select data-malforetag="1"><option value="">Alla bolag (befintligt mål)</option>${L.FORETAG.map(c => `<option value="${esc(c)}" ${malForetag === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label><p class="notis">Målbeloppen ändras inte när du väljer bolag.</p>`;
 }
 
 // ── Vy: Uppföljning ─────────────────────────────────────────────────────────
@@ -431,8 +433,8 @@ function vyUppfoljning() {
   const namn = MANADSNAMN(manad);
 
   // EN sammanställning. Vyn kombinerar inte siffror från två beräkningsvägar.
-  const m = L.manadsSammanstallning(s, manad);
-  const kunder = L.perKund(s, L.manadensDatum(s, manad));
+  const m = L.manadsSammanstallning(malVisning(), manad);
+  const kunder = L.perKund(malVisning(), L.manadensDatum(s, manad));
   const bredd = m.harMal ? Math.min(100, Math.round(m.jobbatInOre / m.malOre * 100)) : 0;
 
   return `
@@ -1133,6 +1135,7 @@ function arkUnderlag() {
   return `
     <p class="notis"><strong>Fakturerar:</strong> ${esc(u.billingCompany || 'Företag inte valt')}<br><strong>Kund:</strong> ${esc(u.clientSnapshot?.name ?? L.kundFor(s, u.clientId)?.name ?? 'Kund inte vald')}</p>
     ${ark.period ? `<div class="notis">Avser ${esc(ark.period)}</div>` : ''}
+    ${u.reconstructed ? '<p class="varning">Äldre sparat underlag utan fryst snapshot. Rader och belopp har rekonstruerats från nuvarande kopplade poster; historiskt innehåll måste stämmas av.</p>' : ''}
     <div class="underlagrader">
       ${(r?.presentationRows || L.fakturarader(s, u)).map(rad => `<div class="ulrad">
         <div class="ulnamn">${esc(rad.beskrivning)}</div>
@@ -1410,8 +1413,8 @@ document.addEventListener('change', async e => {
   if (e.target.dataset.malforetag) {
     const company = e.target.value;
     if (company && !L.FORETAG.includes(company)) return;
-    s = { ...s, installningar: { ...s.installningar, malForetag: company || null } };
-    spara(); rita(); return;
+    malForetag = company;
+    rita(); return;
   }
   if (e.target.dataset.falt === 'billingCompany' && ark?.typ === 'nyttuppdrag') { ark.billingCompany = e.target.value; return rita(); }
   if (e.target.dataset.registreringsforetag && ark) {
@@ -1860,6 +1863,7 @@ export function startaApp(opts) {
   };
   tidigareUppdrag = opts.tidigareUppdrag ?? [];
   historikForslag = opts.historikForslag ?? null;
+  malForetag = '';
   s = opts.tillstand; // Läsning får inte härleda eller skriva om äldre fakturastatusar.
   sparlage = 'sparat';
   clearTimeout(sparTimer);
