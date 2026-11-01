@@ -124,6 +124,8 @@ export function uppdateraUppdrag(tillstand, projectId, indata) {
     throw new Error('Den valda kunden finns inte längre.');
   }
 
+  if (clientId !== befintligt.clientId && ([...(tillstand.poster || []), ...(tillstand.deliverables || [])].some(p => p.projectId === projectId && p.invoiceRecordId) || (tillstand.invoiceRecords || []).some(r => r.snapshot?.rader.some(row => row.projectId === projectId)))) throw new Error('Uppdraget har sparade underlag. Kundbyte kräver ett separat uppdrag.');
+
   const artikelAndringar = new Map((indata?.artiklar || []).map(a => [a.id, a]));
   for (const id of artikelAndringar.keys()) {
     if (!(tillstand.articles || []).some(a => a.id === id && a.projectId === projectId)) {
@@ -180,12 +182,13 @@ export function uppdateraUppdrag(tillstand, projectId, indata) {
     ? heltal(indata?.defaultTripKm, 'Standardresan', { tillatTomt: true })
     : befintligt.defaultTripKm ?? null;
 
-  const artiklarPerId = new Map(articles.map(a => [a.id, a]));
+  // Ändrade standardpriser/tider gäller kommande registreringar. Befintlig tid
+  // bevaras och tidigare artikelpris fryses även på ännu öppna poster.
+  const gamlaArtiklar = new Map((tillstand.articles || []).map(a => [a.id, a]));
   const poster = (tillstand.poster || []).map(p => {
-    const artikel = artiklarPerId.get(p.articleId);
-    if (p.invoiceRecordId || p.status !== 'open' || artikel?.type !== 'session'
-        || !artikel.workSecondsPerUnit) return p;
-    return { ...p, seconds: arbetstidSekunderForArtikel(artikel, p.qtyMilli, { reserv: p.seconds ?? null }) };
+    const a = gamlaArtiklar.get(p.articleId);
+    if (!a || !artikelAndringar.has(a.id) || p.priceSnapshot) return p;
+    return { ...p, priceSnapshot: { unitPriceOre: a.unitPriceOre, vatRate: a.vatRate, unit: a.unit, articleName: a.name } };
   });
 
   return {
@@ -283,6 +286,7 @@ export function skapaNyttUppdrag(tillstand, indata) {
   if (clientId === 'ny' || !clientId) {
     const kundnamn = text(indata?.kundnamn);
     if (!kundnamn) throw new Error('Välj en kund eller skriv ett nytt kundnamn.');
+    if (clients.some(c => text(c.name).toLocaleLowerCase('sv') === kundnamn.toLocaleLowerCase('sv'))) throw new Error('Kunden finns redan. Välj den befintliga kunden.');
     clientId = uniktId('kund', clients);
     clients.push({ id: clientId, name: kundnamn, status: 'active' });
   } else if (!clients.some(c => c.id === clientId)) {
@@ -421,4 +425,13 @@ export function laggTillArtikel(tillstand, projectId, indata) {
       : tillstand.projects.map(p => p.id === projectId ? { ...p, defaultTripKm: standardresaKm } : p),
     articles: [...(tillstand.articles || []), artikel],
   };
+}
+
+/** Bara ett entydigt befintligt pris inom samma kund och bolag får föreslås. */
+export function kundprisForslag(s, clientId, billingCompany, type) {
+  if (!clientId || !billingCompany || !['hourly', 'session'].includes(type)) return null;
+  const ids = new Set(s.projects.filter(p => p.clientId === clientId && p.billingCompany === billingCompany && p.active !== false).map(p => p.id));
+  const candidates = s.articles.filter(a => ids.has(a.projectId) && a.type === type && a.active !== false && a.billable !== false);
+  const prices = [...new Set(candidates.map(a => a.unitPriceOre))];
+  return prices.length === 1 && prices[0] > 0 ? prices[0] : null;
 }

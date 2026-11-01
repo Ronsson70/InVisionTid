@@ -184,43 +184,18 @@ test('klickflöde: veckomål sparas och kontoåtgärder fungerar', async () => {
   assert.equal(utloggningar, 1);
 });
 
-test('klickflöde: ett klart Lundify-underlag kan öppnas för rättning', async () => {
+test('klickflöde: äldre klarmarkering får inte frigöra historiska poster', async () => {
+  const s = skapaTestdata();
+  s.poster[0] = { ...s.poster[0], invoiceRecordId: 'legacy', status: 'included', priceSnapshot: { unitPriceOre: 240000 } };
+  s.invoiceRecords = [{ id: 'legacy', clientId: 'k-a', period: '2026-08', klarmarkeradAt: '2026-08-27' }];
   const sparade = [];
-  const id = 'underlag-att-oppna';
-  const grund = skapaTestdata();
-  const tillstand = {
-    ...grund,
-    poster: grund.poster.map(p => p.id === 'p-1'
-      ? { ...p, status: 'included', invoiceRecordId: id, priceSnapshot: { unitPriceOre: 240000 } }
-      : p),
-    invoiceRecords: [{
-      id, clientId: 'k-a', period: '2026-08', nettoOre: 480000,
-      momsOre: 0, attBetalaOre: 480000, klarmarkeradAt: '2026-08-27',
-    }],
-  };
-  startaApp({
-    lagring: { async spara(s) { sparade.push(structuredClone(s)); } },
-    tillstand,
-  });
-
+  startaApp({ tillstand: s, lagring: { async spara(x) { sparade.push(x); } } });
   klicka({ vy: 'fakturera' });
-  assert.match(html, /Öppna för rättning/);
-  assert.match(html, /Ingenting ändras i Lundify/);
-  assert.ok(!/>Ångra</.test(html), 'knappen ska säga vad den faktiskt gör');
-
-  klicka({ vy: 'vecka' });
-  klicka({ post: 'p-1' });
-  assert.match(html, /data-angra="underlag-att-oppna"/,
-    'den låsta raden har en direkt väg till att öppna hela underlaget');
-  klicka({ angra: id });
+  assert.match(html, /Äldre underlag – behöver avstämmas/);
+  klicka({ angra: 'legacy' });
   await tom();
-
-  const sparat = sparade.at(-1);
-  const post = sparat.poster.find(p => p.id === 'p-1');
-  assert.equal(post.status, 'open');
-  assert.equal(post.invoiceRecordId, null);
-  assert.equal(post.priceSnapshot, null);
-  assert.ok(!sparat.invoiceRecords.some(r => r.id === id));
+  assert.equal(sparade.length, 0);
+  assert.equal(s.poster[0].invoiceRecordId, 'legacy');
 });
 
 test('klickflöde: hela historiken läggs in som redan klar och förblir redigerbar', async () => {
@@ -467,4 +442,105 @@ test('klickflöde: ett tillfällesuppdrag kan få en timartikel och syns sedan u
   // Och nu går uppdraget att välja under Tid.
   klicka({ oppna: 'tid' });
   assert.match(html, /Passuppdrag/);
+});
+
+test('Visa underlag, upprepade klick och stäng skriver inte; explicit spara skriver en gång', async () => {
+  const L = await import('../src/app/logik.mjs');
+  const state = skapaTestdata();
+  state.projects.forEach(p => { p.billingCompany = L.FORETAG[0]; });
+  const original = structuredClone(state);
+  const saved = [];
+  startaApp({ tillstand: state, lagring: { async spara(x) { saved.push(structuredClone(x)); } } });
+  const group = L.underlagsgrupper(state).find(g => g.clientId === 'k-a');
+  klicka({ underlag: group.id });
+  assert.match(html, /Förhandsvisning. Ingenting har sparats eller låsts/);
+  klicka({ stang: 'knapp' });
+  klicka({ underlag: group.id });
+  await tom();
+  assert.equal(saved.length, 0); assert.deepEqual(state, original);
+  klicka({ sparaforberett: '1' });
+  klicka({ sparaforberett: '1' });
+  await tom();
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].invoiceRecords.length, original.invoiceRecords.length + 1);
+  assert.match(html, /Sparat förberett/);
+  klicka({ stang: 'knapp' });
+  klicka({ sparatunderlag: saved[0].invoiceRecords.at(-1).id });
+  await tom(); assert.equal(saved.length, 1);
+});
+
+test('kundprofil sparas endast explicit och hålls separat per fakturerande bolag', async () => {
+  const sparade = [];
+  const state = skapaTestdata();
+  startaApp({ tillstand: state, lagring: { async spara(s) { sparade.push(structuredClone(s)); } } });
+  klicka({ redigerakund: 'k-a' });
+  assert.match(html, /Gemensamma faktureringsvillkor per bolag/);
+  fyll('cp_0_paymentTermsDays', '10');
+  fyll('cp_0_invoiceText', 'Testvillkor A');
+  fyll('cp_0_travelGrouping', 'purpose');
+  fyll('cp_1_paymentTermsDays', '20');
+  await tom();
+  assert.equal(sparade.length, 0);
+  klicka({ sparakund: 'k-a' });
+  await tom();
+  const c = sparade.at(-1).clients.find(c => c.id === 'k-a');
+  assert.equal(c.billingProfiles[FORETAG[0]].paymentTermsDays, 10);
+  assert.equal(c.billingProfiles[FORETAG[1]].paymentTermsDays, 20);
+  assert.equal(c.billingProfiles[FORETAG[0]].travelGrouping, 'purpose');
+  assert.deepEqual(sparade.at(-1).poster, state.poster);
+});
+
+test('kvittots bildbehandling begränsar storlek, sparar arbetskopia och skickar inte bild i underlaget', async () => {
+  const saved = [], calls = [];
+  const state = skapaTestdata();
+  const previousBitmap = globalThis.createImageBitmap;
+  const previousCreate = document.createElement;
+  let canvas;
+  globalThis.createImageBitmap = async () => ({ width: 1600, height: 800, close() { calls.push('close'); } });
+  document.createElement = name => {
+    assert.equal(name, 'canvas');
+    canvas = { width: 0, height: 0, getContext: () => ({ drawImage() { calls.push('draw'); } }),
+      toDataURL(type, quality) { assert.equal(type, 'image/jpeg'); assert.equal(quality, 0.8); return 'data:image/jpeg;base64,dGVzdA=='; } };
+    return canvas;
+  };
+  try {
+    startaApp({ tillstand: state, lagring: { async spara(s) { saved.push(structuredClone(s)); } } });
+    klicka({ oppna: 'utlagg' });
+    await lyssnare.change({ target: { dataset: { kvitto: '1' }, files: [{ type: 'image/png', size: 1000 }] } });
+    assert.equal(canvas.width, 1200); assert.equal(canvas.height, 600);
+    assert.deepEqual(calls, ['draw', 'close']); assert.match(html, /Kvitto att spara/);
+    fyll('projectId', 'u-behandling'); fyll('description', 'Syntetiskt inköp'); fyll('gross', '125');
+    fyll('receiptVat', '2500'); fyll('invoiceVat', '2500'); fyll('rebill', 'yes');
+    klicka({ sparautlagg: '1' }); await tom();
+    const post = saved.at(-1).poster.at(-1);
+    assert.equal(post.receiptImage, 'data:image/jpeg;base64,dGVzdA==');
+    assert.equal(post.qtyMilli, 100000);
+    const L = await import('../src/app/logik.mjs');
+    const group = L.underlagsgrupper(saved.at(-1)).find(g => g.rader.some(r => r.post.id === post.id));
+    assert.ok(group);
+    const preview = L.forberedUnderlag(saved.at(-1), group.id);
+    assert.ok(!L.lundifyText(saved.at(-1), preview.underlag).includes('data:image'));
+  } finally { globalThis.createImageBitmap = previousBitmap; document.createElement = previousCreate; }
+});
+
+test('registrerat underlag kan få spårbart rättelsebehov via UI utan att frigöra poster', async () => {
+  const L = await import('../src/app/logik.mjs');
+  let state = skapaTestdata(); state.projects.forEach(p => { p.billingCompany = FORETAG[0]; });
+  const group = L.underlagsgrupper(state).find(g => g.clientId === 'k-a' && g.rader.length);
+  const preview = L.forberedUnderlag(state, group.id);
+  const prepared = L.sparaForberett(state, group.id, [], L.kontrollversion(state, preview.underlag));
+  assert.equal(prepared.ok, true);
+  const r = prepared.referens;
+  state = L.kontrolleraDokument(prepared.state, r.id, {kind:'registered', reference:'TEST-UI-1', customerId:'TEST-C1', nettoOre:r.nettoOre, confirmed:true, invoiceDate:'2026-10-31'}).state;
+  const saved=[];
+  startaApp({tillstand:state,lagring:{async spara(s){saved.push(structuredClone(s));}}});
+  klicka({sparatunderlag:r.id});
+  assert.match(html,/Rättelsebehov för faktura TEST-UI-1/);
+  fyll('rattelseorsak','Test: kontrollera antal');
+  klicka({rattelsebehov:r.id}); await tom();
+  assert.equal(saved.at(-1).invoiceRecords.find(x=>x.id===r.id).correctionPending,true);
+  assert.deepEqual(saved.at(-1).poster,state.poster);
+  assert.match(html,/Test: kontrollera antal/);
+  klicka({rattelsebehov:r.id}); await tom();
+  assert.equal(saved.length,1);
 });

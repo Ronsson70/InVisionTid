@@ -1,3 +1,7 @@
+import { faktureringsprofil } from './faktureringsprofil.mjs';
+export { faktureringsprofil, uppdateraKundprofil } from './faktureringsprofil.mjs';
+export { underlagsStatus, kontrollversion, sparaForberett, kontrolleraDokument, oppnaNyVersion, registreraRattelsebehov } from './underlagskontroll.mjs';
+
 // Ren logik för användartestversionen.
 //
 // All prissättning, moms och avrundning kommer från src/domain. Ingen beräkning
@@ -23,7 +27,7 @@ export { FORETAG, foretagFor, faktureringsvag, foretagskopplingar, kopplaUnderla
 export {
   DEBITERINGSTYPER, KUNDSTATUSAR, ARTIKELTYPER_ATT_VALJA, tidigareUppdragFranV1,
   aktiveraTidigareUppdrag, aktiveraBefintligtUppdrag, skapaNyttUppdrag,
-  uppdateraKund, uppdateraUppdrag, laggTillArtikel, arbetstidSekunderForArtikel,
+  uppdateraKund, uppdateraUppdrag, laggTillArtikel, arbetstidSekunderForArtikel, kundprisForslag,
 } from './uppdrag.mjs';
 
 export { harAvtalsperiod, periodKontroll, periodandelOre, arGenomford };
@@ -549,7 +553,7 @@ export function underlagsgrupper(s) {
     const grupp = lagg(u.clientId ?? '_utan', p.date.slice(0, 7), foretagFor(s, u.id));
     grupp.loggadTidSekunder += p.seconds || 0;
     if (!kanIngaIFakturaunderlag(s, p)) continue;         // trackingOnly blir ingen rad
-    grupp.rader.push({ post: p, artikel: a, uppdragnamn: u.name, beloppOre: radbeloppOre(a.unitPriceOre, p.qtyMilli) });
+    grupp.rader.push({ post: p, artikel: a, uppdragnamn: u.name, beloppOre: radbeloppOre(p.priceSnapshot?.unitPriceOre ?? a.unitPriceOre, p.qtyMilli) });
   }
 
   for (const l of s.deliverables || []) {
@@ -642,7 +646,9 @@ export function klaraUnderlag(s) {
  * Försöker färdigställa ett underlag.
  * @returns {{ok:true, underlag, poster}|{ok:false, besked:string, artiklar:string[]}}
  */
-export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
+export function forberedUnderlag(s, gruppId, { valdaLeveranser = [], projectId = null } = {}) {
+  const ids = [...s.poster, ...(s.deliverables || [])].map(p => p.id);
+  if (new Set(ids).size !== ids.length) return { ok: false, besked: 'Dubbla käll-ID behöver granskas innan underlag kan skapas.', artiklar: [] };
   const grupper = underlagsgrupper(s);
   const exakt = grupper.find(g => g.id === gruppId);
   const kundgrupper = grupper.filter(g => g.clientId === gruppId);
@@ -651,6 +657,10 @@ export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
   }
   const grupp = exakt || kundgrupper[0];
   if (!grupp) return { ok: false, besked: 'Det finns inget att fakturera för den här kunden just nu.', artiklar: [] };
+  if (projectId) {
+    grupp.rader = grupp.rader.filter(r => r.post.projectId === projectId);
+    grupp.leveranser = grupp.leveranser.filter(l => l.projectId === projectId);
+  }
 
   const tillatnaLeveranser = new Set(grupp.leveranser.map(l => l.id));
   if (valdaLeveranser.some(id => !tillatnaLeveranser.has(id))) {
@@ -681,7 +691,7 @@ export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
       clientId: grupp.clientId,
       period: grupp.period,
     });
-    return { ok: true, underlag: { ...underlag, billingCompany: grupp.billingCompany }, poster, leveranser, grupp };
+    return { ok: true, underlag: { ...underlag, billingCompany: grupp.billingCompany, billingProfiles: [...new Set(underlag.rader.map(r => r.projectId))].map(id => ({ projectId: id, projectName: uppdragFor(s, id)?.name, ...faktureringsprofil(s, id) })) }, poster, leveranser, grupp };
   } catch (e) {
     if (e instanceof OgranskadMoms || e.name === 'OgranskadMoms') {
       return { ok: false, besked: 'Momsen behöver anges', artiklar: (e.artiklar || []).map(a => a.name) };
@@ -692,7 +702,7 @@ export function forberedUnderlag(s, gruppId, { valdaLeveranser = [] } = {}) {
 
 /** Sparade underlag som ännu inte markerats som överförda till Lundify. */
 export function forbereddaUnderlag(s) {
-  return (s.invoiceRecords || []).filter(r => !arKlartILundify(r)
+  return (s.invoiceRecords || []).filter(r => !['superseded', 'registered'].includes(r.workflowStatus) && !['lundifyDraft', 'lundifySent', 'lundifyPaid'].includes(r.status) && !arKlartILundify(r)
     && (s.poster.some(p => p.invoiceRecordId === r.id)
       || (s.deliverables || []).some(l => l.invoiceRecordId === r.id)))
     .map(r => ({ ...r, kundnamn: kundFor(s, r.clientId)?.name ?? '' }));
@@ -702,6 +712,7 @@ export function forbereddaUnderlag(s) {
 export function hamtaSparatUnderlag(s, id) {
   const referens = (s.invoiceRecords || []).find(r => r.id === id);
   if (!referens) throw new Error('Underlaget finns inte längre.');
+  if (referens.snapshot) return structuredClone(referens.snapshot);
   return { ...byggUnderlag({
     id, clientId: referens.clientId, period: referens.period,
     artiklar: s.articles,
@@ -748,18 +759,28 @@ export const momsText = sats => (sats === null || sats === undefined) ? 'ej fast
 
 /** Fakturaunderlaget som ren text att klistra in i Lundify. */
 export function lundifyText(s, underlag) {
-  const rader = fakturarader(s, underlag).map(r => {
+  const sparad = (s.invoiceRecords || []).find(r => r.id === underlag.id);
+  const rader = (sparad?.presentationRows || fakturarader(s, underlag)).map(r => {
     const antal = kvantitetTillText(r.qtyMilli, r.unit);
     return `${r.beskrivning}\t${antal}\t${exaktBelopp(r.unitPriceOre)}\t${momsText(r.vatRate)}\t${exaktBelopp(r.nettoOre)}`;
   });
-  const kund = kundFor(s, underlag.clientId)?.name ?? '';
+  const kund = underlag.clientSnapshot?.name ?? kundFor(s, underlag.clientId)?.name ?? '';
   const period = underlagsPeriod(underlag);
   return [
     `Underlag till Lundify – ${kund}`,
     `Fakturerande företag: ${underlag.billingCompany || 'Inte valt – kontrollera innan du skapar utkast'}`,
-    'Endast fakturaunderlag. Ronney registrerar och skickar själv.',
+    'Endast fakturaunderlag. Ronney granskar och registrerar själv.',
+    `Källposter: ${underlag.rader.map(r => r.sourceType + ':' + r.sourceId).join(', ')}`,
+    sparad?.createdAt ? `Underlagsversion: ${sparad.id}, sparad ${sparad.createdAt}` : 'Förhandsvisning – inte sparad',
+    ...(underlag.previousDraftReferences ?? (sparad ? [] : (s.invoiceRecords || []).filter(r => r.workflowStatus === 'superseded' && r.lundifyDraftId && r.snapshot?.rader.some(old => underlag.rader.some(row => row.sourceType === old.sourceType && row.sourceId === old.sourceId))).map(r => r.lundifyDraftId))).map(ref => `Tidigare Lundify-utkast: ${ref}. Stäm av och uppdatera samma utkast; skapa inte ett nytt.`),
     period ? `Avser: ${period}` : null,
     '',
+    ...(underlag.billingProfiles || []).flatMap(p => [
+      `Uppdrag: ${p.projectName || p.projectId}`,
+      p.paymentTermsDays != null ? `Betalningsvillkor: ${p.paymentTermsDays} dagar` : 'Betalningsvillkor: behöver verifieras',
+      p.customerReference ? `Referens: ${p.customerReference}` : null,
+      p.invoiceText || null, p.vatText || null,
+    ]),
     'Beskrivning\tAntal\tÁ-pris\tMoms\tBelopp',
     ...rader,
     '',
@@ -1012,7 +1033,17 @@ export function jobbatIn(s, datumLista) {
  * Resor och utlägg särredovisas. Både Vecka och Uppföljning använder den här
  * funktionen, så vyerna kan inte visa siffror från två olika beräkningar.
  */
+export function malAvgransatTillstand(s) {
+  const company = s.installningar?.malForetag;
+  if (!company) return s;
+  const ids = new Set(s.projects.filter(p => p.billingCompany === company).map(p => p.id));
+  return { ...s, poster: s.poster.filter(p => ids.has(p.projectId)),
+    deliverables: (s.deliverables || []).filter(l => ids.has(l.projectId)),
+    invoiceRecords: (s.invoiceRecords || []).filter(r => r.billingCompany === company) };
+}
+
 export function sammanstallning(s, datumLista, { malOre = null } = {}) {
+  s = malAvgransatTillstand(s);
   const ingar = d => datumLista.includes(d);
   const summa = jobbatIn(s, datumLista);
 
@@ -1046,6 +1077,7 @@ export function sammanstallning(s, datumLista, { malOre = null } = {}) {
     totaltUnderlagOre: summa.totaltUnderlagOre,
     ofullstandigaPerioder: summa.ofullstandigaPerioder,
 
+    hittillsOre: jobbatIn(s, datumLista.filter(d => d <= new Date().toLocaleDateString('sv-SE'))).jobbatInOre,
     // Frivilligt mål, jämförs ALLTID med jobbat in
     malOre: mal,
     harMal: mal !== null,
@@ -1088,6 +1120,7 @@ export function maltext(v, period = 'veckans') {
 
 /** Intäkt per kund för en period. Använder samma urvalsregler som ovan. */
 export function perKund(s, datumLista) {
+  s = malAvgransatTillstand(s);
   const ingar = d => datumLista.includes(d);
   const rader = new Map();
   const lagg = (namn, sort) => {
@@ -1161,6 +1194,7 @@ export function andraPost(s, id, andringar) {
   if (!artikel) throw new Error('Välj en giltig arbetstyp.');
   const projectId = andringar.projectId ?? artikel.projectId;
   if (artikel.projectId !== projectId) throw new Error('Arbetstypen hör inte till det valda uppdraget.');
+  if (projectId !== befintlig.projectId && (s.invoiceRecords || []).some(r => r.snapshot?.rader.some(row => row.sourceId === id))) throw new Error('Posten har underlagshistorik och får inte flyttas till ett annat uppdrag. Stäm av rättelsen mot Lundify.');
   const befintligKalltyp = befintlig.sourceType ?? kalltypForArtikel(artikelFor(s, befintlig.articleId));
   if (kalltypForArtikel(artikel) !== befintligKalltyp) {
     throw new Error('Registreringens huvudtyp kan inte bytas. Ta bort den och registrera rätt typ i stället.');
@@ -1181,8 +1215,9 @@ export function andraPost(s, id, andringar) {
     anteckning: Object.hasOwn(andringar, 'anteckning')
       ? String(andringar.anteckning ?? '').trim() || null
       : befintlig.anteckning ?? null,
-    seconds: arbetstidSekunderForArtikel(artikel, qtyMilli, { reserv: befintlig.seconds ?? null }),
-    priceSnapshot: null,
+    seconds: andringar.seconds ?? (qtyMilli !== befintlig.qtyMilli || articleId !== befintlig.articleId
+      ? arbetstidSekunderForArtikel(artikel, qtyMilli, { reserv: befintlig.seconds ?? null }) : befintlig.seconds),
+    priceSnapshot: articleId === befintlig.articleId ? befintlig.priceSnapshot : null,
   };
   return {
     ...s,

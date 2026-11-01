@@ -58,7 +58,7 @@ test('Samma kund och månad från två företag kan aldrig blandas i ett underla
     const result = L.forberedUnderlag(s, g.id);
     assert.equal(result.underlag.billingCompany, g.billingCompany);
     assert.equal(result.underlag.rader.length, 1);
-    assert.match(L.lundifyText(s, result.underlag), /Ronney registrerar och skickar själv/);
+    assert.match(L.lundifyText(s, result.underlag), /Ronney granskar och registrerar själv/);
   }
 });
 

@@ -143,7 +143,7 @@ function postrad(p, { klickbar = true } = {}) {
     <span class="txt">
       <span class="namn">${esc(L.radrubrik(s, p))}</span>
       ${L.foretagFor(s, p.projectId) && !ejFakt ? `<span class="under">${esc(L.faktureringsvag(s, p.projectId))}${p.performedBy ? ` · Utförare: ${esc(p.performedBy)}` : ''}</span>` : ''}
-      <span class="under">${p.anteckning ? `${esc(p.anteckning)} · ` : ''}${esc(historikkund)}${esc(mangd)}${last ? ' · klart i Lundify' : ''}${historiklage ? ' · ' + esc(historiklage) : ''}</span>
+      <span class="under">${p.anteckning ? `${esc(p.anteckning)} · ` : ''}${esc(historikkund)}${esc(mangd)}${last ? ' · sparat underlag' : ''}${historiklage ? ' · ' + esc(historiklage) : ''}</span>
     </span>
     ${p.legacyReviewStatus === 'needsReview' || p.legacyReviewStatus === 'historyOnly'
       ? `<span class="ejfakt">${esc(historiklage)}</span>`
@@ -163,7 +163,7 @@ function leveransrad(l) {
     <span class="prick" style="background:${farg(l.projectId)}"></span>
     <span class="txt">
       <span class="namn">${esc(l.uppdragnamn)} · ${esc(l.name)}</span>
-      <span class="under">leverans genomförd${l.invoiceRecordId ? ' · klart i Lundify' : ''}</span>
+      <span class="under">leverans genomförd${l.invoiceRecordId ? ' · sparat underlag' : ''}</span>
     </span>
     <span class="ejfakt">Upparbetas över perioden</span>
   </div>`;
@@ -248,6 +248,9 @@ function vyVecka() {
 
   <div class="kort">
     <div class="rubrik">Jobbat in denna vecka</div>
+    ${malForetagsval()}
+    <p class="notis">Beräknat arbetsvärde för hela vald vecka, inklusive eventuell framtida fastprisandel. Inte fakturerat eller inbetalt.</p>
+    <div class="brad"><span>Arbetsvärde till och med idag</span><span>${esc(kr(v.hittillsOre))}</span></div>
     <div class="malbelopp">${esc(kr(v.jobbatInOre))}<small>exklusive moms</small></div>
     <button class="lankknapp mitten" data-oppna="veckomal">${v.harMal ? 'Ändra veckomål' : 'Sätt veckomål'}</button>
     ${v.harMal ? `
@@ -291,6 +294,7 @@ function vyVecka() {
   </div>
 
   <div class="kort">
+    <div class="notis">Registreringshistorik för alla bolag. Bolagsvalet ovan avgränsar mål och sammanställning.</div>
     ${dagar || '<div class="tom">Inget registrerat den här veckan.</div>'}
     ${veckansPoster.length ? `<div class="summa">
       <span class="etikett">Arbetad tid</span>
@@ -321,6 +325,7 @@ function redokort(g) {
       <span class="hoger">${beloppMedMarkning(forhand ? forhand.nettoOre : g.summaOre, 'exklusive moms')}</span>
     </div>
     <button class="primar" data-underlag="${esc(g.id)}">Visa underlag</button>
+    ${new Set(g.rader.map(r => r.post.projectId)).size > 1 ? `<details><summary>Separat uppdragsunderlag</summary>${[...new Set(g.rader.map(r => r.post.projectId))].map(id => `<button class="sekundar" data-uppdragsunderlag="${esc(JSON.stringify([g.id, id]))}">${esc(L.uppdragFor(s, id)?.name || id)}</button>`).join('')}</details>` : ''}
   </div>`;
 }
 
@@ -352,12 +357,12 @@ function klartkort(r) {
     <div class="statustxt">
       <div class="kundnamn liten">${esc(r.kundnamn)}</div>
       <div class="under">Fakturerar: ${esc(r.billingCompany || 'Inte angivet i äldre underlag')}</div>
-      <div class="under">${esc(MANADSNAMN(r.period))} · ${esc(kr(r.nettoOre))} exklusive moms</div>
-      <div class="under">Klart ${esc(r.klarmarkeradAt)}${r.invoiceNumber ? ` · faktura ${esc(r.invoiceNumber)}` : ''}</div>
+      <div class="under">${esc(MANADSNAMN(r.period))} · ${Number.isSafeInteger(r.nettoOre) ? esc(kr(r.nettoOre)) + ' exklusive moms' : 'Belopp saknas i äldre underlag'}</div>
+      <div class="under">${esc(L.underlagsStatus(r))} · ${esc(r.klarmarkeradAt || r.updatedAt || "")}${r.invoiceNumber ? ` · faktura ${esc(r.invoiceNumber)}` : ''}</div>
       <div class="notis">Öppnar registreringarna i InVisionTid. Ingenting ändras i Lundify.</div>
     </div>
     <div class="statusknappar">
-      <button class="lankknapp" data-angra="${esc(r.id)}">Öppna för rättning</button>
+      <button class="lankknapp" data-sparatunderlag="${esc(r.id)}">Visa sparat underlag</button>
     </div>
   </div>`;
 }
@@ -368,7 +373,7 @@ function vyFakturera() {
   const grupper = L.underlagsgrupper(s).filter(passar);
   const kontroll = grupper.filter(g => g.lage === L.LAGE_KONTROLL);
   const redo = grupper.filter(g => g.lage === L.LAGE_REDO);
-  const klara = L.klaraUnderlag(s).filter(passar);
+  const klara = (s.invoiceRecords || []).filter(r => L.arKlartILundify(r) || ['registered', 'superseded'].includes(r.workflowStatus) || ['lundifyDraft', 'lundifySent', 'lundifyPaid'].includes(r.status)).map(r => ({ ...r, kundnamn: L.kundFor(s, r.clientId)?.name || '' })).filter(passar);
   const forberedda = L.forbereddaUnderlag(s).filter(passar);
   const note = s.installningar?.manadskontroll?.[`${fakturaForetag}|${fakturaManad}`] || '';
   const okanda = [...grupper, ...klara, ...forberedda].filter(r => !r.billingCompany).length;
@@ -406,13 +411,17 @@ function vyFakturera() {
     <div class="kundnamn">Kund: ${esc(r.kundnamn)}</div>
     <div class="under">Fakturerar: ${esc(r.billingCompany || 'Företag inte valt – kontrollera före överföring')}</div>
     <div class="kortperiod">${esc(MANADSNAMN(r.period))}</div>
-    <div class="notis">Underlaget är sparat i InVisionTid. Överföringen till Lundify återstår.</div>
+    <div class="notis">${esc(L.underlagsStatus(r))}.</div>
     <button class="primar" data-sparatunderlag="${esc(r.id)}">Öppna underlaget</button>
   </div>`).join(''))}
-  ${klara.length ? `<details class="avsnitt"><summary>Historik – markerat klart av dig (${klara.length})</summary>
+  ${klara.length ? `<details class="avsnitt"><summary>Historik – sparade och äldre underlag (${klara.length})</summary>
       <div class="kort">${klara.map(klartkort).join('')}
         <div class="notis">Lundify håller reda på fakturanummer, utskick och betalning.</div>
       </div></details>` : ''}`;
+}
+
+function malForetagsval() {
+  return `<label>Mål och uppföljning för bolag<select data-malforetag="1"><option value="">Alla bolag (befintligt mål)</option>${L.FORETAG.map(c => `<option value="${esc(c)}" ${s.installningar?.malForetag === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></label><p class="notis">Målbeloppen ändras inte när du väljer bolag.</p>`;
 }
 
 // ── Vy: Uppföljning ─────────────────────────────────────────────────────────
@@ -435,6 +444,9 @@ function vyUppfoljning() {
   </div>
   <div class="kort">
     <div class="rubrik">Jobbat in denna månad</div>
+    ${malForetagsval()}
+    <p class="notis">Beräknat arbetsvärde för hela vald månad, inklusive eventuell framtida fastprisandel. Inte fakturerat eller inbetalt.</p>
+    <div class="brad"><span>Arbetsvärde till och med idag</span><span>${esc(kr(m.hittillsOre))}</span></div>
     <div class="malbelopp">${esc(kr(m.jobbatInOre))}<small>exklusive moms</small></div>
     <button class="lankknapp mitten" data-oppna="manadsmal">${m.harMal ? 'Ändra månadsmål' : 'Sätt månadsmål'}</button>
     ${m.harMal ? `
@@ -447,8 +459,9 @@ function vyUppfoljning() {
       </div>` : ''}
     ${m.delar.fastPrisAndelOre ? `<div class="uppfrad"><span>Fast pris, månadens andel</span><span class="v">${esc(kr(m.delar.fastPrisAndelOre))}</span></div>` : ''}
     <div class="uppfrad"><span>Redo för Lundify<div class="markning">exklusive moms</div></span><span class="v">${esc(kr(m.redoForLundifyOre))}</span></div>
-    <div class="uppfrad"><span>Klart i Lundify<div class="markning">exklusive moms</div></span><span class="v">${esc(kr(m.klartILundifyOre))}</span></div>
+    <div class="uppfrad"><span>Äldre manuell klarmarkering, ej verifierad<div class="markning">exklusive moms</div></span><span class="v">${esc(kr(m.klartILundifyOre))}</span></div>
     <div class="uppfrad"><span>Arbetad tid</span><span class="v">${esc(timmar(m.arbetadTidSekunder))} h</span></div>
+    <p class="notis">Fakturerat netto efter krediter och faktiskt inbetalt: inte verifierat. Dessa värden kräver aktuell avstämning mot Lundify och kan inte räknas från klarmarkeringar.</p>
   </div>
   <div class="kort">
     <div class="rubrik">Kostnadsersättning</div>
@@ -617,6 +630,20 @@ function arkRedigeraKund() {
     <div class="faltrubrik">Status</div>
     <div class="val">${L.KUNDSTATUSAR.map(x => `
       <button class="${(ark.status ?? c.status ?? 'active') === x.id ? 'vald' : ''}" data-valjkundstatus="${esc(x.id)}">${esc(x.etikett)}</button>`).join('')}</div>
+    <details><summary>Gemensamma faktureringsvillkor per bolag</summary><p class="notis">Tomma uppdragsfält ärver dessa villkor. Priser och moms kontrolleras på uppdragets artiklar. Sparade underlag behåller sina villkor.</p>
+    ${L.FORETAG.map((company, i) => {
+      const profile = c.billingProfiles?.[company] || {};
+      const value = key => ark[`cp_${i}_${key}`] ?? profile[key] ?? '';
+      return `<h3>${esc(company)}</h3>
+        <label>Betalningsvillkor, dagar<input data-falt="cp_${i}_paymentTermsDays" inputmode="numeric" value="${esc(value('paymentTermsDays'))}"></label>
+        <label>Kundreferens<input data-falt="cp_${i}_customerReference" value="${esc(value('customerReference'))}"></label>
+        <label>Godkänd fakturatext<textarea data-falt="cp_${i}_invoiceText">${esc(value('invoiceText'))}</textarea></label>
+        <label>Godkänd momstext<textarea data-falt="cp_${i}_vatText">${esc(value('vatText'))}</textarea></label>
+        <label>Timarbete på underlag<select data-falt="cp_${i}_hourlyGrouping"><option value="individual" ${value('hourlyGrouping') !== 'dated' ? 'selected' : ''}>En rad per registrering</option><option value="dated" ${value('hourlyGrouping') === 'dated' ? 'selected' : ''}>Samlad rad med datum och antal</option></select></label>
+        <label>Rubrik för samlat timarbete<input data-falt="cp_${i}_hourlyLabel" value="${esc(value('hourlyLabel'))}" placeholder="Exempel: Individuella samtal"></label>
+        <label>Rubrik för pass, ämnet behålls<input data-falt="cp_${i}_sessionLabel" value="${esc(value('sessionLabel'))}" placeholder="Tomt använder artikelns namn"></label>
+        <label>Resor på underlag<select data-falt="cp_${i}_travelGrouping"><option value="project" ${value('travelGrouping') !== 'purpose' ? 'selected' : ''}>Per uppdrag</option><option value="purpose" ${value('travelGrouping') === 'purpose' ? 'selected' : ''}>Separera passresor och samtalsresor</option></select></label>`;
+    }).join('')}</details>
     <button class="spara" data-sparakund="${esc(c.id)}">Spara kunden</button>
     <button class="avbryt" data-oppna="kunder">Tillbaka</button>`;
 }
@@ -664,6 +691,7 @@ function arkUppdrag() {
 function arkNyttUppdrag() {
   const debitering = ark.debitering ?? null;
   const fakturerbart = debitering && debitering !== 'internal';
+  const prisforslag = L.kundprisForslag(s, ark.clientId, ark.billingCompany, debitering);
   const prisetikett = debitering === 'hourly' ? 'Timpris exklusive moms'
     : debitering === 'session' ? 'Pris per tillfälle exklusive moms'
       : 'Fast pris exklusive moms';
@@ -690,6 +718,7 @@ function arkNyttUppdrag() {
     ${fakturerbart ? `
       <div class="faltrubrik">${esc(prisetikett)}</div>
       <input type="text" inputmode="decimal" data-falt="pris" value="${esc(ark.pris ?? '')}" placeholder="kronor">
+      ${prisforslag ? `<button class="sekundar" data-anvandkundpris="${prisforslag}">Använd befintligt kundpris ${esc(kr(prisforslag))} som förslag</button><p class="notis">Kontrollera att priset fortfarande gäller. Det nya uppdraget kan ha ett eget pris.</p>` : ''}
 
       ${debitering === 'session' ? `
         <div class="faltrubrik">Arbetstid per tillfälle</div>
@@ -846,6 +875,14 @@ function arkRedigeraUppdrag() {
     }).join('')}
     ${harDelbetalningar ? '</details>' : ''}
 
+    <details><summary>Faktureringsprofil för uppdraget</summary>
+      <p class="notis">Ange endast överenskomna villkor. Priser och moms anges ovan. Kundmatchning kontrolleras separat mot rätt bolag före fakturering.</p>
+      <p class="notis">Tomma fält ärver kundens villkor för detta bolag. Underlagets förhandsvisning visar de villkor som används.</p>
+      <label>Betalningsvillkor, dagar<input data-falt="profileTerms" inputmode="numeric" value="${esc(valt('profileTerms', p.billingProfile?.paymentTermsDays ?? ''))}"></label>
+      <label>Kundens referens<input data-falt="profileReference" value="${esc(valt('profileReference', p.billingProfile?.customerReference ?? ''))}"></label>
+      <label>Godkänd fakturatext<textarea data-falt="profileText">${esc(valt('profileText', p.billingProfile?.invoiceText ?? ''))}</textarea></label>
+      <label>Godkänd momstext<textarea data-falt="profileVatText">${esc(valt('profileVatText', p.billingProfile?.vatText ?? ''))}</textarea></label>
+    </details>
     <button class="spara" data-sparauppdrag="${esc(p.id)}">Spara uppdraget</button>
     <button class="avbryt" data-oppna="uppdrag">Tillbaka</button>`;
 }
@@ -937,6 +974,8 @@ function arkRegistrering() {
   if (ark.typ === 'tillfalle') {
     mangdVal = `<div class="faltrubrik">Tema / innehåll</div>
       <input type="text" data-falt="anteckning" value="${esc(ark.anteckning ?? '')}" placeholder="Vad handlade passet om?">
+      <p class="notis">Temat följer med till kundens underlag.</p>
+      <label>Intern anteckning, skickas inte till kund<input data-falt="internalNote" value="${esc(ark.internalNote || '')}"></label>
       <div class="faltrubrik">Hur många tillfällen?</div>
       <div class="antal">
         <button data-antal="-1" aria-label="Färre">−</button>
@@ -954,7 +993,9 @@ function arkRegistrering() {
         <input type="time" data-falt="slut" value="${esc(ark.slut ?? '')}" aria-label="Till">
       </div>
       <div class="faltrubrik">Anteckning, valfritt</div>
-      <input type="text" data-falt="anteckning" value="${esc(ark.anteckning ?? '')}" placeholder="Till exempel förberedelse eller möte">`;
+      <input type="text" data-falt="anteckning" value="${esc(ark.anteckning ?? '')}" placeholder="Till exempel förberedelse eller möte">
+      <p class="notis">Beskrivningen följer med till kundens underlag.</p>
+      <label>Intern anteckning, skickas inte till kund<input data-falt="internalNote" value="${esc(ark.internalNote || '')}"></label>`;
   } else if (ark.typ === 'resa') {
     const std = L.uppdragFor(s, valt)?.defaultTripKm;
     mangdVal = `<div class="faltrubrik">Kilometer totalt, tur och retur</div>
@@ -963,7 +1004,8 @@ function arkRegistrering() {
         ${[5, 10, 23, 50].filter(k => k !== std).map(k => `<button class="${ark.km === k ? 'vald' : ''}" data-km="${k}">${k} km</button>`).join('')}
       </div>
       <div class="faltrubrik">eller skriv antal kilometer</div>
-      <input type="number" inputmode="numeric" data-falt="km" value="${esc(ark.km ?? '')}" placeholder="km">`;
+      <input type="number" inputmode="numeric" data-falt="km" value="${esc(ark.km ?? '')}" placeholder="km">
+      <label>Resans ändamål<select data-falt="travelPurpose"><option value="">Inte angivet</option>${[['session', 'Passresa'], ['conversation', 'Samtalsresa'], ['other', 'Övrig resa']].map(([id, label]) => `<option value="${id}" ${ark.travelPurpose === id ? 'selected' : ''}>${label}</option>`).join('')}</select></label>`;
   }
 
   const datumVal = `<div class="faltrubrik">Vilken dag?</div>
@@ -989,11 +1031,11 @@ function arkUtlagg() {
     <div class="faltrubrik">Kvittots belopp inklusive moms</div><input inputmode="decimal" data-falt="gross" value="${esc(ark.gross || '')}" placeholder="407,00">
     <div class="faltrubrik">Moms på kvittot</div><select data-falt="receiptVat">${options(ark.receiptVat)}</select>
     <div class="faltrubrik">Moms vid vidarefakturering</div><select data-falt="invoiceVat">${options(ark.invoiceVat)}</select>
-    <p class="notis">Hela kvittot förs vidare till inköpspris utan påslag. Kvitton med flera momssatser behöver delas upp. RUT bedöms separat i Lundify.</p>
+    <label>Vidarefakturera<select data-falt="rebill"><option value="yes" ${ark.rebill !== "no" ? "selected" : ""}>Ja, till inköpspris</option><option value="no" ${ark.rebill === "no" ? "selected" : ""}>Nej, endast eget utlägg</option></select></label><p class="notis">Vid vidarefakturering används inköpspris utan påslag. Kvitton med flera momssatser behöver delas upp. RUT bedöms separat i Lundify.</p>
     <div class="faltrubrik">Vem betalade?</div><select data-falt="paidBy"><option value="company" ${ark.paidBy !== 'private' ? 'selected' : ''}>Företaget</option><option value="private" ${ark.paidBy === 'private' ? 'selected' : ''}>Jag betalade privat</option></select>
     <div class="faltrubrik">Fota eller välj kvitto</div><input type="file" accept="image/*" capture="environment" data-kvitto="1">
     ${ark.receiptImage ? `<img src="${esc(ark.receiptImage)}" alt="Kvitto att spara" style="max-width:100%;max-height:240px;object-fit:contain">` : ''}
-    <p class="notis">Bilden sparas som en komprimerad arbetskopia med posten. Behåll originalkvittot för bokföringen. Privata utlägg betalas inte ut av appen.</p>
+    <p class="notis">Kvittot skickas inte automatiskt till kunden. Bilden sparas som en komprimerad arbetskopia med posten. Behåll originalkvittot för bokföringen. Privata utlägg betalas inte ut av appen.</p>
     <button class="spara" data-sparautlagg="1">Spara inköp</button><button class="avbryt" data-stang="knapp">Avbryt</button>`;
 }
 
@@ -1046,6 +1088,7 @@ function arkAndra() {
     ${a?.type !== 'travel' ? `
       <div class="faltrubrik">Anteckning, valfritt</div>
       <input type="text" data-falt="anteckning" value="${esc(p.anteckning ?? '')}" placeholder="Till exempel förberedelse eller möte">` : ''}
+    ${a?.type === 'travel' ? `<label>Resans ändamål<select data-falt="travelPurpose"><option value="">Inte angivet</option>${[['session', 'Passresa'], ['conversation', 'Samtalsresa'], ['other', 'Övrig resa']].map(([id, label]) => `<option value="${id}" ${(ark.travelPurpose ?? p.travelPurpose) === id ? 'selected' : ''}>${label}</option>`).join('')}</select></label>` : ''}
     <div class="faltrubrik">Antal ${esc(a?.unit ?? '')}</div>
     <input type="number" inputmode="decimal" step="0.5" data-falt="mangd" value="${esc(p.qtyMilli / L.MILLI)}">
     <div class="faltrubrik">Vilken dag?</div>
@@ -1058,7 +1101,7 @@ function arkAndra() {
     </details>
     ${p.receiptImage ? `<img alt="Sparat kvitto" src="${esc(p.receiptImage)}" style="max-width:100%;max-height:300px;object-fit:contain">` : ''}
     ${p.paidBy === 'private' ? '<p class="notis">Betalat privat. Ersättning och bokföring hanteras separat.</p>' : ''}
-    ${p.invoiceRecordId ? `<div class="varning"><strong>Posten hör till ett underlag som är klart i Lundify och kan inte ändras.</strong>Öppna hela underlaget för rättning först. Ingenting ändras i Lundify.</div>
+    ${p.invoiceRecordId ? `<div class="varning"><strong>Posten hör till ett sparat underlag. Status behöver läsas på underlaget.</strong>Öppna hela underlaget för rättning först. Ingenting ändras i Lundify.</div>
       <button class="primar" data-angra="${esc(p.invoiceRecordId)}">Öppna underlaget för rättning</button>
       <button class="avbryt" data-stang="knapp">Avbryt</button>` : `
       <button class="spara" data-sparaandring="${esc(p.id)}">Spara ändring</button>
@@ -1088,10 +1131,10 @@ function arkUnderlag() {
   const r = ark.referens;
   const u = ark.underlag;
   return `
-    <p class="notis"><strong>Fakturerar:</strong> ${esc(u.billingCompany || 'Företag inte valt')}<br><strong>Kund:</strong> ${esc(L.kundFor(s, u.clientId)?.name || 'Kund inte vald')}</p>
+    <p class="notis"><strong>Fakturerar:</strong> ${esc(u.billingCompany || 'Företag inte valt')}<br><strong>Kund:</strong> ${esc(u.clientSnapshot?.name ?? L.kundFor(s, u.clientId)?.name ?? 'Kund inte vald')}</p>
     ${ark.period ? `<div class="notis">Avser ${esc(ark.period)}</div>` : ''}
     <div class="underlagrader">
-      ${L.fakturarader(s, u).map(rad => `<div class="ulrad">
+      ${(r?.presentationRows || L.fakturarader(s, u)).map(rad => `<div class="ulrad">
         <div class="ulnamn">${esc(rad.beskrivning)}</div>
         <div class="ulunder">${esc(L.kvantitetTillText(rad.qtyMilli, rad.unit))} · ${esc(L.exaktBelopp(rad.unitPriceOre))} per ${esc(rad.unit)} · moms ${esc(L.momsText(rad.vatRate))}</div>
         <div class="ulbelopp">${esc(L.exaktBelopp(rad.nettoOre))}</div>
@@ -1104,15 +1147,27 @@ function arkUnderlag() {
       <div class="brad stark"><span>Inklusive moms</span><span>${esc(L.exaktBelopp(u.attBetalaOre))}</span></div>
     </div>
     <button class="primar" data-kopiera="1">${kopierat ? 'Kopierat' : 'Kopiera underlaget'}</button>
-    <p class="notis forklaring">${esc(L.OVERFORINGSBESKED)}</p>
-    <p class="notis">Kopiering skapar eller registrerar ingen faktura. Granska arbete, resor och material i Lundify innan du själv registrerar.</p>
-    <button class="sekundar" data-markklart="${esc(r.id)}">Jag har själv registrerat fakturan</button>
-    <button class="lankknapp mitten" data-merinfo="1">${ark.merinfo ? 'Dölj mer information' : 'Mer information'}</button>
-    ${ark.merinfo ? `
-      <div class="faltrubrik">Fakturanummer, frivilligt</div>
-      <p class="notis">Behövs inte. Lundify äger fakturanumret. Anteckna det bara om du vill kunna hitta tillbaka.</p>
-      <input type="text" data-falt="fakturanummer" value="${esc(ark.fakturanummer ?? r.invoiceNumber ?? '')}" placeholder="till exempel 2341">
-      <button class="sekundar" data-sparanummer="${esc(r.id)}">Spara anteckningen</button>` : ''}
+    <p class="notis">${r ? esc(L.underlagsStatus(r)) + (r.correctionPending ? ' · Rättelsebehov – avstämning krävs' : '') : 'Förhandsvisning. Ingenting har sparats eller låsts.'}</p>
+    ${r?.snapshot && r.lockedVersion && L.kontrollversion(s, r.snapshot) !== r.lockedVersion ? '<p class="varning">Källuppgifterna har ändrats. Tidigare avstämning är inaktuell. Den sparade versionen visas oförändrad.</p>' : ''}
+    <p class="notis">Kopiering skapar ingen faktura. Ingen automatisk synk med Lundify.</p>
+    ${!r ? '<button class="spara" data-sparaforberett="1">Spara förberett underlag</button>' : ''}
+    ${r && ['prepared', 'draft'].includes(r.workflowStatus) ? `
+      <details><summary>Återrapportera avstämning mot Lundify</summary>
+      <p class="notis">Kontrollera fakturerande bolag, mottagare, samtliga källposter, priser, moms och avrundning i Lundify. Referensen för ett utkast är inte ett fakturanummer.</p>
+      <label>Kund-ID i Lundify<input data-falt="lundifykund" value="${esc(r.lundifyCustomerId || '')}"></label>
+      <label>Utkastreferens eller riktigt fakturanummer<input data-falt="dokumentreferens" value=""></label>
+      <label>Kontrollerat belopp exklusive moms<input data-falt="kontrollnetto" inputmode="decimal"></label>
+      <label>Fakturadatum (endast registrerad faktura)<input type="date" data-falt="fakturadatum"></label>
+      <button class="sekundar" data-dokument="draft">Bekräfta avstämt utkast</button>
+      <button class="sekundar" data-dokument="registered">Bekräfta registrerad faktura</button>
+      </details>
+      <button class="sekundar" data-nyversion="${esc(r.id)}">Öppna för ändring och bevara denna version</button>` : ''}
+    ${r?.workflowStatus === 'registered' ? `<details ${r.correctionPending ? 'open' : ''}><summary>Rättelsebehov för faktura ${esc(r.invoiceNumber)}</summary>
+      <p class="notis">Originalfakturan och källposterna förblir låsta. Beskriv avvikelsen och stäm av rättelsen i Lundify. Detta skapar ingen kredit, inbetalning eller ny faktura.</p>
+      ${(r.events || []).filter(e => e.type === 'correctionRequested').map(e => `<p class="varning">${esc(e.at)} · Faktura ${esc(e.originalInvoiceNumber)}: ${esc(e.reason)}</p>`).join('')}
+      <label>Vad behöver rättas eller kontrolleras?<textarea data-falt="rattelseorsak">${esc(ark.rattelseorsak || '')}</textarea></label>
+      <button class="sekundar" data-rattelsebehov="${esc(r.id)}">Spara rättelsebehov</button></details>` : ''}
+    ${r ? `<div class="notis">Underlags-ID: ${esc(r.id)}${r.documentReference ? ' · Dokument: ' + esc(r.documentReference) : ''}${r.checkedAt ? ' · Avstämt: ' + esc(r.checkedAt) : ''}</div>` : ''}
     <button class="avbryt" data-stang="knapp">Stäng utan att ändra något</button>`;
 }
 
@@ -1179,18 +1234,18 @@ function rita() {
 const VALJARE = ['vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara', 'stang', 'post',
   'faktureringsval', 'fakturaarbete', 'kopplaforetag',
   'sparaandring', 'tabort', 'vecka', 'godkannresa', 'avboj', 'underlag', 'valjleverans', 'kopiera',
-  'markklart', 'merinfo', 'sparanummer', 'borjaom', 'angemoms', 'valjmoms', 'sparamoms',
+  'merinfo', 'borjaom', 'angemoms', 'valjmoms', 'sparamoms',
   'angra', 'valjlevuppdrag', 'valjleveransklar', 'markeragenomford', 'leverans',
   'sparaleveransdatum', 'angragenomford', 'aktiverauppdrag', 'valjkund',
   'aktiverabefintligt',
-  'valjdebitering', 'valjnyvat', 'sparanyttuppdrag', 'sparaveckomal',
+  'anvandkundpris', 'valjdebitering', 'valjnyvat', 'sparanyttuppdrag', 'sparaveckomal',
   'valjnyartikeltyp', 'valjnyartikelmoms', 'sparanyartikel',
   'tabortveckomal', 'sparamanadsmal', 'tabortmanadsmal', 'manad',
   'redigerakund', 'valjkundstatus', 'sparakund',
   'redigerauppdrag', 'sparauppdrag', 'valjuppdragsmoms', 'valjleveransmoms',
   'valjredigerakund', 'valjandringartikel',
   'synkaom', 'loggautapp', 'arkivmanad', 'importerahistorik',
-  'historikbeslut', 'angrahistorikbeslut', 'sparatunderlag', 'sparautlagg', 'sparamanadskontroll'].map(n => `[data-${n}]`).join(',');
+  'historikbeslut', 'angrahistorikbeslut', 'sparatunderlag', 'sparaforberett', 'uppdragsunderlag', 'dokument', 'nyversion', 'rattelsebehov', 'sparautlagg', 'sparamanadskontroll'].map(n => `[data-${n}]`).join(',');
 
 document.addEventListener('click', e => {
   const t = e.target.closest(VALJARE);
@@ -1232,6 +1287,16 @@ document.addEventListener('click', e => {
     const sista = Math.max(0, manader.size - 1);
     ark.manadsindex = Math.max(0, Math.min(sista, (Number(ark.manadsindex) || 0) + Number(d.arkivmanad)));
     return rita();
+  }
+  if (d.sparaforberett) return sparaForberett();
+  if (d.dokument) return aterrapporteraDokument(d.dokument);
+  if (d.nyversion) return nyUnderlagsversion(d.nyversion);
+  if (d.rattelsebehov) {
+    const result = L.registreraRattelsebehov(s, d.rattelsebehov, ark.rattelseorsak);
+    if (!result.ok) return visa(result.besked);
+    if (result.state !== s) { s = result.state; spara(); }
+    ark.referens = s.invoiceRecords.find(r => r.id === d.rattelsebehov);
+    return visa('Rättelsebehov sparat. Originalet är låst och måste stämmas av i Lundify.');
   }
   if (d.vy) { vy = d.vy; ark = null; return rita(); }
   if (d.vecka) { veckoOffset += Number(d.vecka); return rita(); }
@@ -1298,6 +1363,7 @@ document.addEventListener('click', e => {
   if (d.sparauppdrag) return sparaUppdrag(d.sparauppdrag);
   if (d.valjkundstatus) { ark.status = d.valjkundstatus; return rita(); }
   if (d.sparakund) return sparaKund(d.sparakund);
+  if (d.anvandkundpris) { ark.pris = prisvarde(Number(d.anvandkundpris)); return rita(); }
   if (d.valjdebitering) { ark.debitering = d.valjdebitering; ark.pris = ''; return rita(); }
   if (d.valjnyvat !== undefined) { ark.vatRate = Number(d.valjnyvat); return rita(); }
   if (d.sparanyttuppdrag) return sparaNyttUppdrag();
@@ -1313,13 +1379,14 @@ document.addEventListener('click', e => {
   if (d.tabort) return taBort(d.tabort);
   if (d.avboj) { return visa('Inget reseförslag den här gången.'); }
   if (d.godkannresa) return godkannResa(d.godkannresa);
+  if (d.uppdragsunderlag) { const [groupId, projectId] = JSON.parse(d.uppdragsunderlag); return skapaUnderlag(groupId, [], projectId); }
   if (d.underlag) return skapaUnderlag(d.underlag, []);
   if (d.sparatunderlag) return oppnaSparatUnderlag(d.sparatunderlag);
   if (d.valjleverans) { const pos = d.valjleverans.lastIndexOf('|'); return skapaUnderlag(d.valjleverans.slice(0, pos), [d.valjleverans.slice(pos + 1)]); }
   if (d.kopiera) return kopiera();
-  if (d.markklart) return markeraKlart(d.markklart);
+
   if (d.merinfo) { ark.merinfo = !ark.merinfo; return rita(); }
-  if (d.sparanummer) return sparaNummer(d.sparanummer);
+
   if (d.angemoms) { ark = { typ: 'moms', articleId: d.angemoms, valdSats: null, rubrik: 'Ange moms' }; return rita(); }
   if (d.valjmoms) { ark.valdSats = Number(d.valjmoms); return rita(); }
   if (d.sparamoms) return sparaMoms(d.sparamoms);
@@ -1340,6 +1407,13 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('change', async e => {
+  if (e.target.dataset.malforetag) {
+    const company = e.target.value;
+    if (company && !L.FORETAG.includes(company)) return;
+    s = { ...s, installningar: { ...s.installningar, malForetag: company || null } };
+    spara(); rita(); return;
+  }
+  if (e.target.dataset.falt === 'billingCompany' && ark?.typ === 'nyttuppdrag') { ark.billingCompany = e.target.value; return rita(); }
   if (e.target.dataset.registreringsforetag && ark) {
     ark.foretag = e.target.value; ark.projectId = null; ark.km = null;
     return rita();
@@ -1429,7 +1503,14 @@ function taBortManadsmal() {
 
 function sparaKund(id) {
   try {
-    s = L.uppdateraKund(s, id, ark);
+    let next = L.uppdateraKund(s, id, ark);
+    L.FORETAG.forEach((company, i) => {
+      const profile = L.kundFor(s, id).billingProfiles?.[company] || {};
+      const keys = ['paymentTermsDays', 'customerReference', 'invoiceText', 'vatText', 'travelGrouping', 'hourlyGrouping', 'hourlyLabel', 'sessionLabel'];
+      if (keys.some(key => Object.hasOwn(ark, `cp_${i}_${key}`))) next = L.uppdateraKundprofil(next, id, company,
+        Object.fromEntries(keys.map(key => [key, ark[`cp_${i}_${key}`] ?? profile[key] ?? (key === 'travelGrouping' ? 'project' : '')])));
+    });
+    s = next;
     spara(); ark = { typ: 'kunder' };
     visa('Kunduppgifterna är sparade.');
   } catch (e) { visa(e.message); }
@@ -1475,6 +1556,9 @@ function sparaUppdrag(id) {
       vatRate: ark[`leveransmoms_${l.id}`] ?? l.vatRate,
     }));
   try {
+    if ((ark.billingCompany ?? p.billingCompany) !== p.billingCompany && ([...s.poster, ...(s.deliverables || [])].some(x => x.projectId === id && x.invoiceRecordId) || (s.invoiceRecords || []).some(r => r.snapshot?.rader.some(row => row.projectId === id)))) throw new Error('Uppdraget har sparade underlag. Skapa ett separat uppdrag för ett annat fakturerande bolag.');
+    const terms = ark.profileTerms ?? p.billingProfile?.paymentTermsDays ?? '';
+    if (String(terms) !== '' && (!/^\d+$/.test(String(terms)) || Number(terms) > 365)) throw new Error('Ange betalningsvillkor i hela dagar, högst 365, eller lämna tomt.');
     s = L.uppdateraUppdrag(s, id, {
       name: ark.uppdragsnamn ?? p.name,
       clientId: ark.clientId ?? p.clientId,
@@ -1482,7 +1566,12 @@ function sparaUppdrag(id) {
       artiklar: prisartiklar,
       leveranser,
     });
-    s = { ...s, projects: s.projects.map(u => u.id === id ? { ...u, billingCompany: ark.billingCompany ?? p.billingCompany ?? null } : u) };
+    s = { ...s, projects: s.projects.map(u => u.id === id ? { ...u, billingCompany: ark.billingCompany ?? p.billingCompany ?? null, billingProfile: {
+      paymentTermsDays: String(terms) === '' ? null : Number(terms),
+      customerReference: String(ark.profileReference ?? p.billingProfile?.customerReference ?? '').trim(),
+      invoiceText: String(ark.profileText ?? p.billingProfile?.invoiceText ?? '').trim(),
+      vatText: String(ark.profileVatText ?? p.billingProfile?.vatText ?? '').trim(),
+    } } : u) };
     spara(); ark = { typ: 'uppdrag' };
     visa('Uppdragets priser och villkor är sparade.');
   } catch (e) { visa(e.message); }
@@ -1516,8 +1605,11 @@ function sparaNy() {
     performedBy: String(ark.performedBy ?? '').trim() || null,
     consultedWith: String(ark.consultedWith ?? '').trim() || null,
     anteckning: String(ark.anteckning ?? '').trim() || null,
+    customerText: String(ark.anteckning ?? '').trim() || null,
+    internalNote: String(ark.internalNote ?? '').trim() || null,
     seconds: L.arbetstidSekunderForArtikel(artikel, qty),
     sourceType: ark.typ === 'resa' ? 'trip' : 'entry',
+    travelPurpose: ark.typ === 'resa' ? ark.travelPurpose || null : null,
     status: 'open', invoiceRecordId: null, priceSnapshot: null,
   });
   spara(); ark = null; visa('Registrerat.');
@@ -1534,11 +1626,13 @@ function sparaAndring(id) {
     if (qty <= 0) return visa('Antalet måste vara större än noll.');
     s = L.andraPost(s, id, {
       projectId: a.projectId, articleId: a.id,
+      travelPurpose: document.querySelector('[data-falt="travelPurpose"]')?.value ?? p.travelPurpose ?? null,
       qtyMilli: qty, date: datum || p.date,
       beskrivning: document.querySelector('[data-falt="beskrivning"]')?.value ?? p.beskrivning,
       performedBy: document.querySelector('[data-falt="performedBy"]')?.value ?? p.performedBy,
       consultedWith: document.querySelector('[data-falt="consultedWith"]')?.value ?? p.consultedWith,
       anteckning: document.querySelector('[data-falt="anteckning"]')?.value ?? p.anteckning ?? '',
+      customerText: document.querySelector('[data-falt="anteckning"]')?.value ?? p.customerText ?? p.anteckning ?? '',
     });
     spara(); ark = null; visa('Ändringen är sparad.');
   } catch (e) { visa(e.message); }
@@ -1559,6 +1653,7 @@ function uppdateraFranAndringsformular(id) {
     qtyMilli: qty,
     date: datumFalt?.value || p.date,
     anteckning: document.querySelector('[data-falt="anteckning"]')?.value ?? p.anteckning ?? '',
+      customerText: document.querySelector('[data-falt="anteckning"]')?.value ?? p.customerText ?? p.anteckning ?? '',
   });
 }
 
@@ -1643,21 +1738,13 @@ function angraGenomford(id) {
   visa('Leveransen är inte längre markerad som genomförd.');
 }
 
-function skapaUnderlag(gruppId, valdaLeveranser) {
+function skapaUnderlag(gruppId, valdaLeveranser, projectId = null) {
   const g = L.underlagsgrupper(s).find(g => g.id === gruppId);
   if (g && !g.billingCompany) return visa('Välj fakturerande företag under Mer → Uppdrag innan du förbereder underlaget.');
-  const res = L.forberedUnderlag(s, gruppId, { valdaLeveranser });
+  const res = L.forberedUnderlag(s, gruppId, { valdaLeveranser, projectId });
   if (!res.ok) return visa(res.besked);
   const clientId = res.grupp.clientId;
-  const referens = {
-    id: res.underlag.id, clientId, period: res.grupp.period, billingCompany: res.grupp.billingCompany, status: 'prepared',
-    nettoOre: res.underlag.nettoOre, momsOre: res.underlag.momsOre,
-    attBetalaOre: res.underlag.attBetalaOre,
-    invoiceNumber: null, klarmarkeradAt: null,
-  };
-  s = { ...s, poster: res.poster, invoiceRecords: [...(s.invoiceRecords || []), referens] };
-  s = { ...s, deliverables: res.leveranser };
-  spara();
+  const referens = null;
   kopierat = false;
   ark = {
     typ: 'underlag',
@@ -1665,9 +1752,35 @@ function skapaUnderlag(gruppId, valdaLeveranser) {
     text: L.lundifyText(s, res.underlag),
     period: L.underlagsPeriod(res.underlag),
     underlag: res.underlag,
+    gruppId, valdaLeveranser, projectId, version: L.kontrollversion(s, res.underlag),
     referens,
   };
   rita();
+}
+
+function sparaForberett() {
+  if (!ark || ark.referens) return;
+  const res = L.sparaForberett(s, ark.gruppId, ark.valdaLeveranser, ark.version, { projectId: ark.projectId });
+  if (!res.ok) return visa(res.besked);
+  s = res.state; spara(); oppnaSparatUnderlag(res.referens.id);
+}
+
+function aterrapporteraDokument(kind) {
+  if (!ark?.referens) return;
+  const falt = name => document.querySelector(`[data-falt="${name}"]`)?.value || '';
+  const netto = falt('kontrollnetto').trim().replace(/\s/g, '').replace(',', '.');
+  if (!/^\d+(?:\.\d{1,2})?$/.test(netto)) return visa('Ange kontrollerat nettobelopp i kronor.');
+  if (!window.confirm('Har du kontrollerat rätt bolag och kund, alla rader, moms och avrundning i Lundify? Detta sparar endast en avstämning i appen.')) return;
+  const res = L.kontrolleraDokument(s, ark.referens.id, { kind, reference: falt('dokumentreferens'), customerId: falt('lundifykund'), nettoOre: Math.round(Number(netto) * 100), invoiceDate: falt('fakturadatum'), confirmed: true });
+  if (!res.ok) return visa(res.besked);
+  s = res.state; spara(); oppnaSparatUnderlag(ark.referens.id);
+}
+
+function nyUnderlagsversion(id) {
+  if (!window.confirm('Den sparade versionen bevaras. Tidigare avstämning blir inaktuell och eventuellt Lundify-utkast måste kontrolleras igen. Fortsätt?')) return;
+  const res = L.oppnaNyVersion(s, id);
+  if (!res.ok) return visa(res.besked);
+  s = res.state; spara(); ark = null; visa('Versionen är bevarad. Gör ändringen och skapa ett nytt underlag.');
 }
 
 function oppnaSparatUnderlag(id) {
@@ -1709,7 +1822,7 @@ function angraOverforing(id) {
   const kund = L.kundFor(s, referens?.clientId)?.name ?? 'kunden';
   if (!window.confirm(
     `Öppna underlaget för ${kund} för rättning? Registreringarna blir redigerbara igen. Ingenting ändras i Lundify.`)) return;
-  const res = L.angraOverforing(s, id);
+  const res = L.oppnaNyVersion(s, id);
   if (!res.ok) return visa(res.besked);
   s = res.state; spara(); ark = null;
   const antal = res.antalPoster + res.antalLeveranser;
@@ -1747,7 +1860,7 @@ export function startaApp(opts) {
   };
   tidigareUppdrag = opts.tidigareUppdrag ?? [];
   historikForslag = opts.historikForslag ?? null;
-  s = L.normaliseraTillstand(opts.tillstand);
+  s = opts.tillstand; // Läsning får inte härleda eller skriva om äldre fakturastatusar.
   sparlage = 'sparat';
   clearTimeout(sparTimer);
   sparRevision = 0;

@@ -26,9 +26,9 @@ body{font-family:'Outfit',system-ui,-apple-system,sans-serif;background:var(--wa
 }
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 button:active{transform:scale(.98)}
-input,select{font-family:inherit;font-size:17px;padding:14px 16px;border:1.5px solid var(--border);
+input,select,textarea{font-family:inherit;font-size:17px;padding:14px 16px;border:1.5px solid var(--border);
   border-radius:12px;background:var(--kort);color:var(--text);width:100%}
-input:focus,select:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 3px rgba(94,115,104,.15)}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 3px rgba(94,115,104,.15)}
 
 .testbanner{background:var(--accent);color:#fff;padding:10px 16px;font-size:13px;font-weight:600;
   display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -202,7 +202,7 @@ pre.underlag{background:var(--warm);border:1px solid var(--border);border-radius
 
 .underlagrader{margin-top:6px}
 .ulrad{display:grid;grid-template-columns:1fr auto;gap:2px 14px;padding:12px 0;border-bottom:1px solid var(--sage-ghost)}
-.ulnamn{font-size:16px;font-weight:600}
+.ulnamn{font-size:16px;font-weight:600;overflow-wrap:anywhere}
 .ulunder{font-size:13px;color:var(--text-muted);grid-column:1}
 .ulbelopp{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;grid-row:1;grid-column:2;white-space:nowrap}
 

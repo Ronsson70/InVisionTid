@@ -193,7 +193,7 @@ test('rendering: Uppföljning visar tid och kronor på egna rader', () => {
   assert.match(html, /Arbetad tid/);
   assert.match(html, /Jobbat in/);
   assert.match(html, /Redo för Lundify/);
-  assert.match(html, /Klart i Lundify/);
+  assert.match(html, /Äldre manuell klarmarkering, ej verifierad/);
   assert.match(html, />Resor</);
   assert.match(html, />Utlägg</);
   assert.ok(!/Betalt enligt Lundify/.test(html), 'betalstatus ska vara borttagen ur första versionen');

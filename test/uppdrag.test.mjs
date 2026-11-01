@@ -239,7 +239,7 @@ test('ett låst fastpris kan inte rättas förrän underlaget flyttats tillbaka'
   assert.equal(JSON.stringify(s), fore, 'indata får inte delvis ändras när valideringen stoppar');
 });
 
-test('arbetstid per tillfälle rättar öppna pass men ändrar inte fakturakvantiteten', () => {
+test('ändrad standardtid gäller framtida pass och skriver aldrig om historik', () => {
   const session = { ...artikel('a-pass', 'u1', 'session', 'pass'), unitPriceOre: 240000 };
   const s = {
     ...grund(),
@@ -257,7 +257,7 @@ test('arbetstid per tillfälle rättar öppna pass men ändrar inte fakturakvant
     leveranser: [],
   });
   assert.equal(ut.articles.find(a => a.id === 'a-pass').workSecondsPerUnit, 10800);
-  assert.equal(ut.poster.find(p => p.id === 'oppet').seconds, 10800);
+  assert.equal(ut.poster.find(p => p.id === 'oppet').seconds, null);
   assert.equal(ut.poster.find(p => p.id === 'oppet').qtyMilli, 1000);
   assert.equal(ut.poster.find(p => p.id === 'klart').seconds, 5400);
   assert.equal(L.fakturerbartOre(ut, [ut.poster.find(p => p.id === 'oppet')]), 240000);

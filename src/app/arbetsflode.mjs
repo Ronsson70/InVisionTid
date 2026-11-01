@@ -1,3 +1,4 @@
+import { faktureringsprofil } from './faktureringsprofil.mjs';
 import { radbeloppOre } from '../domain/pengar.mjs';
 
 export const FORETAG = ['In Vision Järvsö AB', 'Järvsö IK Event AB'];
@@ -32,23 +33,43 @@ export function kopplaUnderlagsForetag(s, ids) {
 // Detta är presentationsrader. Originalbesöken och prisögonblicksbilden behålls.
 export function fakturarader(s, underlag) {
   const resor = new Map();
+  const samtal = new Map();
   const rader = [];
   for (const rad of underlag.rader) {
     const post = s.poster.find(p => p.id === rad.sourceId);
+    const profile = faktureringsprofil(s, rad.projectId);
+    const article = s.articles.find(a => a.id === post?.articleId);
     if (rad.sourceType === 'trip') {
-      const key = `${rad.unit}|${rad.unitPriceOre}|${rad.vatRate}`;
-      const r = resor.get(key) || { ...rad, beskrivning: `Resor för arbete ${underlag.period || ''}`.trim(), qtyMilli: 0, nettoOre: 0, sourceIds: [] };
+      const purpose = faktureringsprofil(s, rad.projectId).travelGrouping === 'purpose';
+      const label = purpose ? ({ session: 'Passresor', conversation: 'Samtalsresor', other: 'Övriga resor' }[post?.travelPurpose] || 'Resor – ändamål behöver verifieras') : 'Resor för arbete';
+      const key = `${rad.projectId}|${post?.travelPurpose || ''}|${rad.unit}|${rad.unitPriceOre}|${rad.vatRate}`;
+      const r = resor.get(key) || { ...rad, beskrivning: `${label} ${underlag.period || ''}`.trim(), qtyMilli: 0, nettoOre: 0, sourceIds: [] };
       r.qtyMilli += rad.qtyMilli;
       r.nettoOre += rad.nettoOre;
       r.sourceIds.push(rad.sourceId);
       resor.set(key, r);
     } else {
-      const delar = [rad.datum, rad.beskrivning];
-      if (post?.anteckning && !rad.beskrivning.includes(post.anteckning)) delar.push(post.anteckning);
+      const title = article?.type === 'session' ? profile.sessionLabel || rad.beskrivning : rad.beskrivning;
+      const delar = [rad.datum, title, title !== rad.beskrivning ? rad.beskrivning : null];
+      const kundtext = post?.customerText ?? post?.anteckning; // äldre fält var kundens arbetsbeskrivning
+      if (kundtext && !title.includes(kundtext)) delar.push(kundtext);
       if (post?.consultedWith) delar.push(`Utfört i samråd med ${post.consultedWith}`);
       if (post?.performedBy) delar.push(`Utförare: ${post.performedBy}`);
-      rader.push({ ...rad, beskrivning: delar.filter(Boolean).join(' · ') });
+      const decorated = { ...rad, beskrivning: delar.filter(Boolean).join(' · ') };
+      if (article?.type === 'hourly' && profile.hourlyGrouping === 'dated') {
+        const key = `${rad.projectId}|${rad.unit}|${rad.unitPriceOre}|${rad.vatRate}`;
+        const group = samtal.get(key) || { ...rad, label: profile.hourlyLabel || 'Timarbete', qtyMilli: 0, nettoOre: 0, sourceIds: [], originals: [] };
+        group.qtyMilli += rad.qtyMilli; group.nettoOre += rad.nettoOre;
+        group.sourceIds.push(rad.sourceId); group.originals.push(decorated);
+        samtal.set(key, group);
+      } else rader.push(decorated);
     }
+  }
+  for (const group of samtal.values()) {
+    const { originals, label, ...row } = group;
+    if (radbeloppOre(row.unitPriceOre, row.qtyMilli) !== row.nettoOre) { rader.push(...originals); continue; }
+    const dates = [...originals].sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
+    rader.push({ ...row, beskrivning: `${label}: ${dates.map(r => `${r.beskrivning} (${String(r.qtyMilli / 1000).replace('.', ',')} ${r.unit})`).join('; ')}` });
   }
   // Olika priser/moms hålls isär. Öresavrundning måste också bli densamma.
   for (const r of resor.values()) {
@@ -72,9 +93,9 @@ export function registreraUtlagg(s, indata, id) {
   const articleId = `utlagg-${id}`;
   return {
     ...s,
-    articles: [...s.articles, { id: articleId, projectId: project.id, name: 'Material utan påslag', type: 'piece', unit: 'kr', unitPriceOre: 100, vatRate: invoiceVat, vatStatus: 'reviewed', billable: true, active: true }],
+    articles: [...s.articles, { id: articleId, projectId: project.id, name: 'Material utan påslag', type: 'piece', unit: 'kr', unitPriceOre: 100, vatRate: invoiceVat, vatStatus: 'reviewed', billable: indata.rebill !== 'no', active: true }],
     poster: [...s.poster, { id, projectId: project.id, articleId, date: indata.date, beskrivning: String(indata.description).trim(), qtyMilli: netOre * 10, seconds: 0, sourceType: 'expense', status: 'open', invoiceRecordId: null, priceSnapshot: null,
-      receiptGrossOre: grossOre, receiptVatOre: grossOre - netOre, receiptVatRate: receiptVat, paidBy: indata.paidBy || 'company', receiptImage: indata.receiptImage || null, reimbursementStatus: 'unreviewed' }],
+      rebill: indata.rebill !== 'no', receiptGrossOre: grossOre, receiptVatOre: grossOre - netOre, receiptVatRate: receiptVat, paidBy: indata.paidBy || 'company', receiptImage: indata.receiptImage || null, reimbursementStatus: 'unreviewed' }],
   };
 }
 
