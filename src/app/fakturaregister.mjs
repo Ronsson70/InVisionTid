@@ -50,3 +50,25 @@ export function fakturafacit(s, month, company='') {
   const registered=all.filter(r=>r.status==='registered');
   return {records,coverage,coveredMonth:coverage.some(c=>c.from.slice(0,7)<=month && c.to.slice(0,7)>=month),allNetOre:registered.reduce((n,r)=>n+r.netOre,0),allCount:registered.length,netOre:records.reduce((a,r)=>a+r.netOre,0),vatOre:records.reduce((a,r)=>a+r.vatOre,0),totalOre:records.reduce((a,r)=>a+r.totalOre,0),hasRegister:true};
 }
+
+/** Explicit matchning, aldrig namnmatchning eller en ny faktura. */
+export function kopplaDelbetalning(s, id, invoiceNumber, customerNumber, {nu = new Date().toISOString()} = {}) {
+  const l = s.deliverables?.find(x => x.id === id);
+  const p = s.projects?.find(x => x.id === l?.projectId);
+  const c = s.clients?.find(x => x.id === p?.clientId);
+  if (!l || !p || !c || l.billingDisabled || l.invoiceRecordId) fail('Delen saknas, är spärrad eller ligger redan i ett underlag.');
+  const matches = (s.lundifyLedger?.records || []).filter(r => r.billingCompany === p.billingCompany && r.invoiceNumber === invoiceNumber);
+  if (matches.length !== 1) fail('En entydig registrerad faktura i rätt bolag krävs.');
+  const r = matches[0]; validateRecord(r, s);
+  if (r.kind !== 'invoice' || r.customer.number !== customerNumber || !text(customerNumber)) fail('Bekräfta rätt kundnummer i Lundify.');
+  if (r.netOre !== l.amountOre || r.vatOre !== Math.round(l.amountOre * l.vatRate / 10000)) fail('Delens belopp och moms måste stämma med hela fakturan.');
+  if ((r.underlagIds || []).length) fail('Fakturan är redan kopplad till ett underlag.');
+  const refs = (s.deliverables || []).filter(x => x.ledgerReference?.billingCompany === r.billingCompany && x.ledgerReference?.invoiceNumber === r.invoiceNumber);
+  if (refs.some(x => x.id !== id)) fail('Fakturan är redan kopplad till en annan del.');
+  if (l.ledgerReference) {
+    if (l.ledgerReference.billingCompany === r.billingCompany && l.ledgerReference.invoiceNumber === r.invoiceNumber && l.ledgerReference.clientId === c.id && l.ledgerReference.customerNumber === customerNumber) return s;
+    fail('Befintlig fakturakoppling får inte skrivas över.');
+  }
+  if ((s.deliverables || []).some(x => x.ledgerReference?.billingCompany === r.billingCompany && x.ledgerReference?.clientId === c.id && x.ledgerReference.customerNumber !== customerNumber)) fail('Kundnumret motsäger en tidigare verifierad koppling.');
+  return {...s, deliverables:s.deliverables.map(x => x.id === id ? {...x, status:'invoiced', ledgerReference:{billingCompany:r.billingCompany,invoiceNumber:r.invoiceNumber,invoiceDate:r.invoiceDate,customerNumber,clientId:c.id,netOre:r.netOre,vatOre:r.vatOre,verifiedAt:nu,previousStatus:x.status,previousCompletedAt:x.completedAt ?? null}} : x)};
+}

@@ -403,7 +403,7 @@ export function genomfordaLeveranserForDag(s, datum) {
 }
 
 /** Sant när leveransen hör till ett underlag och därför är låst. */
-export const leveransArLast = leverans => !!leverans?.invoiceRecordId;
+export const leveransArLast = leverans => !!(leverans?.invoiceRecordId || leverans?.ledgerReference);
 
 /** Vad som händer när leveransen markeras genomförd. Visas INNAN bekräftelsen. */
 export function genomforandebesked(leverans) {
@@ -559,7 +559,7 @@ export function underlagsgrupper(s) {
 
   for (const l of s.deliverables || []) {
     if (!arGiltigFastprispost(s, l)) continue;
-    if (l.status !== 'open' || l.invoiceRecordId) continue;
+    if (l.status !== 'open' || l.invoiceRecordId || l.ledgerReference) continue;
     if (!arGenomford(l)) continue;                        // ej genomförd kan inte faktureras
     const u = uppdragFor(s, l.projectId);
     if (!uppdragArFakturerbart(u)) continue;

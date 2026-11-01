@@ -8,7 +8,7 @@
 // varken testdata eller en väg tillbaka till testdata.
 
 import * as L from './logik.mjs';
-import { importeraFakturaregister, fakturafacit } from './fakturaregister.mjs';
+import { importeraFakturaregister, fakturafacit, kopplaDelbetalning } from './fakturaregister.mjs';
 
 const DAGAR = ['Söndag', 'Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lördag'];
 const MANADER = ['januari', 'februari', 'mars', 'april', 'maj', 'juni',
@@ -882,6 +882,15 @@ function arkRedigeraUppdrag() {
       <div class="faltrubrik">Standardresa i kilometer</div>
       <input type="number" inputmode="decimal" data-falt="standardresaKm" value="${esc(valt('standardresaKm', p.defaultTripKm ?? ''))}" placeholder="Kan lämnas tomt">` : ''}
 
+    ${leveranser.map(l => `<div class="avskild"><strong>${esc(l.name)}</strong>
+      <label>Planerat fakturadatum – ${esc(l.name)}<input type="date" data-falt="planerat_${esc(l.id)}" value="${esc(valt(`planerat_${l.id}`, l.plannedInvoiceDate ?? ''))}" ${l.ledgerReference ? 'disabled' : ''}></label>
+      ${l.ledgerReference ? `<p>Registrerad faktura ${esc(l.ledgerReference.invoiceNumber)} · ${esc(l.ledgerReference.invoiceDate)} · kund ${esc(l.ledgerReference.customerNumber)}. Spärrad från ny fakturering.</p>` : `<details><summary>Koppla redan registrerad faktura – ${esc(l.name)}</summary>
+        <p>Välj endast fakturan som avser denna del. Bekräfta att fakturans kund motsvarar ${esc(L.kundNamnForUppdrag(s, p.id))}. Hela fakturans netto och moms måste stämma. Ingen faktura skapas.</p>
+        <label>Registrerad faktura – ${esc(l.name)}<select data-falt="faktura_${esc(l.id)}"><option value="">Ingen koppling</option>${(s.lundifyLedger?.records || []).filter(r => r.billingCompany === p.billingCompany && r.kind === 'invoice' && r.netOre === l.amountOre).map(r => `<option value="${esc(r.invoiceNumber)}" ${valt(`faktura_${l.id}`, '') === r.invoiceNumber ? 'selected' : ''}>${esc(r.invoiceNumber)} · ${esc(r.customer.name)} · kund ${esc(r.customer.number)} · ${esc(r.invoiceDate)}</option>`).join('')}</select></label>
+        <label>Bekräftat Lundifykundnummer – ${esc(l.name)}<input data-falt="kundnummer_${esc(l.id)}" value="${esc(valt(`kundnummer_${l.id}`, ''))}"></label>
+      </details>`}
+    </div>`).join('')}
+    <p class="notis">Planerat fakturadatum styr planen. Arbetsperioden nedan styr endast fördelat arbetsvärde. Registrerat fakturadatum ändras aldrig här.</p>
     ${harDelbetalningar ? '<details><summary>Ändra delbelopp, arbetsperiod eller moms</summary>' : ''}
     ${leveranser.map(l => {
       const last = !!l.invoiceRecordId;
@@ -965,7 +974,7 @@ function arkAndraLeverans() {
     <div class="beloppforhand">${esc(kr(l.amountOre))}<small>exklusive moms, enligt avtalet</small></div>
     <div class="faltrubrik">Vilken dag genomfördes den?</div>
     <input type="date" data-falt="datum" value="${esc(l.completedAt ?? idag())}" ${last ? 'disabled' : ''}>
-    ${last
+    ${l.ledgerReference ? `<div class="notis">Registrerad faktura ${esc(l.ledgerReference.invoiceNumber)} · ${esc(l.ledgerReference.invoiceDate)}. Rättelse kräver avstämning mot Lundify.</div><button class="avbryt" data-stang="knapp">Stäng</button>` : last
       ? `<div class="varning"><strong>Leveransen ligger i ett underlag som är klart i Lundify.</strong>
            Öppna underlaget för rättning om du behöver ändra.</div>
          <button class="primar" data-angra="${esc(l.invoiceRecordId)}">Öppna underlaget för rättning</button>
@@ -1583,6 +1592,7 @@ function sparaNyArtikel(id) {
 }
 
 function sparaUppdrag(id) {
+  if (sparlage !== 'sparat') return visa('Vänta tills Sparat visas.');
   const p = L.uppdragFor(s, id);
   if (!p) return visa('Uppdraget finns inte längre.');
   const prisartiklar = (s.articles || [])
@@ -1602,25 +1612,31 @@ function sparaUppdrag(id) {
       pris: ark[`leveranspris_${l.id}`] ?? prisvarde(l.amountOre),
       startDate: ark[`leveransstart_${l.id}`] ?? l.startDate,
       endDate: ark[`leveransslut_${l.id}`] ?? l.endDate,
+      plannedInvoiceDate: ark[`planerat_${l.id}`] ?? l.plannedInvoiceDate,
       vatRate: ark[`leveransmoms_${l.id}`] ?? l.vatRate,
     }));
   try {
     if ((ark.billingCompany ?? p.billingCompany) !== p.billingCompany && ([...s.poster, ...(s.deliverables || [])].some(x => x.projectId === id && x.invoiceRecordId) || (s.invoiceRecords || []).some(r => r.snapshot?.rader.some(row => row.projectId === id)))) throw new Error('Uppdraget har sparade underlag. Skapa ett separat uppdrag för ett annat fakturerande bolag.');
     const terms = ark.profileTerms ?? p.billingProfile?.paymentTermsDays ?? '';
     if (String(terms) !== '' && (!/^\d+$/.test(String(terms)) || Number(terms) > 365)) throw new Error('Ange betalningsvillkor i hela dagar, högst 365, eller lämna tomt.');
-    s = L.uppdateraUppdrag(s, id, {
+    let next = L.uppdateraUppdrag(s, id, {
       name: ark.uppdragsnamn ?? p.name,
       clientId: ark.clientId ?? p.clientId,
       defaultTripKm: ark.standardresaKm ?? p.defaultTripKm ?? '',
       artiklar: prisartiklar,
       leveranser,
     });
-    s = { ...s, projects: s.projects.map(u => u.id === id ? { ...u, billingCompany: ark.billingCompany ?? p.billingCompany ?? null, billingProfile: {
+    next = { ...next, projects: next.projects.map(u => u.id === id ? { ...u, billingCompany: ark.billingCompany ?? p.billingCompany ?? null, billingProfile: {
       paymentTermsDays: String(terms) === '' ? null : Number(terms),
       customerReference: String(ark.profileReference ?? p.billingProfile?.customerReference ?? '').trim(),
       invoiceText: String(ark.profileText ?? p.billingProfile?.invoiceText ?? '').trim(),
       vatText: String(ark.profileVatText ?? p.billingProfile?.vatText ?? '').trim(),
     } } : u) };
+    const links = leveranser.filter(l => ark[`faktura_${l.id}`]);
+    if (links.length && !lagring?.version?.eTag) throw new Error('Versionsskyddad OneDrive-lagring krävs för fakturakoppling.');
+    for (const l of links) next = kopplaDelbetalning(next, l.id, ark[`faktura_${l.id}`], String(ark[`kundnummer_${l.id}`] ?? '').trim());
+    if (leveranser.some(l => s.deliverables.find(x => x.id === l.id)?.ledgerReference) && (next.projects.find(u=>u.id===id).billingCompany !== p.billingCompany || next.projects.find(u=>u.id===id).clientId !== p.clientId)) throw new Error('Registrerade fakturakopplingar låser kund och bolag.');
+    s = next;
     spara(); ark = { typ: 'uppdrag' };
     visa('Uppdragets priser och villkor är sparade.');
   } catch (e) { visa(e.message); }

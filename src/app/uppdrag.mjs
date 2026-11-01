@@ -124,7 +124,7 @@ export function uppdateraUppdrag(tillstand, projectId, indata) {
     throw new Error('Den valda kunden finns inte längre.');
   }
 
-  if (clientId !== befintligt.clientId && ([...(tillstand.poster || []), ...(tillstand.deliverables || [])].some(p => p.projectId === projectId && p.invoiceRecordId) || (tillstand.invoiceRecords || []).some(r => r.snapshot?.rader.some(row => row.projectId === projectId)))) throw new Error('Uppdraget har sparade underlag. Kundbyte kräver ett separat uppdrag.');
+  if (clientId !== befintligt.clientId && ([...(tillstand.poster || []), ...(tillstand.deliverables || [])].some(p => p.projectId === projectId && (p.invoiceRecordId || p.ledgerReference)) || (tillstand.invoiceRecords || []).some(r => r.snapshot?.rader.some(row => row.projectId === projectId)))) throw new Error('Uppdraget har sparade underlag. Kundbyte kräver ett separat uppdrag.');
 
   const artikelAndringar = new Map((indata?.artiklar || []).map(a => [a.id, a]));
   for (const id of artikelAndringar.keys()) {
@@ -164,6 +164,9 @@ export function uppdateraUppdrag(tillstand, projectId, indata) {
     const startDate = text(andring.startDate);
     const endDate = text(andring.endDate);
     const vatRate = Number(andring.vatRate);
+    const plannedInvoiceDate = andring.plannedInvoiceDate === undefined ? l.plannedInvoiceDate : text(andring.plannedInvoiceDate) || null;
+    if (plannedInvoiceDate && !giltigtDatum(plannedInvoiceDate)) throw new Error('Välj ett giltigt planerat fakturadatum.');
+    if (l.ledgerReference && (amountOre !== l.amountOre || vatRate !== l.vatRate || plannedInvoiceDate !== l.plannedInvoiceDate)) throw new Error('Registrerad faktura: belopp, moms och faktureringsplan är låsta.');
     if (!giltigtDatum(startDate) || !giltigtDatum(endDate)) {
       throw new Error(`Välj start- och slutdatum för ${l.name}.`);
     }
@@ -174,7 +177,9 @@ export function uppdateraUppdrag(tillstand, projectId, indata) {
     if (l.invoiceRecordId && ekonominAndras) {
       throw new Error(`${l.name} ligger i ett Lundify-underlag. Flytta tillbaka underlaget först.`);
     }
-    return { ...l, amountOre, startDate, endDate, vatRate, vatStatus: 'reviewed', needsReview: false };
+    const periodChanged = startDate !== l.startDate || endDate !== l.endDate || plannedInvoiceDate !== l.plannedInvoiceDate;
+    const history = periodChanged ? {scheduleHistory:[...(l.scheduleHistory || []), {changedAt:new Date().toISOString(),startDate:l.startDate,endDate:l.endDate,plannedInvoiceDate:l.plannedInvoiceDate ?? null}]} : {};
+    return { ...l, ...history, amountOre, startDate, endDate, ...(plannedInvoiceDate !== undefined ? {plannedInvoiceDate} : {}), vatRate, vatStatus: 'reviewed', needsReview: false };
   });
 
   const harResa = articles.some(a => a.projectId === projectId && a.type === 'travel');

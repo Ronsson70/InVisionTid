@@ -117,6 +117,7 @@ export function byggUnderlag({
 
   const valda = new Set(valdaLeveranser);
   const valdaLev = (leveranser || []).filter(l => valda.has(l.id));
+  if (valdaLev.some(l => l.ledgerReference)) throw new Error('Leveransen är redan kopplad till en registrerad faktura.');
 
   const rader = [
     ...fakturerbara.map(({ post, artikel }) => radFranPost(post, artikel)),
