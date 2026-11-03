@@ -95,3 +95,43 @@ test('samma kundnummer får inte verifieras för olika kunder inom samma bolag',
   }
  }
 });
+
+
+test('avstämningsdagen följer Stockholm vid midnatt, sommartid och årsskifte',()=>{
+ const cases=[
+  ['2026-01-15T22:59:59Z','2026-01-15'],
+  ['2026-01-15T23:00:00Z','2026-01-16'],
+  ['2026-07-15T21:59:59Z','2026-07-15'],
+  ['2026-07-15T22:00:00Z','2026-07-16'],
+  ['2026-03-28T22:30:00Z','2026-03-28'],
+  ['2026-03-29T00:59:59Z','2026-03-29'],
+  ['2026-03-29T01:00:00Z','2026-03-29'],
+  ['2026-03-29T22:30:00Z','2026-03-30'],
+  ['2026-10-24T22:30:00Z','2026-10-25'],
+  ['2026-10-25T00:59:59Z','2026-10-25'],
+  ['2026-10-25T01:00:00Z','2026-10-25'],
+  ['2026-10-25T22:30:00Z','2026-10-25'],
+  ['2026-12-31T23:30:00Z','2027-01-01'],
+  ['2026-07-16T00:30:00+02:00','2026-07-16'],
+  ['2026-07-15T18:30:00-04:00','2026-07-16'],
+ ];
+ for(const [nu,expected] of cases){
+  const s=fixture(),before=structuredClone(s),v=review(s,'old',q());
+  const out=save(s,v,{...opts,nu}),r=out.invoiceRecords[0];
+  assert.equal(r.klarmarkeradAt,expected,nu);
+  assert.equal(r.invoiceDate,'2026-10-31');
+  assert.equal(r.checkedAt,nu);assert.equal(r.updatedAt,nu);
+  assert.equal(r.snapshot.reconstructedAt,nu);assert.equal(r.events[0].at,nu);
+  assert.equal(r.events[0].invoiceDate,'2026-10-31');
+  assert.deepEqual(s,before);
+ }
+});
+
+test('befintlig klarmarkeringsdag bevaras vid avstämning nära svensk midnatt',()=>{
+ const s=fixture();s.invoiceRecords[0].klarmarkeradAt='2026-10-31';
+ const v=review(s,'old',q()),nu='2026-11-03T23:30:00Z';
+ const out=save(s,v,{...opts,nu}),r=out.invoiceRecords[0];
+ assert.equal(r.klarmarkeradAt,'2026-10-31');assert.equal(r.checkedAt,nu);
+ assert.equal(r.invoiceDate,'2026-10-31');
+ assert.equal(save(out,v,{...opts,nu:'2026-11-04T23:30:00Z'}),out);
+});

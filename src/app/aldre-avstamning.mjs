@@ -3,6 +3,15 @@ import {hamtaSparatUnderlag, kontrollversion, foretagFor, fakturarader} from './
 import {faktureringsprofil} from './faktureringsprofil.mjs';
 import {fakturafacit} from './fakturaregister.mjs';
 const fail = message => { throw new Error(message); };
+// Kalenderdagen följer svensk tid, oberoende av webbläsarens tidszon.
+const stockholmDate = new Intl.DateTimeFormat('sv-SE', {
+  timeZone:'Europe/Stockholm', calendar:'gregory', numberingSystem:'latn',
+  year:'numeric', month:'2-digit', day:'2-digit',
+});
+const avstamningsdag = nu => {
+  const parts=Object.fromEntries(stockholmDate.formatToParts(new Date(nu)).map(x=>[x.type,x.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+};
 const signature = s => JSON.stringify(s);
 const requestKey = q => JSON.stringify([q.invoiceNumber,q.customerNumber,q.clientId,q.sourceId,q.correction,q.confirmed]);
 export function granskaAldreAvstamning(s, id, q) {
@@ -52,7 +61,7 @@ export function sparaAldreAvstamning(s, review, {eTag,expectedETag,nu=new Date()
   const checked=granskaAldreAvstamning(s,review.id,review.request);
   const q=checked.request, invoice=checked.invoice;
   const observation={type:'legacyReconciled',at:nu,invoiceNumber:invoice.invoiceNumber,invoiceDate:invoice.invoiceDate,customerNumber:invoice.customer.number,clientId:old.clientId,sourceId:q.sourceId,correction:q.correction,originalNote:checked.source.anteckning??null};
-  const record={...old,workflowStatus:'registered',invoiceNumber:invoice.invoiceNumber,invoiceDate:invoice.invoiceDate,documentReference:invoice.invoiceNumber,checkedAt:nu,updatedAt:nu,klarmarkeradAt:old.klarmarkeradAt||nu.slice(0,10),snapshot:{...checked.snapshot,reconstructed:true,reconstructedAt:nu},legacyReconciliation:{requestKey:review.requestKey,originalRecord:structuredClone(old),originalSource:checked.source},events:[...(old.events||[]),observation]};
+  const record={...old,workflowStatus:'registered',invoiceNumber:invoice.invoiceNumber,invoiceDate:invoice.invoiceDate,documentReference:invoice.invoiceNumber,checkedAt:nu,updatedAt:nu,klarmarkeradAt:old.klarmarkeradAt||avstamningsdag(nu),snapshot:{...checked.snapshot,reconstructed:true,reconstructedAt:nu},legacyReconciliation:{requestKey:review.requestKey,originalRecord:structuredClone(old),originalSource:checked.source},events:[...(old.events||[]),observation]};
   record.presentationRows=structuredClone(fakturarader(s,record.snapshot));
   record.lockedVersion=kontrollversion(s,record.snapshot);
   return {...s,invoiceRecords:s.invoiceRecords.map(x=>x.id===old.id?record:x),lundifyLedger:{...s.lundifyLedger,records:s.lundifyLedger.records.map(x=>x===s.lundifyLedger.records.find(y=>y.billingCompany===invoice.billingCompany&&y.invoiceNumber===invoice.invoiceNumber)?{...x,underlagIds:[old.id]}:x)}};
