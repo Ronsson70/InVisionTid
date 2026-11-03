@@ -774,7 +774,7 @@ export function lundifyText(s, underlag) {
     `Källposter: ${underlag.rader.map(r => r.sourceType + ':' + r.sourceId).join(', ')}`,
     sparad ? `Underlagsreferens: ${sparad.id}${sparad.createdAt ? ', sparad ' + sparad.createdAt : ', spartid saknas'}` : 'Förhandsvisning – inte sparad',
     ...(sparad && underlag.reconstructed ? [`Status: ${underlagsStatus(sparad)}`, `Dokumentreferens: ${sparad.documentReference || sparad.invoiceNumber || sparad.lundifyDraftId || 'saknas – behöver avstämmas'}`] : []),
-    ...(underlag.reconstructed ? ['Äldre sparat underlag utan fryst snapshot. Rekonstruerat från nuvarande kopplade poster; historiskt innehåll måste stämmas av.'] : []),
+    ...(underlag.reconstructed ? [sparad?.legacyReconciliation ? `Rekonstruerad snapshot fryst vid avstämning ${sparad.checkedAt}. Fakturadatum ${sparad.invoiceDate}. Redan registrerad faktura; skapa inte en ny.` : 'Äldre sparat underlag utan fryst snapshot. Rekonstruerat från nuvarande kopplade poster; historiskt innehåll måste stämmas av.'] : []),
     ...(underlag.previousDraftReferences ?? (sparad ? [] : (s.invoiceRecords || []).filter(r => r.workflowStatus === 'superseded' && r.lundifyDraftId && r.snapshot?.rader.some(old => underlag.rader.some(row => row.sourceType === old.sourceType && row.sourceId === old.sourceId))).map(r => r.lundifyDraftId))).map(ref => `Tidigare Lundify-utkast: ${ref}. Stäm av och uppdatera samma utkast; skapa inte ett nytt.`),
     period ? `Avser: ${period}` : null,
     '',

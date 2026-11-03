@@ -8,6 +8,7 @@
 // varken testdata eller en väg tillbaka till testdata.
 
 import * as L from './logik.mjs';
+import {granskaAldreAvstamning,sparaAldreAvstamning} from './aldre-avstamning.mjs';
 import { importeraFakturaregister, fakturafacit, kopplaDelbetalning } from './fakturaregister.mjs';
 
 const DAGAR = ['Söndag', 'Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lördag'];
@@ -1168,7 +1169,7 @@ function arkUnderlag() {
   return `
     <p class="notis"><strong>Fakturerar:</strong> ${esc(u.billingCompany || 'Företag inte valt')}<br><strong>Kund:</strong> ${esc(u.clientSnapshot?.name ?? L.kundFor(s, u.clientId)?.name ?? 'Kund inte vald')}</p>
     ${ark.period ? `<div class="notis">Avser ${esc(ark.period)}</div>` : ''}
-    ${u.reconstructed ? '<p class="varning">Äldre sparat underlag utan fryst snapshot. Rader och belopp har rekonstruerats från nuvarande kopplade poster; historiskt innehåll måste stämmas av.</p>' : ''}
+    ${u.reconstructed ? (r?.legacyReconciliation ? `<p class="notis">Rekonstruerad snapshot fryst vid avstämningen ${esc(r.checkedAt)}. Det ursprungliga underlaget och källraderna är bevarade.</p>` : '<p class="varning">Äldre sparat underlag utan fryst snapshot. Rader och belopp har rekonstruerats från nuvarande kopplade poster; historiskt innehåll måste stämmas av.</p>') : ''}
     <div class="underlagrader">
       ${(r?.presentationRows || L.fakturarader(s, u)).map(rad => `<div class="ulrad">
         <div class="ulnamn">${esc(rad.beskrivning)}</div>
@@ -1203,6 +1204,17 @@ function arkUnderlag() {
       ${(r.events || []).filter(e => e.type === 'correctionRequested').map(e => `<p class="varning">${esc(e.at)} · Faktura ${esc(e.originalInvoiceNumber)}: ${esc(e.reason)}</p>`).join('')}
       <label>Vad behöver rättas eller kontrolleras?<textarea data-falt="rattelseorsak">${esc(ark.rattelseorsak || '')}</textarea></label>
       <button class="sekundar" data-rattelsebehov="${esc(r.id)}">Spara rättelsebehov</button></details>` : ''}
+    ${r && !r.workflowStatus && !r.snapshot ? `<details><summary>Stäm av äldre underlag mot registrerad faktura</summary>
+      <p>Kontrollera rätt bolag, mottagare och alla låsta rader mot Lundify. Ingen faktura skapas eller skickas. Fakturadatum hämtas från registret; avstämningen dateras idag.</p>
+      <label>Befintlig registrerad faktura<select data-falt="aldreFaktura"><option value="">Välj faktura</option>${(s.lundifyLedger?.records||[]).filter(x=>x.billingCompany===r.billingCompany && x.kind==='invoice').map(x=>`<option value="${esc(x.invoiceNumber)}" ${ark.aldreFaktura===x.invoiceNumber?'selected':''}>${esc(x.invoiceNumber)} · ${esc(x.customer.name)} · kund ${esc(x.customer.number)} · ${esc(x.invoiceDate)} · ${esc(L.exaktBelopp(x.netOre))}</option>`).join('')}</select></label>
+      <label>Bekräftat kundnummer i Lundify<input data-falt="aldreKund" value="${esc(ark.aldreKund||'')}"></label>
+      <label>Källrad som rättelsen gäller<select data-falt="aldreRad"><option value="">Välj källrad</option>${s.poster.filter(x=>x.invoiceRecordId===r.id).map(x=>`<option value="${esc(x.id)}" ${ark.aldreRad===x.id?'selected':''}>${esc(x.date)} · ${esc(x.id)} · ${esc(x.anteckning||x.description||'')}</option>`).join('')}</select></label>
+      <label>Rättelse till anteckningen<textarea data-falt="aldreText">${esc(ark.aldreText||'')}</textarea></label>
+      <p>Originalanteckningen bevaras på källraden. Rättelsen läggs till i underlagets historik med dagens tidsstämpel.</p>
+      <button data-aldregranska="1">Jag har kontrollerat kund och samtliga rader – granska kopplingen</button>
+      ${ark.aldreReview?`<p>Granskat: faktura ${esc(ark.aldreReview.invoice.invoiceNumber)}, kund ${esc(ark.aldreReview.invoice.customer.name)} (${esc(ark.aldreReview.invoice.customer.number)}), fakturadatum ${esc(ark.aldreReview.invoice.invoiceDate)}, netto ${esc(L.exaktBelopp(ark.aldreReview.invoice.netOre))}. Rättelse: ${esc(ark.aldreReview.request.correction)}</p><button data-aldrespara="1">Spara avstämning och daterad rättelse</button>`:''}
+    </details>`:''}
+    ${(r?.events||[]).filter(x=>x.type==='legacyReconciled').map(x=>`<div class="notis"><strong>Daterad rättelse ${esc(x.at)}</strong><br>Källrad ${esc(x.sourceId)} · Faktura ${esc(x.invoiceNumber)} · fakturadatum ${esc(x.invoiceDate)}<p>${esc(x.correction)}</p><details><summary>Tidigare anteckning, bevarad</summary>${esc(x.originalNote||'Ingen anteckning')}</details></div>`).join('')}
     ${r ? `<div class="notis">Underlags-ID: ${esc(r.id)}${r.documentReference ? ' · Dokument: ' + esc(r.documentReference) : ''}${r.checkedAt ? ' · Avstämt: ' + esc(r.checkedAt) : ''}</div>` : ''}
     <button class="avbryt" data-stang="knapp">Stäng utan att ändra något</button>`;
 }
@@ -1268,7 +1280,7 @@ function rita() {
 
 // ── Händelser ───────────────────────────────────────────────────────────────
 
-const VALJARE = ['registeroppna', 'registergranska', 'registerspara', 'vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara', 'stang', 'post',
+const VALJARE = ['aldregranska','aldrespara','registeroppna', 'registergranska', 'registerspara', 'vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara', 'stang', 'post',
   'faktureringsval', 'fakturaarbete', 'kopplaforetag',
   'sparaandring', 'tabort', 'vecka', 'godkannresa', 'avboj', 'underlag', 'valjleverans', 'kopiera',
   'merinfo', 'borjaom', 'angemoms', 'valjmoms', 'sparamoms',
@@ -1288,6 +1300,17 @@ document.addEventListener('click', e => {
   const t = e.target.closest(VALJARE);
   if (!t) return;
   const d = t.dataset;
+  if (d.aldregranska || d.aldrespara) {
+    try {
+      if(sparlage!=='sparat' || !lagring?.version?.eTag) throw new Error('Sparad, versionsskyddad OneDrive-lagring krävs.');
+      const q={invoiceNumber:ark.aldreFaktura||'',customerNumber:ark.aldreKund||'',clientId:ark.referens.clientId,sourceId:ark.aldreRad||'',correction:ark.aldreText||'',confirmed:true};
+      if(d.aldregranska){ark.aldreReview=granskaAldreAvstamning(s,ark.referens.id,q);ark.aldreInput=JSON.stringify(q);ark.aldreETag=lagring.version.eTag;return rita();}
+      if(!ark.aldreReview || JSON.stringify(q)!==ark.aldreInput) throw new Error('Formuläret har ändrats. Granska igen.');
+      const next=sparaAldreAvstamning(s,ark.aldreReview,{eTag:lagring.version.eTag,expectedETag:ark.aldreETag});
+      if(next===s)return visa('Avstämningen är redan sparad.');
+      s=next;spara();oppnaSparatUnderlag(ark.referens.id);return;
+    }catch(error){return visa(error.message);}
+  }
   if (d.registeroppna) { ark = {typ:'fakturaregister',rubrik:'Verifierat fakturaregister',registerJson:''}; return rita(); }
   if (d.registergranska || d.registerspara) {
     try {
