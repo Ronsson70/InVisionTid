@@ -9,6 +9,7 @@
 
 import * as L from './logik.mjs';
 import {granskaAldreAvstamning,sparaAldreAvstamning} from './aldre-avstamning.mjs';
+import {granskaGruppavstamning,sparaGruppavstamning} from './gruppavstamning.mjs';
 import { importeraFakturaregister, fakturafacit, kopplaDelbetalning } from './fakturaregister.mjs';
 
 const DAGAR = ['Söndag', 'Måndag', 'Tisdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lördag'];
@@ -1163,13 +1164,34 @@ function arkMoms() {
     <button class="avbryt" data-stang="knapp">Avbryt</button>`;
 }
 
+function arkGruppavstamning() {
+  const anchor=ark.anchor;
+  const candidates=s.invoiceRecords.filter(r=>r.billingCompany===anchor.billingCompany && r.clientId===anchor.clientId && r.period===anchor.period && !r.groupReconciliation && (!r.workflowStatus || ['prepared','registered'].includes(r.workflowStatus)));
+  const v=ark.gruppReview;
+  return `<p class="notis">${esc(anchor.billingCompany)} · ${esc(L.kundFor(s,anchor.clientId)?.name)} · arbetsmånad ${esc(anchor.period)}. Välj hela gruppen som hör till samma registrerade faktura. Ingen faktura skapas eller skickas.</p>
+    <p>Varje underlag behåller sina belopp, tider, resor och tidigare avstämningsdatum. Fakturan räknas en gång i fakturaregistret.</p>
+    ${candidates.map(r=>`<button class="sekundar" data-gruppval="${esc(r.id)}" aria-pressed="${ark.gruppIds.includes(r.id)}">${ark.gruppIds.includes(r.id)?'✓ ':''}${esc(r.id)} · ${esc(r.period)} · netto ${esc(L.exaktBelopp(r.nettoOre))} · moms ${esc(L.exaktBelopp(r.momsOre))} · totalt ${esc(L.exaktBelopp(r.attBetalaOre))}${r.invoiceNumber?' · faktura '+esc(r.invoiceNumber):''}${r.checkedAt?' · tidigare avstämt '+esc(r.checkedAt):''}</button>`).join('')}
+    <label>Gemensam registrerad faktura<select data-falt="gruppFaktura"><option value="">Välj faktura</option>${(s.lundifyLedger?.records||[]).filter(x=>x.billingCompany===anchor.billingCompany && x.kind==='invoice').map(x=>`<option value="${esc(x.invoiceNumber)}" ${ark.gruppFaktura===x.invoiceNumber?'selected':''}>${esc(x.invoiceNumber)} · ${esc(x.customer.name)} · kund ${esc(x.customer.number)} · ${esc(x.invoiceDate)} · netto ${esc(L.exaktBelopp(x.netOre))} · arbetsperiod ${esc(x.workPeriod.description)}</option>`).join('')}</select></label>
+    <label>Bekräftat kundnummer i Lundify<input data-falt="gruppKund" value="${esc(ark.gruppKund||'')}"></label>
+    <label>Bekräftad arbetsmånad<input type="month" data-falt="gruppPeriod" value="${esc(ark.gruppPeriod||'')}"></label>
+    <label>Avstämningsanteckning<textarea data-falt="gruppNotering">${esc(ark.gruppNotering||'')}</textarea></label>
+    <button data-gruppgranska="1">Jag har kontrollerat kund, arbetsmånad och samtliga rader – granska gruppen</button>
+    ${v?`<div class="notis"><strong>Granskat: ${v.ids.length} underlag → faktura ${esc(v.invoice.invoiceNumber)}</strong><p>Kund ${esc(v.invoice.customer.name)} (${esc(v.invoice.customer.number)}) · fakturadatum ${esc(v.invoice.invoiceDate)}</p>
+      <p>Summa underlag: netto ${esc(L.exaktBelopp(v.totals.netOre))}, moms ${esc(L.exaktBelopp(v.totals.vatOre))}, avrundning ${esc(L.exaktBelopp(v.totals.roundingOre))}, totalt ${esc(L.exaktBelopp(v.totals.totalOre))}.</p>
+      <p>Fakturan: netto ${esc(L.exaktBelopp(v.invoice.netOre))}, moms ${esc(L.exaktBelopp(v.invoice.vatOre))}, avrundning ${esc(L.exaktBelopp(v.invoice.roundingOre))}, totalt ${esc(L.exaktBelopp(v.invoice.totalOre))}.</p>
+      ${v.members.map(member=>`<details><summary>Granska rader i ${esc(member.id)}</summary>${member.presentationRows.map(row=>`<p>${esc(row.beskrivning)}<br>${esc(L.kvantitetTillText(row.qtyMilli,row.unit))} · à ${esc(L.exaktBelopp(row.unitPriceOre))} · moms ${esc(L.momsText(row.vatRate))} · netto ${esc(L.exaktBelopp(row.nettoOre))}</p>`).join('')}</details>`).join('')}
+      <p>Avrundningsskillnad på gruppnivå: ${esc(L.exaktBelopp(v.roundingDifferenceOre))}. Summa underlag + skillnaden = fakturans total. Underlagens belopp ändras inte.</p>
+      <button data-gruppspara="1">Bekräfta avrundningsskillnad ${esc(L.exaktBelopp(v.roundingDifferenceOre))} och spara gruppavstämning</button></div>`:''}
+    <button data-stang="knapp">Avbryt utan att spara</button>`;
+}
+
 function arkUnderlag() {
   const r = ark.referens;
   const u = ark.underlag;
   return `
     <p class="notis"><strong>Fakturerar:</strong> ${esc(u.billingCompany || 'Företag inte valt')}<br><strong>Kund:</strong> ${esc(u.clientSnapshot?.name ?? L.kundFor(s, u.clientId)?.name ?? 'Kund inte vald')}</p>
     ${ark.period ? `<div class="notis">Avser ${esc(ark.period)}</div>` : ''}
-    ${u.reconstructed ? (r?.legacyReconciliation ? `<p class="notis">Rekonstruerad snapshot fryst vid avstämningen ${esc(r.checkedAt)}. Det ursprungliga underlaget och källraderna är bevarade.</p>` : '<p class="varning">Äldre sparat underlag utan fryst snapshot. Rader och belopp har rekonstruerats från nuvarande kopplade poster; historiskt innehåll måste stämmas av.</p>') : ''}
+    ${u.reconstructed ? (r?.groupReconciliation ? `<p class="notis">Fryst rekonstruerad snapshot. Gemensam faktura avstämd ${esc(r.groupReconciliation.checkedAt)}.</p>` : r?.legacyReconciliation ? `<p class="notis">Rekonstruerad snapshot fryst vid avstämningen ${esc(r.checkedAt)}. Det ursprungliga underlaget och källraderna är bevarade.</p>` : '<p class="varning">Äldre sparat underlag utan fryst snapshot. Rader och belopp har rekonstruerats från nuvarande kopplade poster; historiskt innehåll måste stämmas av.</p>') : ''}
     <div class="underlagrader">
       ${(r?.presentationRows || L.fakturarader(s, u)).map(rad => `<div class="ulrad">
         <div class="ulnamn">${esc(rad.beskrivning)}</div>
@@ -1214,6 +1236,8 @@ function arkUnderlag() {
       <button data-aldregranska="1">Jag har kontrollerat kund och samtliga rader – granska kopplingen</button>
       ${ark.aldreReview?`<p>Granskat: faktura ${esc(ark.aldreReview.invoice.invoiceNumber)}, kund ${esc(ark.aldreReview.invoice.customer.name)} (${esc(ark.aldreReview.invoice.customer.number)}), fakturadatum ${esc(ark.aldreReview.invoice.invoiceDate)}, netto ${esc(L.exaktBelopp(ark.aldreReview.invoice.netOre))}. Rättelse: ${esc(ark.aldreReview.request.correction)}</p><button data-aldrespara="1">Spara avstämning och daterad rättelse</button>`:''}
     </details>`:''}
+    ${r && !r.groupReconciliation && (!r.workflowStatus || ['prepared','registered'].includes(r.workflowStatus)) ? `<button class="sekundar" data-gruppoppna="${esc(r.id)}">Koppla flera underlag till en faktura</button>` : ''}
+    ${r?.groupReconciliation ? `<div class="notis"><strong>Ingår i gemensam faktura ${esc(r.invoiceNumber)}</strong><p>Underlag: ${esc(r.groupReconciliation.underlagIds.join(', '))}. Gruppavstämning ${esc(r.groupReconciliation.checkedAt)}.</p><p>${esc(r.groupReconciliation.note)}</p><p>Avrundningsskillnad för hela gruppen: ${esc(L.exaktBelopp(r.groupReconciliation.roundingDifferenceOre))}. Den läggs inte på detta underlag. Fakturans total räknas en gång i fakturaregistret.</p></div>` : ''}
     ${(r?.events||[]).filter(x=>x.type==='legacyReconciled').map(x=>`<div class="notis"><strong>Daterad rättelse ${esc(x.at)}</strong><br>Källrad ${esc(x.sourceId)} · Faktura ${esc(x.invoiceNumber)} · fakturadatum ${esc(x.invoiceDate)}<p>${esc(x.correction)}</p><details><summary>Tidigare anteckning, bevarad</summary>${esc(x.originalNote||'Ingen anteckning')}</details></div>`).join('')}
     ${r ? `<div class="notis">Underlags-ID: ${esc(r.id)}${r.documentReference ? ' · Dokument: ' + esc(r.documentReference) : ''}${r.checkedAt ? ' · Avstämt: ' + esc(r.checkedAt) : ''}</div>` : ''}
     <button class="avbryt" data-stang="knapp">Stäng utan att ändra något</button>`;
@@ -1222,7 +1246,8 @@ function arkUnderlag() {
 function ritaArk() {
   if (!ark) return '';
   let innehall = '';
-  if (ark.typ === 'fakturaregister') innehall = arkFakturaregister();
+  if (ark.typ === 'gruppavstamning') innehall = arkGruppavstamning();
+  else if (ark.typ === 'fakturaregister') innehall = arkFakturaregister();
   else if (ark.typ === 'mer') innehall = arkMer();
   else if (ark.typ === 'utlagg') innehall = arkUtlagg();
   else if (ark.typ === 'uppdrag') innehall = arkUppdrag();
@@ -1280,7 +1305,7 @@ function rita() {
 
 // ── Händelser ───────────────────────────────────────────────────────────────
 
-const VALJARE = ['aldregranska','aldrespara','registeroppna', 'registergranska', 'registerspara', 'vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara', 'stang', 'post',
+const VALJARE = ['gruppoppna','gruppval','gruppgranska','gruppspara','aldregranska','aldrespara','registeroppna', 'registergranska', 'registerspara', 'vy', 'oppna', 'valjuppdrag', 'antal', 'timmar', 'km', 'spara', 'stang', 'post',
   'faktureringsval', 'fakturaarbete', 'kopplaforetag',
   'sparaandring', 'tabort', 'vecka', 'godkannresa', 'avboj', 'underlag', 'valjleverans', 'kopiera',
   'merinfo', 'borjaom', 'angemoms', 'valjmoms', 'sparamoms',
@@ -1300,6 +1325,28 @@ document.addEventListener('click', e => {
   const t = e.target.closest(VALJARE);
   if (!t) return;
   const d = t.dataset;
+  if(d.gruppoppna) {
+    const anchor=s.invoiceRecords.find(r=>r.id===d.gruppoppna);
+    if(!anchor)return visa('Underlaget saknas.');
+    ark={typ:'gruppavstamning',rubrik:'Flera underlag – en faktura',anchor,gruppIds:[anchor.id],gruppPeriod:anchor.period};return rita();
+  }
+  if(d.gruppval && ark?.typ==='gruppavstamning') {
+    ark.gruppIds=ark.gruppIds.includes(d.gruppval)?ark.gruppIds.filter(id=>id!==d.gruppval):[...ark.gruppIds,d.gruppval];
+    ark.gruppReview=null;return rita();
+  }
+  if(d.gruppgranska || d.gruppspara) {
+    try {
+      if(ark?.typ!=='gruppavstamning')throw new Error('Öppna gruppavstämningen igen.');
+      if(sparlage!=='sparat'||!lagring?.version?.eTag)throw new Error('Sparad, versionsskyddad OneDrive-lagring krävs.');
+      const q={billingCompany:ark.anchor.billingCompany,clientId:ark.anchor.clientId,period:ark.gruppPeriod,invoiceNumber:ark.gruppFaktura||'',customerNumber:ark.gruppKund||'',note:ark.gruppNotering||'',confirmed:true};
+      const input=JSON.stringify([ark.gruppIds,q]);
+      if(d.gruppgranska){ark.gruppReview=granskaGruppavstamning(s,ark.gruppIds,q);ark.gruppInput=input;ark.gruppETag=lagring.version.eTag;return rita();}
+      if(!ark.gruppReview||input!==ark.gruppInput)throw new Error('Formuläret har ändrats. Granska igen.');
+      const next=sparaGruppavstamning(s,ark.gruppReview,{eTag:lagring.version.eTag,expectedETag:ark.gruppETag,confirmedRoundingOre:ark.gruppReview.roundingDifferenceOre});
+      if(next===s)return visa('Gruppavstämningen är redan sparad.');
+      const id=ark.anchor.id;s=next;spara();oppnaSparatUnderlag(id);return;
+    }catch(error){return visa(error.message);}
+  }
   if (d.aldregranska || d.aldrespara) {
     try {
       if(sparlage!=='sparat' || !lagring?.version?.eTag) throw new Error('Sparad, versionsskyddad OneDrive-lagring krävs.');
